@@ -563,25 +563,26 @@ function renderPlayerCareer(player) {
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
     const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
-    const titleY = domains[ri][1] + 0.08;
-    const subtitleY = domains[ri][1] + 0.04;
-    const titleSize = mobile ? 11 : 13;
-    const subSize = mobile ? 8 : 10;
+    const annoY = domains[ri][1] + 0.05;
 
     if (r === 'bat') {
       layout[yName].title = '';
       layout[yName].range = [0, batMax * 1.3];
-      layout.annotations.push(
-        { text: 'Batting Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: titleSize, color: textColor } },
-        { text: mobile ? 'Per 10-match window (min. 10 innings)' : 'Average for each 10-match window (min. 10 batting innings to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: subSize, color: mutedColor } },
-      );
+      const sub = mobile ? 'Per 10-match window (min. 10 innings)' : 'Average for each 10-match window (min. 10 batting innings to qualify)';
+      layout.annotations.push({
+        text: `<b>Batting Average per Stint</b><br><span style="color:${mutedColor};font-size:${mobile ? 9 : 11}px">${sub}</span>`,
+        xref: 'paper', yref: 'paper', x: 0.5, y: annoY, showarrow: false,
+        font: { size: mobile ? 12 : 14, color: textColor },
+      });
     } else if (r === 'bowl') {
       layout[yName].title = '';
       layout[yName].range = [0, bowlMax * 1.3];
-      layout.annotations.push(
-        { text: 'Bowling Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: titleSize, color: textColor } },
-        { text: mobile ? 'Per 10-match window (min. 10 innings) \u2014 lower is better' : 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: subSize, color: mutedColor } },
-      );
+      const sub = mobile ? 'Per 10-match window (min. 10 innings) \u2014 lower is better' : 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better';
+      layout.annotations.push({
+        text: `<b>Bowling Average per Stint</b><br><span style="color:${mutedColor};font-size:${mobile ? 9 : 11}px">${sub}</span>`,
+        xref: 'paper', yref: 'paper', x: 0.5, y: annoY, showarrow: false,
+        font: { size: mobile ? 12 : 14, color: textColor },
+      });
     }
   }
 
