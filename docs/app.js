@@ -552,8 +552,8 @@ function renderPlayerCareer(player) {
     ...plotlyLayout(),
     height: totalRows === 1 ? 350 : totalRows === 2 ? 600 : 820,
     showlegend: hasKDE,
-    legend: { orientation: 'h', y: -0.02, x: 0.5, xanchor: 'center' },
-    margin: { l: 60, r: 30, t: 45, b: 40 },
+    legend: { orientation: 'h', y: -0.06, x: 0.5, xanchor: 'center' },
+    margin: { l: 60, r: 30, t: 45, b: 60 },
     annotations: [],
   };
 
@@ -586,7 +586,7 @@ function renderPlayerCareer(player) {
         { text: '1000 \u00F7 bowling avg for each 10-match window (min. 10 wickets to qualify) \u2014 higher is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
       );
     } else if (r === 'kde') {
-      layout[xName].title = 'Score';
+      layout[xName].title = '';
       layout[yName].title = '';
       layout[yName].showticklabels = false;
       layout.annotations.push(
