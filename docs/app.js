@@ -327,7 +327,7 @@ function renderAlphaTable(category) {
   }
 
   thead.innerHTML = `<tr><th></th>${alphas.map(a =>
-    `<th class="${a === '0.75' ? 'alpha-current' : ''}">\u03b1=${a}</th>`
+    `<th class="${a === '0.7' ? 'alpha-current' : ''}">\u03b1=${a}</th>`
   ).join('')}</tr>`;
 
   let rows = '';
@@ -339,7 +339,7 @@ function renderAlphaTable(category) {
         const p = list[rank];
         const name = p.name.length > 16 ? p.name.slice(0, 15) + '\u2026' : p.name;
         const rating = p[metricKey + '_rating'] || Math.round(p[metricKey]);
-        rows += `<td class="${a === '0.75' ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${rating}</span></td>`;
+        rows += `<td class="${a === '0.7' ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${rating}</span></td>`;
       } else {
         rows += '<td></td>';
       }

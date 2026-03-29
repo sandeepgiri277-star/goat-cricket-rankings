@@ -88,7 +88,7 @@
 
         <h3>Batting Excellence Index (BEI)</h3>
         <div class="formula">
-          BEI = (&sum; stint_bat_avg &times; stint_matches) / M<sup>0.75</sup>
+          BEI = (&sum; stint_bat_avg &times; stint_matches) / M<sup>0.7</sup>
         </div>
         <p>The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.</p>
 
@@ -97,12 +97,12 @@
 
         <h3>Bowling Excellence Index (BoEI)</h3>
         <div class="formula">
-          BoEI = (&sum; bowl_score &times; stint_matches) &times; scale / M<sup>0.75</sup>
+          BoEI = (&sum; bowl_score &times; stint_matches) &times; scale / M<sup>0.7</sup>
         </div>
         <p>Same integral concept as BEI, but for bowling scores. A data-driven scaling factor (<span id="boei-scale-display"></span>) ensures that the average bowling stint contributes equally to the average batting stint, so the two indices are comparable.</p>
 
-        <h3>Why M<sup>0.75</sup>?</h3>
-        <p>The raw integral grows with career length, so we divide by M<sup>&alpha;</sup> (where &alpha; = 0.75) to control <em>how much</em> longevity matters. At &alpha; = 1.0, a 20-Test player averaging 50 and a 180-Test player averaging 50 would rate equally &mdash; career length wouldn't matter at all. At &alpha; = 0.5, the 180-Test player would rate 3&times; higher &mdash; longevity dominates. At &alpha; = 0.75, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.</p>
+        <h3>Why M<sup>0.7</sup>?</h3>
+        <p>The raw integral grows with career length, so we divide by M<sup>&alpha;</sup> (where &alpha; = 0.7) to control <em>how much</em> longevity matters. At &alpha; = 1.0, a 20-Test player averaging 50 and a 180-Test player averaging 50 would rate equally &mdash; career length wouldn't matter at all. At &alpha; = 0.5, the 180-Test player would rate 3&times; higher &mdash; longevity dominates. At &alpha; = 0.7, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.</p>
 
         <div class="alpha-section">
           <h4>Alpha Sensitivity</h4>
