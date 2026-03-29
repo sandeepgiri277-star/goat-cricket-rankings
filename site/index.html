@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Cricket GOAT Rankings</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <h1>Test Cricket GOAT Rankings</h1>
+      <p class="subtitle">Stint-based excellence indices for every Test cricketer with 20+ matches</p>
+      <p class="updated" id="last-updated"></p>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+        <span class="icon-sun">&#9788;</span>
+        <span class="icon-moon">&#9790;</span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="allrounders">Allrounders</button>
+    <button class="tab" data-tab="batting">Batting</button>
+    <button class="tab" data-tab="bowling">Bowling</button>
+    <button class="tab" data-tab="player-lookup">Player Lookup</button>
+    <button class="tab" data-tab="methodology">Methodology</button>
+  </nav>
+
+  <main class="content">
+    <!-- Allrounders Tab -->
+    <section class="tab-panel active" id="panel-allrounders">
+      <h2>Top 25 Test Allrounders</h2>
+      <p class="panel-desc">Ranked by AEI (BEI + BoEI). Must have min(BEI, BoEI) &ge; 25% of AEI.</p>
+      <div class="chart-container" id="chart-allrounders"></div>
+      <div class="table-wrap">
+        <table class="leaderboard" id="table-allrounders">
+          <thead><tr><th>#</th><th>Player</th><th>Country</th><th>BEI</th><th>BoEI</th><th>AEI</th><th>Bal%</th><th>Mat</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Batting Tab -->
+    <section class="tab-panel" id="panel-batting">
+      <h2>Top 25 Test Batters</h2>
+      <p class="panel-desc">Ranked by Batting Excellence Index (BEI) = (&int; stint_bat_avg &middot; dM) / M<sup>0.75</sup></p>
+      <div class="chart-container" id="chart-batting"></div>
+      <div class="table-wrap">
+        <table class="leaderboard" id="table-batting">
+          <thead><tr><th>#</th><th>Player</th><th>Country</th><th>BEI</th><th>Mat</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Bowling Tab -->
+    <section class="tab-panel" id="panel-bowling">
+      <h2>Top 25 Test Bowlers</h2>
+      <p class="panel-desc">Ranked by Bowling Excellence Index (BoEI) = (&int; (1000/stint_bowl_avg) &middot; dM) / M<sup>0.75</sup> &times; scale</p>
+      <div class="chart-container" id="chart-bowling"></div>
+      <div class="table-wrap">
+        <table class="leaderboard" id="table-bowling">
+          <thead><tr><th>#</th><th>Player</th><th>Country</th><th>BoEI</th><th>Mat</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Player Lookup Tab -->
+    <section class="tab-panel" id="panel-player-lookup">
+      <h2>Player Lookup</h2>
+      <p class="panel-desc">Search any Test player to see their stint-by-stint career breakdown.</p>
+      <div class="search-wrap">
+        <input type="text" id="player-search" placeholder="Search player name..." autocomplete="off">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div id="player-card" class="player-card hidden">
+        <div class="player-header" id="player-header"></div>
+        <div class="chart-container" id="chart-player-career"></div>
+      </div>
+    </section>
+
+    <!-- Methodology Tab -->
+    <section class="tab-panel" id="panel-methodology">
+      <div class="methodology">
+        <h2>Methodology</h2>
+
+        <h3>The Problem with Career Averages</h3>
+        <p>Traditional career averages are <strong>cumulative</strong> &mdash; they smooth over an entire career into a single number. This hides crucial information: how <em>consistently</em> did a player perform across different phases of their career? A player who averaged 50 for their first 30 tests then 25 for the next 70 looks the same as someone who averaged 32 throughout.</p>
+
+        <h3>Stint-Based Approach</h3>
+        <p>We divide every career into <strong>10-match stints</strong> and compute batting and bowling averages independently for each stint. If the final leftover is shorter than 10 matches, it gets absorbed into the previous stint (e.g., 71 matches &rarr; stints of 10, 10, 10, 10, 10, 10, 11).</p>
+
+        <h3>Minimum Qualification</h3>
+        <p>Each stint requires &ge; <strong>10 dismissals</strong> for the batting average to count, and &ge; <strong>10 wickets</strong> for the bowling average to count. This filters out part-time batsmen/bowlers and naturally caps outlier stints from not-out inflation.</p>
+
+        <h3>Batting Excellence Index (BEI)</h3>
+        <div class="formula">
+          BEI = (&sum; stint_bat_avg &times; stint_matches) / M<sup>0.75</sup>
+        </div>
+        <p>The integral of batting score over matches, adjusted for career length. Higher batting averages sustained over more matches produce a bigger area under the curve.</p>
+
+        <h3>Bowling Score Transformation</h3>
+        <p>Bowling averages are "lower is better," so we transform them: <strong>bowl_score = 1000 / bowl_avg</strong>. This maps bowling averages to a scale where higher is better: avg 20 &rarr; score 50, avg 25 &rarr; 40, avg 30 &rarr; 33.</p>
+
+        <h3>Bowling Excellence Index (BoEI)</h3>
+        <div class="formula">
+          BoEI = (&sum; bowl_score &times; stint_matches) &times; scale / M<sup>0.75</sup>
+        </div>
+        <p>The raw BoEI is rescaled by a data-driven factor (<span id="boei-scale-display"></span>) so that the average qualifying bowling stint contributes equally to the average qualifying batting stint. This factor is computed from match-weighted means across all players.</p>
+
+        <h3>Career-Length Adjustment (M<sup>0.75</sup>)</h3>
+        <p>All indices are divided by M<sup>&alpha;</sup> where &alpha; = 0.75. This means quality per match matters more than sheer longevity, but long careers are still rewarded. At &alpha; = 0.5 (&radic;M), long careers dominate; at &alpha; = 1.0, it's purely per-match average and career length is irrelevant.</p>
+
+        <div class="alpha-section">
+          <h4>Alpha Sensitivity</h4>
+          <p>How do the top 15 rankings change as &alpha; varies from 0.5 to 1.0?</p>
+          <div class="alpha-tabs" id="alpha-tabs">
+            <button class="alpha-tab active" data-category="allrounder">Allrounders</button>
+            <button class="alpha-tab" data-category="batting">Batting</button>
+            <button class="alpha-tab" data-category="bowling">Bowling</button>
+          </div>
+          <div class="table-wrap">
+            <table class="alpha-table" id="alpha-table">
+              <thead id="alpha-thead"></thead>
+              <tbody id="alpha-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3>Allrounder Excellence Index (AEI)</h3>
+        <div class="formula">
+          AEI = BEI + BoEI
+        </div>
+        <p>A genuine allrounder must have their weaker discipline contribute at least <strong>25%</strong> of their total AEI. This filters out specialists &mdash; Tendulkar (BoEI &approx; 0) and Warne (BEI = 54) don't qualify despite high total scores.</p>
+
+        <h3>Distribution Overview</h3>
+        <p>The density curves below show where all 870 qualifying Test players fall across BEI, BoEI, and AEI.</p>
+        <div class="chart-container" id="chart-kde"></div>
+
+        <h3>Data Source</h3>
+        <p>All data is scraped from <a href="https://stats.espncricinfo.com" target="_blank" rel="noopener">ESPN Cricinfo Statsguru</a>. Player allround cumulative data is cached locally and updated daily.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Data from ESPN Cricinfo &middot; Updated daily &middot; <span id="player-count"></span> Test players analysed</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
