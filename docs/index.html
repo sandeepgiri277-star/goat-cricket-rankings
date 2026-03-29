@@ -7,13 +7,13 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <header class="hero">
     <div class="hero-inner">
       <h1>Test Cricket GOAT Rankings</h1>
-      <p class="subtitle">Stint-based excellence indices for every Test cricketer with 20+ matches</p>
+      <p class="subtitle">Who are the greatest Test cricketers of all time? A data-driven answer.</p>
       <p class="updated" id="last-updated"></p>
       <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
         <span class="icon-sun">&#9788;</span>
@@ -34,48 +34,33 @@
     <!-- Allrounders Tab -->
     <section class="tab-panel active" id="panel-allrounders">
       <h2>Top 25 Test Allrounders</h2>
-      <p class="panel-desc">Ranked by AEI (BEI + BoEI). Must have min(BEI, BoEI) &ge; 25% of AEI.</p>
+      <p class="panel-desc">Players who excelled with both bat and ball across their careers. Click any player to explore their stint-by-stint breakdown.</p>
       <div class="chart-container" id="chart-allrounders"></div>
-      <div class="table-wrap">
-        <table class="leaderboard" id="table-allrounders">
-          <thead><tr><th>#</th><th>Player</th><th>Country</th><th>BEI</th><th>BoEI</th><th>AEI</th><th>Bal%</th><th>Mat</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+      <div class="lb-container" id="table-allrounders"></div>
     </section>
 
     <!-- Batting Tab -->
     <section class="tab-panel" id="panel-batting">
       <h2>Top 25 Test Batters</h2>
-      <p class="panel-desc">Ranked by Batting Excellence Index (BEI) = (&int; stint_bat_avg &middot; dM) / M<sup>0.75</sup></p>
+      <p class="panel-desc">The greatest run-scorers in Test history, ranked by sustained batting excellence across 10-match stints. Click any player to explore their career.</p>
       <div class="chart-container" id="chart-batting"></div>
-      <div class="table-wrap">
-        <table class="leaderboard" id="table-batting">
-          <thead><tr><th>#</th><th>Player</th><th>Country</th><th>BEI</th><th>Mat</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+      <div class="lb-container" id="table-batting"></div>
     </section>
 
     <!-- Bowling Tab -->
     <section class="tab-panel" id="panel-bowling">
       <h2>Top 25 Test Bowlers</h2>
-      <p class="panel-desc">Ranked by Bowling Excellence Index (BoEI) = (&int; (1000/stint_bowl_avg) &middot; dM) / M<sup>0.75</sup> &times; scale</p>
+      <p class="panel-desc">The most dominant wicket-takers in Test history, ranked by sustained bowling excellence across 10-match stints. Click any player to explore their career.</p>
       <div class="chart-container" id="chart-bowling"></div>
-      <div class="table-wrap">
-        <table class="leaderboard" id="table-bowling">
-          <thead><tr><th>#</th><th>Player</th><th>Country</th><th>BoEI</th><th>Mat</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+      <div class="lb-container" id="table-bowling"></div>
     </section>
 
     <!-- Player Lookup Tab -->
     <section class="tab-panel" id="panel-player-lookup">
       <h2>Player Lookup</h2>
-      <p class="panel-desc">Search any Test player to see their stint-by-stint career breakdown.</p>
+      <p class="panel-desc">Search any Test player by name to see their stint-by-stint career breakdown.</p>
       <div class="search-wrap">
-        <input type="text" id="player-search" placeholder="Search player name..." autocomplete="off">
+        <input type="text" id="player-search" placeholder="Search by name (e.g. Warne, Tendulkar, Imran Khan)..." autocomplete="off">
         <div class="search-results" id="search-results"></div>
       </div>
       <div id="player-card" class="player-card hidden">
@@ -139,17 +124,17 @@
         <p>A genuine allrounder must have their weaker discipline contribute at least <strong>25%</strong> of their total AEI. This filters out specialists &mdash; Tendulkar (BoEI &approx; 0) and Warne (BEI = 54) don't qualify despite high total scores.</p>
 
         <h3>Distribution Overview</h3>
-        <p>The density curves below show where all 870 qualifying Test players fall across BEI, BoEI, and AEI.</p>
+        <p>The density curves below show where all qualifying Test players fall across BEI, BoEI, and AEI.</p>
         <div class="chart-container" id="chart-kde"></div>
 
         <h3>Data Source</h3>
-        <p>All data is scraped from <a href="https://stats.espncricinfo.com" target="_blank" rel="noopener">ESPN Cricinfo Statsguru</a>. Player allround cumulative data is cached locally and updated daily.</p>
+        <p>All data is scraped from <a href="https://stats.espncricinfo.com" target="_blank" rel="noopener">ESPN Cricinfo Statsguru</a>. Player data is cached and updated weekly.</p>
       </div>
     </section>
   </main>
 
   <footer>
-    <p>Data from ESPN Cricinfo &middot; Updated daily &middot; <span id="player-count"></span> Test players analysed</p>
+    <p>Data from ESPN Cricinfo &middot; Updated weekly &middot; <span id="player-count"></span> Test players analysed</p>
   </footer>
 
   <script src="app.js"></script>

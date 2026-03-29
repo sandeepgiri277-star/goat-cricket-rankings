@@ -6,11 +6,64 @@ const COLORS = {
   bat: '#636EFA',
   bowl: '#00CC96',
   aei: '#EF553B',
-  batLight: 'rgba(99,110,250,0.35)',
-  bowlLight: 'rgba(0,204,150,0.35)',
+  gold: '#FFD700',
+  silver: '#C0C0C0',
+  bronze: '#CD7F32',
 };
 
 const plotlyConfig = { responsive: true, displayModeBar: false };
+
+// Country code → flag emoji
+const FLAGS = {
+  AUS: '\u{1F1E6}\u{1F1FA}', ENG: '\u{1F1EC}\u{1F1E7}', IND: '\u{1F1EE}\u{1F1F3}',
+  PAK: '\u{1F1F5}\u{1F1F0}', SA: '\u{1F1FF}\u{1F1E6}', WI: '\u{1F3DD}\uFE0F',
+  NZ: '\u{1F1F3}\u{1F1FF}', SL: '\u{1F1F1}\u{1F1F0}', BAN: '\u{1F1E7}\u{1F1E9}',
+  ZIM: '\u{1F1FF}\u{1F1FC}', ICC: '\u{1F3CF}',
+};
+
+function getFlag(country) {
+  if (!country) return '';
+  const primary = country.split('/').pop();
+  return FLAGS[primary] || FLAGS[country.split('/')[0]] || '\u{1F3CF}';
+}
+
+// Known full name → abbreviated name mappings for search
+const FULL_NAMES = {};
+function buildNameIndex() {
+  if (!DATA) return;
+  for (const p of DATA.all_players) {
+    const parts = p.name.split(' ');
+    if (parts.length >= 2) {
+      const surname = parts[parts.length - 1].toLowerCase();
+      if (!FULL_NAMES[surname]) FULL_NAMES[surname] = [];
+      FULL_NAMES[surname].push(p.name);
+    }
+  }
+}
+
+function searchPlayers(query) {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+
+  const words = q.split(/\s+/);
+  const lastName = words[words.length - 1];
+
+  const scored = DATA.all_players.map(p => {
+    const nameLower = p.name.toLowerCase();
+    let score = 0;
+
+    if (nameLower.includes(q)) score += 100;
+    for (const w of words) {
+      if (nameLower.includes(w)) score += 30;
+    }
+    if (nameLower.split(' ').pop() === lastName) score += 50;
+
+    return { player: p, score };
+  }).filter(s => s.score > 0);
+
+  scored.sort((a, b) => b.score - a.score || b.player.AEI - a.player.AEI);
+  return scored.slice(0, 12).map(s => s.player);
+}
 
 function plotlyLayout(overrides = {}) {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -31,6 +84,7 @@ async function loadData() {
   try {
     const resp = await fetch('rankings.json');
     DATA = await resp.json();
+    buildNameIndex();
     renderAll();
     document.body.classList.add('loaded');
   } catch (e) {
@@ -49,7 +103,7 @@ function renderAll() {
   renderBowlingTable();
   renderKDE();
   renderAlphaTable('allrounder');
-  document.getElementById('boei-scale-display').textContent = `×${DATA.metadata.boei_scale}`;
+  document.getElementById('boei-scale-display').textContent = `\u00d7${DATA.metadata.boei_scale}`;
 }
 
 function renderMeta() {
@@ -62,29 +116,31 @@ function renderMeta() {
 
 function renderAllrounderChart() {
   const players = [...DATA.allrounder_top25].reverse();
-  const labels = players.map(p => `${p.name} (${p.country})`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [
     {
       y: labels, x: players.map(p => p.BEI), type: 'bar', orientation: 'h',
-      name: 'BEI', marker: { color: COLORS.bat },
+      name: 'Batting (BEI)', marker: { color: COLORS.bat },
       text: players.map(p => Math.round(p.BEI)), textposition: 'inside',
+      textfont: { color: '#fff', size: 11 },
       hovertemplate: '%{y}<br>BEI: %{x:.0f}<extra></extra>',
     },
     {
       y: labels, x: players.map(p => p.BoEI), type: 'bar', orientation: 'h',
-      name: 'BoEI', marker: { color: COLORS.bowl },
+      name: 'Bowling (BoEI)', marker: { color: COLORS.bowl },
       text: players.map(p => Math.round(p.BoEI)), textposition: 'inside',
+      textfont: { color: '#fff', size: 11 },
       hovertemplate: '%{y}<br>BoEI: %{x:.0f}<extra></extra>',
     },
   ];
 
   const layout = plotlyLayout({
     barmode: 'stack',
-    height: Math.max(500, players.length * 28 + 80),
-    margin: { l: 200, r: 80, t: 10, b: 30 },
-    legend: { orientation: 'h', y: 1.02, x: 1, xanchor: 'right' },
-    xaxis: { title: 'Allrounder Excellence Index' },
+    height: Math.max(550, players.length * 30 + 80),
+    margin: { l: 220, r: 80, t: 10, b: 30 },
+    legend: { orientation: 'h', y: 1.02, x: 1, xanchor: 'right', font: { size: 12 } },
+    xaxis: { title: '' },
   });
 
   Plotly.newPlot('chart-allrounders', traces, layout, plotlyConfig);
@@ -94,20 +150,21 @@ function renderAllrounderChart() {
 
 function renderBattingChart() {
   const players = [...DATA.batting_top25].reverse();
-  const labels = players.map(p => `${p.name} (${p.country})`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
     y: labels, x: players.map(p => p.BEI), type: 'bar', orientation: 'h',
     marker: { color: COLORS.bat },
     text: players.map(p => Math.round(p.BEI)), textposition: 'inside',
+    textfont: { color: '#fff', size: 11 },
     hovertemplate: '%{y}<br>BEI: %{x:.0f}<br>%{customdata} matches<extra></extra>',
     customdata: players.map(p => p.matches),
   }];
 
   const layout = plotlyLayout({
-    height: Math.max(500, players.length * 28 + 80),
-    margin: { l: 200, r: 60, t: 10, b: 30 },
-    xaxis: { title: 'Batting Excellence Index (BEI)' },
+    height: Math.max(550, players.length * 30 + 80),
+    margin: { l: 220, r: 60, t: 10, b: 30 },
+    xaxis: { title: '' },
     showlegend: false,
   });
 
@@ -118,77 +175,98 @@ function renderBattingChart() {
 
 function renderBowlingChart() {
   const players = [...DATA.bowling_top25].reverse();
-  const labels = players.map(p => `${p.name} (${p.country})`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
     y: labels, x: players.map(p => p.BoEI), type: 'bar', orientation: 'h',
     marker: { color: COLORS.bowl },
     text: players.map(p => Math.round(p.BoEI)), textposition: 'inside',
+    textfont: { color: '#fff', size: 11 },
     hovertemplate: '%{y}<br>BoEI: %{x:.0f}<br>%{customdata} matches<extra></extra>',
     customdata: players.map(p => p.matches),
   }];
 
   const layout = plotlyLayout({
-    height: Math.max(500, players.length * 28 + 80),
-    margin: { l: 200, r: 60, t: 10, b: 30 },
-    xaxis: { title: 'Bowling Excellence Index (BoEI)' },
+    height: Math.max(550, players.length * 30 + 80),
+    margin: { l: 220, r: 60, t: 10, b: 30 },
+    xaxis: { title: '' },
     showlegend: false,
   });
 
   Plotly.newPlot('chart-bowling', traces, layout, plotlyConfig);
 }
 
-// ─── Tables ─────────────────────────────────────────────────────────────────
+// ─── Tables (ICC-style) ─────────────────────────────────────────────────────
+
+function medalClass(i) {
+  return i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+}
 
 function renderAllrounderTable() {
-  const tbody = document.querySelector('#table-allrounders tbody');
-  tbody.innerHTML = DATA.allrounder_top25.map((p, i) => `
-    <tr class="${i < 3 ? 'top3' : ''}" data-player="${p.name}">
-      <td class="rank">${i + 1}</td>
-      <td class="name">${p.name}</td>
-      <td class="country">${p.country}</td>
-      <td class="metric">${Math.round(p.BEI)}</td>
-      <td class="metric">${Math.round(p.BoEI)}</td>
-      <td class="metric"><strong>${Math.round(p.AEI)}</strong></td>
-      <td class="metric">${p.balance}%</td>
-      <td class="metric">${p.matches}</td>
-    </tr>
+  const container = document.getElementById('table-allrounders');
+  container.innerHTML = DATA.allrounder_top25.map((p, i) => `
+    <div class="lb-row ${medalClass(i)}" data-player="${p.name}">
+      <div class="lb-rank">${String(i + 1).padStart(2, '0')}</div>
+      <div class="lb-flag">${getFlag(p.country)}</div>
+      <div class="lb-info">
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-country">${p.country} · ${p.matches} matches</div>
+      </div>
+      <div class="lb-scores">
+        <div class="lb-score-item"><span class="lb-score-label">BEI</span><span class="lb-score-val bei">${Math.round(p.BEI)}</span></div>
+        <div class="lb-score-item"><span class="lb-score-label">BoEI</span><span class="lb-score-val boei">${Math.round(p.BoEI)}</span></div>
+      </div>
+      <div class="lb-primary">
+        <div class="lb-primary-val">${Math.round(p.AEI)}</div>
+        <div class="lb-primary-label">AEI</div>
+      </div>
+    </div>
   `).join('');
-  addTableClickHandlers(tbody);
+  addRowClickHandlers(container);
 }
 
 function renderBattingTable() {
-  const tbody = document.querySelector('#table-batting tbody');
-  tbody.innerHTML = DATA.batting_top25.map((p, i) => `
-    <tr class="${i < 3 ? 'top3' : ''}" data-player="${p.name}">
-      <td class="rank">${i + 1}</td>
-      <td class="name">${p.name}</td>
-      <td class="country">${p.country}</td>
-      <td class="metric"><strong>${Math.round(p.BEI)}</strong></td>
-      <td class="metric">${p.matches}</td>
-    </tr>
+  const container = document.getElementById('table-batting');
+  container.innerHTML = DATA.batting_top25.map((p, i) => `
+    <div class="lb-row ${medalClass(i)}" data-player="${p.name}">
+      <div class="lb-rank">${String(i + 1).padStart(2, '0')}</div>
+      <div class="lb-flag">${getFlag(p.country)}</div>
+      <div class="lb-info">
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-country">${p.country} · ${p.matches} matches</div>
+      </div>
+      <div class="lb-primary">
+        <div class="lb-primary-val">${Math.round(p.BEI)}</div>
+        <div class="lb-primary-label">BEI</div>
+      </div>
+    </div>
   `).join('');
-  addTableClickHandlers(tbody);
+  addRowClickHandlers(container);
 }
 
 function renderBowlingTable() {
-  const tbody = document.querySelector('#table-bowling tbody');
-  tbody.innerHTML = DATA.bowling_top25.map((p, i) => `
-    <tr class="${i < 3 ? 'top3' : ''}" data-player="${p.name}">
-      <td class="rank">${i + 1}</td>
-      <td class="name">${p.name}</td>
-      <td class="country">${p.country}</td>
-      <td class="metric"><strong>${Math.round(p.BoEI)}</strong></td>
-      <td class="metric">${p.matches}</td>
-    </tr>
+  const container = document.getElementById('table-bowling');
+  container.innerHTML = DATA.bowling_top25.map((p, i) => `
+    <div class="lb-row ${medalClass(i)}" data-player="${p.name}">
+      <div class="lb-rank">${String(i + 1).padStart(2, '0')}</div>
+      <div class="lb-flag">${getFlag(p.country)}</div>
+      <div class="lb-info">
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-country">${p.country} · ${p.matches} matches</div>
+      </div>
+      <div class="lb-primary">
+        <div class="lb-primary-val">${Math.round(p.BoEI)}</div>
+        <div class="lb-primary-label">BoEI</div>
+      </div>
+    </div>
   `).join('');
-  addTableClickHandlers(tbody);
+  addRowClickHandlers(container);
 }
 
-function addTableClickHandlers(tbody) {
-  tbody.querySelectorAll('tr').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const name = tr.dataset.player;
+function addRowClickHandlers(container) {
+  container.querySelectorAll('.lb-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const name = row.dataset.player;
       switchTab('player-lookup');
       document.getElementById('player-search').value = name;
       showPlayer(name);
@@ -249,7 +327,7 @@ function renderAlphaTable(category) {
   }
 
   thead.innerHTML = `<tr><th></th>${alphas.map(a =>
-    `<th class="${a === '0.75' ? 'alpha-current' : ''}">&alpha;=${a}</th>`
+    `<th class="${a === '0.75' ? 'alpha-current' : ''}">\u03b1=${a}</th>`
   ).join('')}</tr>`;
 
   let rows = '';
@@ -259,7 +337,7 @@ function renderAlphaTable(category) {
       const list = dataSets[a];
       if (rank < list.length) {
         const p = list[rank];
-        const name = p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name;
+        const name = p.name.length > 16 ? p.name.slice(0, 15) + '\u2026' : p.name;
         rows += `<td class="${a === '0.75' ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${Math.round(p[metricKey])}</span></td>`;
       } else {
         rows += '<td></td>';
@@ -277,23 +355,21 @@ function setupSearch() {
   const results = document.getElementById('search-results');
 
   input.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
+    const q = input.value.trim();
     if (q.length < 2) {
       results.classList.remove('open');
       return;
     }
 
-    const matches = DATA.all_players
-      .filter(p => p.name.toLowerCase().includes(q))
-      .slice(0, 15);
+    const matches = searchPlayers(q);
 
     if (matches.length === 0) {
       results.innerHTML = '<div class="search-result"><span class="sr-name">No results</span></div>';
     } else {
       results.innerHTML = matches.map(p => `
         <div class="search-result" data-name="${p.name}">
-          <span class="sr-name">${p.name}</span>
-          <span class="sr-meta">${p.country} · ${p.matches}m · AEI ${Math.round(p.AEI)}</span>
+          <span class="sr-name">${getFlag(p.country)} ${p.name}</span>
+          <span class="sr-meta">${p.country} · ${p.matches} matches</span>
         </div>
       `).join('');
     }
@@ -310,12 +386,11 @@ function setupSearch() {
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      const q = input.value.trim().toLowerCase();
-      const match = DATA.all_players.find(p => p.name.toLowerCase().includes(q));
-      if (match) {
-        input.value = match.name;
+      const matches = searchPlayers(input.value);
+      if (matches.length > 0) {
+        input.value = matches[0].name;
         results.classList.remove('open');
-        showPlayer(match.name);
+        showPlayer(matches[0].name);
       }
     }
   });
@@ -336,13 +411,12 @@ function showPlayer(name) {
 
   document.getElementById('player-header').innerHTML = `
     <div>
-      <div class="ph-name">${player.name}</div>
+      <div class="ph-name">${getFlag(player.country)} ${player.name}</div>
       <div class="ph-country">${player.country} · ${player.matches} matches</div>
     </div>
     <div class="ph-stats">
       <div class="ph-stat"><div class="label">BEI</div><div class="value bei">${Math.round(player.BEI)}</div></div>
       <div class="ph-stat"><div class="label">BoEI</div><div class="value boei">${Math.round(player.BoEI)}</div></div>
-      <div class="ph-stat"><div class="label">AEI</div><div class="value aei">${Math.round(player.AEI)}</div></div>
     </div>
   `;
 
@@ -355,108 +429,168 @@ function renderPlayerCareer(player) {
   const batVals = stints.map(s => s.bat_avg);
   const bowlVals = stints.map(s => s.bowl_score);
 
-  const traces = [];
+  const hasBat = batVals.some(v => v != null);
+  const hasBowl = bowlVals.some(v => v != null);
 
-  // Row 1: Batting bars + spline
-  traces.push({
-    x: labels, y: batVals, type: 'bar', name: 'Bat Score',
-    marker: { color: batVals.map(v => v != null ? COLORS.bat : '#555') },
-    opacity: 0.4, text: batVals.map(v => v != null ? v.toFixed(1) : ''),
-    textposition: 'outside', cliponaxis: false, showlegend: false,
-    hovertemplate: '%{x}<br>Bat Score: %{y:.1f}<extra></extra>',
-    xaxis: 'x', yaxis: 'y',
-  });
-
-  const validBat = batVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
-  if (validBat.length >= 2) {
-    const splineBat = splineInterp(validBat, labels);
-    traces.push({
-      x: splineBat.x, y: splineBat.y, type: 'scatter', mode: 'lines',
-      line: { color: COLORS.bat, width: 3, shape: 'spline' }, showlegend: false,
-      hovertemplate: 'Bat Score: %{y:.1f}<extra></extra>',
-      xaxis: 'x', yaxis: 'y',
-    });
-  }
-
-  // Row 2: Bowling bars + spline
-  traces.push({
-    x: labels, y: bowlVals, type: 'bar', name: 'Bowl Score',
-    marker: { color: bowlVals.map(v => v != null ? COLORS.bowl : '#555') },
-    opacity: 0.4, text: bowlVals.map(v => v != null ? v.toFixed(1) : ''),
-    textposition: 'outside', cliponaxis: false, showlegend: false,
-    hovertemplate: '%{x}<br>Bowl Score: %{y:.1f}<extra></extra>',
-    xaxis: 'x2', yaxis: 'y2',
-  });
-
-  const validBowl = bowlVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
-  if (validBowl.length >= 2) {
-    const splineBowl = splineInterp(validBowl, labels);
-    traces.push({
-      x: splineBowl.x, y: splineBowl.y, type: 'scatter', mode: 'lines',
-      line: { color: COLORS.bowl, width: 3, shape: 'spline' }, showlegend: false,
-      hovertemplate: 'Bowl Score: %{y:.1f}<extra></extra>',
-      xaxis: 'x2', yaxis: 'y2',
-    });
-  }
-
-  // Row 3: KDE of stint scores
+  // Determine which rows to show
+  const rows = [];
+  if (hasBat) rows.push('bat');
+  if (hasBowl) rows.push('bowl');
   const batValid = batVals.filter(v => v != null);
   const bowlValid = bowlVals.filter(v => v != null);
+  const hasKDE = batValid.length >= 3 || bowlValid.length >= 3;
+  if (hasKDE) rows.push('kde');
 
-  if (batValid.length >= 3) {
-    const kde = simpleKDE(batValid);
-    traces.push({
-      x: kde.x, y: kde.y, type: 'scatter', mode: 'lines', name: 'Batting',
-      line: { color: COLORS.bat, width: 2.5 }, fill: 'tozeroy', opacity: 0.35,
-      xaxis: 'x3', yaxis: 'y3',
-    });
-  }
-  if (bowlValid.length >= 3) {
-    const kde = simpleKDE(bowlValid);
-    traces.push({
-      x: kde.x, y: kde.y, type: 'scatter', mode: 'lines', name: 'Bowling',
-      line: { color: COLORS.bowl, width: 2.5 }, fill: 'tozeroy', opacity: 0.35,
-      xaxis: 'x3', yaxis: 'y3',
-    });
+  if (rows.length === 0) {
+    document.getElementById('chart-player-career').innerHTML =
+      '<p style="padding:2rem;text-align:center;color:var(--text-muted)">No qualifying stint data for this player.</p>';
+    return;
   }
 
-  const batMax = Math.max(...batVals.filter(v => v != null), 10);
-  const bowlMax = Math.max(...bowlVals.filter(v => v != null), 10);
-
+  const traces = [];
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const gc = isDark ? '#2a2e3d' : '#dfe1e8';
+  const textColor = isDark ? '#e4e6ed' : '#1a1d27';
+
+  // Build axis assignments dynamically
+  let axisIdx = 0;
+  const axisMap = {};
+  for (const r of rows) {
+    axisIdx++;
+    axisMap[r] = axisIdx;
+  }
+
+  function xKey(r) { return axisMap[r] === 1 ? 'x' : `x${axisMap[r]}`; }
+  function yKey(r) { return axisMap[r] === 1 ? 'y' : `y${axisMap[r]}`; }
+
+  if (hasBat) {
+    traces.push({
+      x: labels, y: batVals, type: 'bar', name: 'Bat Score',
+      marker: { color: batVals.map(v => v != null ? COLORS.bat : '#555') },
+      opacity: 0.4, text: batVals.map(v => v != null ? v.toFixed(1) : ''),
+      textposition: 'outside', cliponaxis: false, showlegend: false,
+      hovertemplate: '%{x}<br>Bat Score: %{y:.1f}<extra></extra>',
+      xaxis: xKey('bat'), yaxis: yKey('bat'),
+    });
+    const valid = batVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
+    if (valid.length >= 2) {
+      traces.push({
+        x: valid.map(([i]) => labels[i]), y: valid.map(([, v]) => v),
+        type: 'scatter', mode: 'lines',
+        line: { color: COLORS.bat, width: 3, shape: 'spline' }, showlegend: false,
+        hovertemplate: 'Bat Score: %{y:.1f}<extra></extra>',
+        xaxis: xKey('bat'), yaxis: yKey('bat'),
+      });
+    }
+  }
+
+  if (hasBowl) {
+    traces.push({
+      x: labels, y: bowlVals, type: 'bar', name: 'Bowl Score',
+      marker: { color: bowlVals.map(v => v != null ? COLORS.bowl : '#555') },
+      opacity: 0.4, text: bowlVals.map(v => v != null ? v.toFixed(1) : ''),
+      textposition: 'outside', cliponaxis: false, showlegend: false,
+      hovertemplate: '%{x}<br>Bowl Score: %{y:.1f}<extra></extra>',
+      xaxis: xKey('bowl'), yaxis: yKey('bowl'),
+    });
+    const valid = bowlVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
+    if (valid.length >= 2) {
+      traces.push({
+        x: valid.map(([i]) => labels[i]), y: valid.map(([, v]) => v),
+        type: 'scatter', mode: 'lines',
+        line: { color: COLORS.bowl, width: 3, shape: 'spline' }, showlegend: false,
+        hovertemplate: 'Bowl Score: %{y:.1f}<extra></extra>',
+        xaxis: xKey('bowl'), yaxis: yKey('bowl'),
+      });
+    }
+  }
+
+  if (hasKDE) {
+    if (batValid.length >= 3) {
+      const kde = simpleKDE(batValid);
+      traces.push({
+        x: kde.x, y: kde.y, type: 'scatter', mode: 'lines', name: 'Batting',
+        line: { color: COLORS.bat, width: 2.5 }, fill: 'tozeroy', opacity: 0.35,
+        xaxis: xKey('kde'), yaxis: yKey('kde'),
+      });
+    }
+    if (bowlValid.length >= 3) {
+      const kde = simpleKDE(bowlValid);
+      traces.push({
+        x: kde.x, y: kde.y, type: 'scatter', mode: 'lines', name: 'Bowling',
+        line: { color: COLORS.bowl, width: 2.5 }, fill: 'tozeroy', opacity: 0.35,
+        xaxis: xKey('kde'), yaxis: yKey('kde'),
+      });
+    }
+  }
+
+  // Dynamic domain allocation based on which rows exist
+  const totalRows = rows.length;
+  const gap = 0.08;
+  const usable = 1 - gap * (totalRows - 1);
+  const rowH = totalRows === 1 ? 1 : totalRows === 2 ? 0.5 : [0.37, 0.37, 0.26];
+
+  const domains = [];
+  let cursor = 1;
+  for (let ri = 0; ri < totalRows; ri++) {
+    const h = Array.isArray(rowH) ? rowH[ri] * usable / (0.37 + 0.37 + 0.26) * (usable) : (Array.isArray(rowH) ? rowH[ri] : rowH);
+    // Simpler: equal or proportional
+    let frac;
+    if (totalRows === 3) {
+      frac = [0.36, 0.36, 0.22][ri];
+    } else if (totalRows === 2) {
+      frac = 0.47;
+    } else {
+      frac = 0.95;
+    }
+    const top = cursor;
+    const bottom = cursor - frac;
+    domains.push([Math.max(0, bottom), top]);
+    cursor = bottom - gap;
+  }
+
+  const batMax = hasBat ? Math.max(...batVals.filter(v => v != null), 10) : 10;
+  const bowlMax = hasBowl ? Math.max(...bowlVals.filter(v => v != null), 10) : 10;
 
   const layout = {
     ...plotlyLayout(),
-    height: 750,
-    grid: { rows: 3, columns: 1, subplots: [['xy'], ['x2y2'], ['x3y3']], roworder: 'top to bottom' },
-    xaxis: { gridcolor: gc, domain: [0, 1], anchor: 'y' },
-    yaxis: { title: 'Bat Score', range: [0, batMax * 1.3], gridcolor: gc, domain: [0.72, 1], anchor: 'x' },
-    xaxis2: { gridcolor: gc, domain: [0, 1], anchor: 'y2' },
-    yaxis2: { title: 'Bowl Score', range: [0, bowlMax * 1.3], gridcolor: gc, domain: [0.38, 0.66], anchor: 'x2' },
-    xaxis3: { title: 'Score', gridcolor: gc, domain: [0, 1], anchor: 'y3' },
-    yaxis3: { title: 'Density', showticklabels: false, gridcolor: gc, domain: [0, 0.28], anchor: 'x3' },
-    annotations: [
-      { text: 'Batting Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: 1.02, showarrow: false, font: { size: 13, color: isDark ? '#e4e6ed' : '#1a1d27' } },
-      { text: 'Bowling Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: 0.68, showarrow: false, font: { size: 13, color: isDark ? '#e4e6ed' : '#1a1d27' } },
-      { text: 'Score Distribution (KDE)', xref: 'paper', yref: 'paper', x: 0.5, y: 0.3, showarrow: false, font: { size: 13, color: isDark ? '#e4e6ed' : '#1a1d27' } },
-    ],
-    legend: { orientation: 'h', y: -0.05, x: 0.5, xanchor: 'center' },
-    margin: { l: 60, r: 30, t: 30, b: 50 },
+    height: totalRows === 1 ? 350 : totalRows === 2 ? 550 : 700,
+    showlegend: hasKDE,
+    legend: { orientation: 'h', y: -0.02, x: 0.5, xanchor: 'center' },
+    margin: { l: 60, r: 30, t: 35, b: 40 },
+    annotations: [],
   };
+
+  // Set up axes for each row
+  for (let ri = 0; ri < rows.length; ri++) {
+    const r = rows[ri];
+    const n = ri + 1;
+    const xName = n === 1 ? 'xaxis' : `xaxis${n}`;
+    const yName = n === 1 ? 'yaxis' : `yaxis${n}`;
+
+    layout[xName] = { gridcolor: gc, domain: [0, 1], anchor: n === 1 ? 'y' : `y${n}` };
+    layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
+
+    if (r === 'bat') {
+      layout[yName].title = 'Bat Score';
+      layout[yName].range = [0, batMax * 1.3];
+      layout.annotations.push({ text: 'Batting Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } });
+    } else if (r === 'bowl') {
+      layout[yName].title = 'Bowl Score';
+      layout[yName].range = [0, bowlMax * 1.3];
+      layout.annotations.push({ text: 'Bowling Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } });
+    } else if (r === 'kde') {
+      layout[xName].title = 'Score';
+      layout[yName].title = 'Density';
+      layout[yName].showticklabels = false;
+      layout.annotations.push({ text: 'Score Distribution (KDE)', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } });
+    }
+  }
 
   Plotly.newPlot('chart-player-career', traces, layout, plotlyConfig);
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function splineInterp(validPoints, labels) {
-  // Returns labels at valid points for Plotly's built-in spline
-  return {
-    x: validPoints.map(([i]) => labels[i]),
-    y: validPoints.map(([, v]) => v),
-  };
-}
 
 function simpleKDE(values, nPoints = 150) {
   const n = values.length;
@@ -491,7 +625,6 @@ function switchTab(tabId) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
-  // Trigger Plotly resize after tab switch (fixes hidden chart sizing)
   setTimeout(() => {
     const panel = document.getElementById(`panel-${tabId}`);
     panel.querySelectorAll('.chart-container > .js-plotly-plot').forEach(el => {
