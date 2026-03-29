@@ -305,6 +305,7 @@ def compute_stints(df: pd.DataFrame, stint_size: int = STINT_SIZE) -> list[dict]
             "label": f"{int(df.iloc[i]['Mat'])}\u2013{int(c['Mat'])}",
             "matches": matches,
             "bat_avg": round(bat_avg, 2) if bat_avg is not None else None,
+            "bowl_avg": round(bowl_avg, 2) if bowl_avg is not None else None,
             "bowl_score": round(bowl_score, 2) if bowl_score is not None else None,
         })
         i = end_idx + 1

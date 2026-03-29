@@ -428,19 +428,14 @@ function renderPlayerCareer(player) {
   const stints = player.stints;
   const labels = stints.map(s => s.label);
   const batVals = stints.map(s => s.bat_avg);
-  const bowlVals = stints.map(s => s.bowl_score);
+  const bowlVals = stints.map(s => s.bowl_avg);
 
   const hasBat = batVals.some(v => v != null);
   const hasBowl = bowlVals.some(v => v != null);
 
-  // Determine which rows to show
   const rows = [];
   if (hasBat) rows.push('bat');
   if (hasBowl) rows.push('bowl');
-  const batValid = batVals.filter(v => v != null);
-  const bowlValid = bowlVals.filter(v => v != null);
-  const hasKDE = batValid.length >= 3 || bowlValid.length >= 3;
-  if (hasKDE) rows.push('kde');
 
   if (rows.length === 0) {
     document.getElementById('chart-player-career').innerHTML =
@@ -466,11 +461,11 @@ function renderPlayerCareer(player) {
 
   if (hasBat) {
     traces.push({
-      x: labels, y: batVals, type: 'bar', name: 'Bat Score',
+      x: labels, y: batVals, type: 'bar', name: 'Batting Avg',
       marker: { color: batVals.map(v => v != null ? COLORS.bat : '#555') },
       opacity: 0.4, text: batVals.map(v => v != null ? v.toFixed(1) : ''),
       textposition: 'outside', cliponaxis: false, showlegend: false,
-      hovertemplate: '%{x}<br>Bat Score: %{y:.1f}<extra></extra>',
+      hovertemplate: '%{x}<br>Batting Avg: %{y:.1f}<extra></extra>',
       xaxis: xKey('bat'), yaxis: yKey('bat'),
     });
     const valid = batVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
@@ -479,7 +474,7 @@ function renderPlayerCareer(player) {
         x: valid.map(([i]) => labels[i]), y: valid.map(([, v]) => v),
         type: 'scatter', mode: 'lines',
         line: { color: COLORS.bat, width: 3, shape: 'spline' }, showlegend: false,
-        hovertemplate: 'Bat Score: %{y:.1f}<extra></extra>',
+        hovertemplate: 'Batting Avg: %{y:.1f}<extra></extra>',
         xaxis: xKey('bat'), yaxis: yKey('bat'),
       });
     }
@@ -487,11 +482,11 @@ function renderPlayerCareer(player) {
 
   if (hasBowl) {
     traces.push({
-      x: labels, y: bowlVals, type: 'bar', name: 'Bowl Score',
+      x: labels, y: bowlVals, type: 'bar', name: 'Bowling Avg',
       marker: { color: bowlVals.map(v => v != null ? COLORS.bowl : '#555') },
       opacity: 0.4, text: bowlVals.map(v => v != null ? v.toFixed(1) : ''),
       textposition: 'outside', cliponaxis: false, showlegend: false,
-      hovertemplate: '%{x}<br>Bowl Score: %{y:.1f}<extra></extra>',
+      hovertemplate: '%{x}<br>Bowling Avg: %{y:.1f}<extra></extra>',
       xaxis: xKey('bowl'), yaxis: yKey('bowl'),
     });
     const valid = bowlVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
@@ -500,46 +495,19 @@ function renderPlayerCareer(player) {
         x: valid.map(([i]) => labels[i]), y: valid.map(([, v]) => v),
         type: 'scatter', mode: 'lines',
         line: { color: COLORS.bowl, width: 3, shape: 'spline' }, showlegend: false,
-        hovertemplate: 'Bowl Score: %{y:.1f}<extra></extra>',
+        hovertemplate: 'Bowling Avg: %{y:.1f}<extra></extra>',
         xaxis: xKey('bowl'), yaxis: yKey('bowl'),
       });
     }
   }
 
-  if (hasKDE) {
-    if (batValid.length >= 3) {
-      const kde = simpleKDE(batValid);
-      traces.push({
-        x: kde.x, y: kde.y, type: 'scatter', mode: 'lines', name: 'Batting',
-        line: { color: COLORS.bat, width: 2.5 }, fill: 'tozeroy', opacity: 0.35,
-        xaxis: xKey('kde'), yaxis: yKey('kde'),
-      });
-    }
-    if (bowlValid.length >= 3) {
-      const kde = simpleKDE(bowlValid);
-      traces.push({
-        x: kde.x, y: kde.y, type: 'scatter', mode: 'lines', name: 'Bowling',
-        line: { color: COLORS.bowl, width: 2.5 }, fill: 'tozeroy', opacity: 0.35,
-        xaxis: xKey('kde'), yaxis: yKey('kde'),
-      });
-    }
-  }
-
-  // Dynamic domain allocation with generous gaps for titles + subtitles
   const totalRows = rows.length;
-  const gap = totalRows === 3 ? 0.16 : 0.12;
+  const gap = 0.14;
 
   const domains = [];
   let cursor = 1;
   for (let ri = 0; ri < totalRows; ri++) {
-    let frac;
-    if (totalRows === 3) {
-      frac = [0.26, 0.26, 0.17][ri];
-    } else if (totalRows === 2) {
-      frac = 0.40;
-    } else {
-      frac = 0.90;
-    }
+    const frac = totalRows === 2 ? 0.40 : 0.90;
     const top = cursor;
     const bottom = cursor - frac;
     domains.push([Math.max(0, bottom), top]);
@@ -551,14 +519,12 @@ function renderPlayerCareer(player) {
 
   const layout = {
     ...plotlyLayout(),
-    height: totalRows === 1 ? 350 : totalRows === 2 ? 650 : 950,
-    showlegend: hasKDE,
-    legend: { orientation: 'h', y: -0.05, x: 0.5, xanchor: 'center' },
-    margin: { l: 60, r: 30, t: 60, b: 55 },
+    height: totalRows === 1 ? 380 : 700,
+    showlegend: false,
+    margin: { l: 60, r: 30, t: 60, b: 40 },
     annotations: [],
   };
 
-  // Set up axes for each row
   for (let ri = 0; ri < rows.length; ri++) {
     const r = rows[ri];
     const n = ri + 1;
@@ -569,30 +535,22 @@ function renderPlayerCareer(player) {
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
     const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
-    const titleY = domains[ri][1] + 0.06;
-    const subtitleY = domains[ri][1] + 0.03;
+    const titleY = domains[ri][1] + 0.055;
+    const subtitleY = domains[ri][1] + 0.025;
 
     if (r === 'bat') {
       layout[yName].title = '';
       layout[yName].range = [0, batMax * 1.3];
       layout.annotations.push(
-        { text: 'Batting Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
-        { text: 'Batting average for each 10-match window (min. 10 dismissals to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+        { text: 'Batting Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
+        { text: 'Average for each 10-match window (min. 10 dismissals to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
       );
     } else if (r === 'bowl') {
       layout[yName].title = '';
       layout[yName].range = [0, bowlMax * 1.3];
       layout.annotations.push(
-        { text: 'Bowling Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
-        { text: '1000 \u00F7 bowling avg for each 10-match window (min. 10 wickets to qualify) \u2014 higher is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
-      );
-    } else if (r === 'kde') {
-      layout[xName].title = '';
-      layout[yName].title = '';
-      layout[yName].showticklabels = false;
-      layout.annotations.push(
-        { text: 'Score Distribution', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
-        { text: 'Taller & narrower = more consistent \u00B7 Wider & flatter = more variable', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+        { text: 'Bowling Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
+        { text: 'Average for each 10-match window (min. 10 wickets to qualify) \u2014 lower is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
       );
     }
   }
