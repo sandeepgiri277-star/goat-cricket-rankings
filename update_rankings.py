@@ -37,7 +37,7 @@ TOP_N = 25
 
 CACHE_DIR = Path(__file__).parent / "cricket_cache"
 CACHE_DIR.mkdir(exist_ok=True)
-SITE_DIR = Path(__file__).parent / "site"
+SITE_DIR = Path(__file__).parent / "docs"
 SITE_DIR.mkdir(exist_ok=True)
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
