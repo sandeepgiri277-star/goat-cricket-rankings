@@ -524,24 +524,20 @@ function renderPlayerCareer(player) {
     }
   }
 
-  // Dynamic domain allocation based on which rows exist
+  // Dynamic domain allocation with generous gaps for titles
   const totalRows = rows.length;
-  const gap = 0.08;
-  const usable = 1 - gap * (totalRows - 1);
-  const rowH = totalRows === 1 ? 1 : totalRows === 2 ? 0.5 : [0.37, 0.37, 0.26];
+  const gap = totalRows === 3 ? 0.12 : 0.10;
 
   const domains = [];
   let cursor = 1;
   for (let ri = 0; ri < totalRows; ri++) {
-    const h = Array.isArray(rowH) ? rowH[ri] * usable / (0.37 + 0.37 + 0.26) * (usable) : (Array.isArray(rowH) ? rowH[ri] : rowH);
-    // Simpler: equal or proportional
     let frac;
     if (totalRows === 3) {
-      frac = [0.36, 0.36, 0.22][ri];
+      frac = [0.30, 0.30, 0.20][ri];
     } else if (totalRows === 2) {
-      frac = 0.47;
+      frac = 0.43;
     } else {
-      frac = 0.95;
+      frac = 0.92;
     }
     const top = cursor;
     const bottom = cursor - frac;
@@ -554,10 +550,10 @@ function renderPlayerCareer(player) {
 
   const layout = {
     ...plotlyLayout(),
-    height: totalRows === 1 ? 350 : totalRows === 2 ? 550 : 700,
+    height: totalRows === 1 ? 350 : totalRows === 2 ? 600 : 820,
     showlegend: hasKDE,
     legend: { orientation: 'h', y: -0.02, x: 0.5, xanchor: 'center' },
-    margin: { l: 60, r: 30, t: 35, b: 40 },
+    margin: { l: 60, r: 30, t: 45, b: 40 },
     annotations: [],
   };
 
@@ -571,21 +567,31 @@ function renderPlayerCareer(player) {
     layout[xName] = { gridcolor: gc, domain: [0, 1], anchor: n === 1 ? 'y' : `y${n}` };
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
+    const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
+    const titleY = domains[ri][1] + 0.04;
+    const subtitleY = domains[ri][1] + 0.015;
+
     if (r === 'bat') {
-      layout[yName].title = 'Bat Score';
+      layout[yName].title = '';
       layout[yName].range = [0, batMax * 1.3];
-      layout.annotations.push({ text: 'Batting Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } });
+      layout.annotations.push(
+        { text: 'Batting Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
+        { text: 'Batting average for each 10-match window (min. 10 dismissals to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+      );
     } else if (r === 'bowl') {
-      layout[yName].title = 'Bowl Score';
+      layout[yName].title = '';
       layout[yName].range = [0, bowlMax * 1.3];
-      layout.annotations.push({ text: 'Bowling Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } });
+      layout.annotations.push(
+        { text: 'Bowling Score per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
+        { text: '1000 \u00F7 bowling avg for each 10-match window (min. 10 wickets to qualify) \u2014 higher is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+      );
     } else if (r === 'kde') {
       layout[xName].title = 'Score';
-      layout[yName].title = 'Density';
+      layout[yName].title = '';
       layout[yName].showticklabels = false;
       layout.annotations.push(
-        { text: 'Score Distribution — how consistent were their stint scores?', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } },
-        { text: 'Taller & narrower = more consistent · Wider & flatter = more variable', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] - 0.01, showarrow: false, font: { size: 10, color: isDark ? '#8b8fa3' : '#6b7085' } },
+        { text: 'Score Distribution', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
+        { text: 'Taller & narrower = more consistent \u00B7 Wider & flatter = more variable', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
       );
     }
   }
