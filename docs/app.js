@@ -531,9 +531,9 @@ function renderPlayerCareer(player) {
   const gap = 0.18;
 
   const domains = [];
-  let cursor = 1;
+  let cursor = totalRows === 1 ? 0.88 : 1;
   for (let ri = 0; ri < totalRows; ri++) {
-    const frac = totalRows === 2 ? 0.38 : 0.88;
+    const frac = totalRows === 2 ? 0.38 : 0.85;
     const top = cursor;
     const bottom = cursor - frac;
     domains.push([Math.max(0, bottom), top]);
@@ -547,9 +547,9 @@ function renderPlayerCareer(player) {
 
   const layout = {
     ...plotlyLayout(),
-    height: totalRows === 1 ? (mobile ? 340 : 420) : (mobile ? 600 : 750),
+    height: totalRows === 1 ? (mobile ? 350 : 420) : (mobile ? 600 : 750),
     showlegend: false,
-    margin: { l: mobile ? 40 : 60, r: mobile ? 15 : 30, t: mobile ? 65 : 80, b: mobile ? 30 : 40 },
+    margin: { l: mobile ? 40 : 60, r: mobile ? 15 : 30, t: mobile ? 10 : 10, b: mobile ? 30 : 40 },
     annotations: [],
   };
 
@@ -563,7 +563,7 @@ function renderPlayerCareer(player) {
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
     const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
-    const annoY = domains[ri][1] + 0.05;
+    const annoY = domains[ri][1] + (totalRows === 1 ? 0.06 : 0.05);
 
     if (r === 'bat') {
       layout[yName].title = '';
