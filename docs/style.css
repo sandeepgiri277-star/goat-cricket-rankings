@@ -169,12 +169,14 @@ a:hover { text-decoration: underline; }
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.3rem;
+  text-align: center;
 }
 
 .panel-desc {
   color: var(--text-muted);
   font-size: 0.9rem;
   margin-bottom: 1.2rem;
+  text-align: center;
 }
 
 .chart-container {
