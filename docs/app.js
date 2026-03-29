@@ -514,12 +514,12 @@ function renderPlayerCareer(player) {
   }
 
   const totalRows = rows.length;
-  const gap = 0.14;
+  const gap = 0.18;
 
   const domains = [];
   let cursor = 1;
   for (let ri = 0; ri < totalRows; ri++) {
-    const frac = totalRows === 2 ? 0.40 : 0.90;
+    const frac = totalRows === 2 ? 0.38 : 0.88;
     const top = cursor;
     const bottom = cursor - frac;
     domains.push([Math.max(0, bottom), top]);
@@ -533,9 +533,9 @@ function renderPlayerCareer(player) {
 
   const layout = {
     ...plotlyLayout(),
-    height: totalRows === 1 ? (mobile ? 300 : 380) : (mobile ? 550 : 700),
+    height: totalRows === 1 ? (mobile ? 340 : 420) : (mobile ? 600 : 750),
     showlegend: false,
-    margin: { l: mobile ? 40 : 60, r: mobile ? 15 : 30, t: mobile ? 50 : 60, b: mobile ? 30 : 40 },
+    margin: { l: mobile ? 40 : 60, r: mobile ? 15 : 30, t: mobile ? 65 : 80, b: mobile ? 30 : 40 },
     annotations: [],
   };
 
@@ -549,8 +549,8 @@ function renderPlayerCareer(player) {
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
     const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
-    const titleY = domains[ri][1] + 0.055;
-    const subtitleY = domains[ri][1] + 0.025;
+    const titleY = domains[ri][1] + 0.08;
+    const subtitleY = domains[ri][1] + 0.04;
     const titleSize = mobile ? 11 : 13;
     const subSize = mobile ? 8 : 10;
 
