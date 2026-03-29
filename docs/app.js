@@ -46,17 +46,30 @@ function searchPlayers(query) {
   if (q.length < 2) return [];
 
   const words = q.split(/\s+/);
-  const lastName = words[words.length - 1];
+  const surname = words[words.length - 1];
+  const multiWord = words.length > 1;
 
   const scored = DATA.all_players.map(p => {
     const nameLower = p.name.toLowerCase();
+    const nameParts = nameLower.split(' ');
+    const playerSurname = nameParts[nameParts.length - 1];
     let score = 0;
 
-    if (nameLower.includes(q)) score += 100;
-    for (const w of words) {
-      if (nameLower.includes(w)) score += 30;
+    if (nameLower.includes(q)) score += 200;
+
+    if (multiWord) {
+      // Multi-word query: require surname match, then boost for other word matches
+      if (playerSurname !== surname && !playerSurname.includes(surname)) return { player: p, score: 0 };
+      score += 100;
+      for (const w of words.slice(0, -1)) {
+        if (nameLower.includes(w)) score += 40;
+      }
+    } else {
+      // Single word: match anywhere in name, prioritize surname
+      if (playerSurname === q) score += 150;
+      else if (playerSurname.includes(q)) score += 80;
+      else if (nameLower.includes(q)) score += 50;
     }
-    if (nameLower.split(' ').pop() === lastName) score += 50;
 
     return { player: p, score };
   }).filter(s => s.score > 0);
@@ -116,33 +129,22 @@ function renderMeta() {
 
 function renderAllrounderChart() {
   const players = [...DATA.allrounder_top25].reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name} (${p.ar_rating})`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
-  const traces = [
-    {
-      y: labels, x: players.map(p => p.BEI), type: 'bar', orientation: 'h',
-      name: 'Batting (BEI)', marker: { color: COLORS.bat },
-      text: players.map(p => Math.round(p.BEI)), textposition: 'inside',
-      textfont: { color: '#fff', size: 11 },
-      hovertemplate: '%{y}<br>BEI: %{x:.0f} · Bat Rating: %{customdata}<extra></extra>',
-      customdata: players.map(p => p.bat_rating),
-    },
-    {
-      y: labels, x: players.map(p => p.BoEI), type: 'bar', orientation: 'h',
-      name: 'Bowling (BoEI)', marker: { color: COLORS.bowl },
-      text: players.map(p => Math.round(p.BoEI)), textposition: 'inside',
-      textfont: { color: '#fff', size: 11 },
-      hovertemplate: '%{y}<br>BoEI: %{x:.0f} · Bowl Rating: %{customdata}<extra></extra>',
-      customdata: players.map(p => p.bowl_rating),
-    },
-  ];
+  const traces = [{
+    y: labels, x: players.map(p => p.ar_rating), type: 'bar', orientation: 'h',
+    marker: { color: players.map(p => p.ar_rating >= 1000 ? COLORS.aei : COLORS.bat) },
+    text: players.map(p => p.ar_rating), textposition: 'inside',
+    textfont: { color: '#fff', size: 12, weight: 700 },
+    hovertemplate: '%{y}<br>Rating: %{x}<br>Bat: %{customdata[0]} · Bowl: %{customdata[1]}<extra></extra>',
+    customdata: players.map(p => [p.bat_rating, p.bowl_rating]),
+  }];
 
   const layout = plotlyLayout({
-    barmode: 'stack',
     height: Math.max(550, players.length * 30 + 80),
-    margin: { l: 220, r: 80, t: 10, b: 30 },
-    legend: { orientation: 'h', y: 1.02, x: 1, xanchor: 'right', font: { size: 12 } },
-    xaxis: { title: '' },
+    margin: { l: 220, r: 60, t: 10, b: 30 },
+    xaxis: { title: 'Rating' },
+    showlegend: false,
   });
 
   Plotly.newPlot('chart-allrounders', traces, layout, plotlyConfig);
@@ -152,21 +154,21 @@ function renderAllrounderChart() {
 
 function renderBattingChart() {
   const players = [...DATA.batting_top25].reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name} (${p.bat_rating})`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
-    y: labels, x: players.map(p => p.BEI), type: 'bar', orientation: 'h',
-    marker: { color: COLORS.bat },
-    text: players.map(p => Math.round(p.BEI)), textposition: 'inside',
-    textfont: { color: '#fff', size: 11 },
-    hovertemplate: '%{y}<br>Rating: %{customdata[0]}<br>BEI: %{x:.0f} · %{customdata[1]} matches<extra></extra>',
-    customdata: players.map(p => [p.bat_rating, p.matches]),
+    y: labels, x: players.map(p => p.bat_rating), type: 'bar', orientation: 'h',
+    marker: { color: players.map(p => p.bat_rating >= 1000 ? COLORS.aei : COLORS.bat) },
+    text: players.map(p => p.bat_rating), textposition: 'inside',
+    textfont: { color: '#fff', size: 12, weight: 700 },
+    hovertemplate: '%{y}<br>Rating: %{x}<br>%{customdata} matches<extra></extra>',
+    customdata: players.map(p => p.matches),
   }];
 
   const layout = plotlyLayout({
     height: Math.max(550, players.length * 30 + 80),
     margin: { l: 220, r: 60, t: 10, b: 30 },
-    xaxis: { title: '' },
+    xaxis: { title: 'Rating' },
     showlegend: false,
   });
 
@@ -177,21 +179,21 @@ function renderBattingChart() {
 
 function renderBowlingChart() {
   const players = [...DATA.bowling_top25].reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name} (${p.bowl_rating})`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
-    y: labels, x: players.map(p => p.BoEI), type: 'bar', orientation: 'h',
-    marker: { color: COLORS.bowl },
-    text: players.map(p => Math.round(p.BoEI)), textposition: 'inside',
-    textfont: { color: '#fff', size: 11 },
-    hovertemplate: '%{y}<br>Rating: %{customdata[0]}<br>BoEI: %{x:.0f} · %{customdata[1]} matches<extra></extra>',
-    customdata: players.map(p => [p.bowl_rating, p.matches]),
+    y: labels, x: players.map(p => p.bowl_rating), type: 'bar', orientation: 'h',
+    marker: { color: players.map(p => p.bowl_rating >= 1000 ? COLORS.aei : COLORS.bowl) },
+    text: players.map(p => p.bowl_rating), textposition: 'inside',
+    textfont: { color: '#fff', size: 12, weight: 700 },
+    hovertemplate: '%{y}<br>Rating: %{x}<br>%{customdata} matches<extra></extra>',
+    customdata: players.map(p => p.matches),
   }];
 
   const layout = plotlyLayout({
     height: Math.max(550, players.length * 30 + 80),
     margin: { l: 220, r: 60, t: 10, b: 30 },
-    xaxis: { title: '' },
+    xaxis: { title: 'Rating' },
     showlegend: false,
   });
 
@@ -213,10 +215,6 @@ function renderAllrounderTable() {
       <div class="lb-info">
         <div class="lb-name">${p.name}</div>
         <div class="lb-country">${p.country} · ${p.matches} matches</div>
-      </div>
-      <div class="lb-scores">
-        <div class="lb-score-item"><span class="lb-score-label">Bat</span><span class="lb-score-val bei">${p.bat_rating}</span></div>
-        <div class="lb-score-item"><span class="lb-score-label">Bowl</span><span class="lb-score-val boei">${p.bowl_rating}</span></div>
       </div>
       <div class="lb-primary">
         <div class="lb-primary-val">${p.ar_rating}</div>
