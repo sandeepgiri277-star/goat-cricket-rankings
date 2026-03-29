@@ -583,7 +583,10 @@ function renderPlayerCareer(player) {
       layout[xName].title = 'Score';
       layout[yName].title = 'Density';
       layout[yName].showticklabels = false;
-      layout.annotations.push({ text: 'Score Distribution (KDE)', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } });
+      layout.annotations.push(
+        { text: 'Score Distribution — how consistent were their stint scores?', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] + 0.02, showarrow: false, font: { size: 13, color: textColor } },
+        { text: 'Taller & narrower = more consistent · Wider & flatter = more variable', xref: 'paper', yref: 'paper', x: 0.5, y: domains[ri][1] - 0.01, showarrow: false, font: { size: 10, color: isDark ? '#8b8fa3' : '#6b7085' } },
+      );
     }
   }
 
