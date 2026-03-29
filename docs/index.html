@@ -127,6 +127,13 @@
         <p>The density curves below show where all qualifying Test players fall across BEI, BoEI, and AEI.</p>
         <div class="chart-container" id="chart-kde"></div>
 
+        <h3>Rating Scale (0&ndash;1000)</h3>
+        <p>Raw indices are converted to an ICC-style rating using z-scores within each metric's population:</p>
+        <div class="formula">
+          Rating = 500 + (value &minus; &mu;) / &sigma; &times; 110
+        </div>
+        <p>This anchors the <strong>median player at ~500</strong>, with 800+ being elite, 900+ being all-time great, and 1000 being virtually unreachable. Only Bradman (batting: 1021) and Kallis (allrounder: 1005) have ever broken 1000 &mdash; reflecting their status as the most extreme statistical outliers in Test cricket history.</p>
+
         <h3>Data Source</h3>
         <p>All data is scraped from <a href="https://stats.espncricinfo.com" target="_blank" rel="noopener">ESPN Cricinfo Statsguru</a>. Player data is cached and updated weekly.</p>
       </div>

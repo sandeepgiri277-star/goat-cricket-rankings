@@ -116,7 +116,7 @@ function renderMeta() {
 
 function renderAllrounderChart() {
   const players = [...DATA.allrounder_top25].reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name} (${p.ar_rating})`);
 
   const traces = [
     {
@@ -124,14 +124,16 @@ function renderAllrounderChart() {
       name: 'Batting (BEI)', marker: { color: COLORS.bat },
       text: players.map(p => Math.round(p.BEI)), textposition: 'inside',
       textfont: { color: '#fff', size: 11 },
-      hovertemplate: '%{y}<br>BEI: %{x:.0f}<extra></extra>',
+      hovertemplate: '%{y}<br>BEI: %{x:.0f} · Bat Rating: %{customdata}<extra></extra>',
+      customdata: players.map(p => p.bat_rating),
     },
     {
       y: labels, x: players.map(p => p.BoEI), type: 'bar', orientation: 'h',
       name: 'Bowling (BoEI)', marker: { color: COLORS.bowl },
       text: players.map(p => Math.round(p.BoEI)), textposition: 'inside',
       textfont: { color: '#fff', size: 11 },
-      hovertemplate: '%{y}<br>BoEI: %{x:.0f}<extra></extra>',
+      hovertemplate: '%{y}<br>BoEI: %{x:.0f} · Bowl Rating: %{customdata}<extra></extra>',
+      customdata: players.map(p => p.bowl_rating),
     },
   ];
 
@@ -150,15 +152,15 @@ function renderAllrounderChart() {
 
 function renderBattingChart() {
   const players = [...DATA.batting_top25].reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name} (${p.bat_rating})`);
 
   const traces = [{
     y: labels, x: players.map(p => p.BEI), type: 'bar', orientation: 'h',
     marker: { color: COLORS.bat },
     text: players.map(p => Math.round(p.BEI)), textposition: 'inside',
     textfont: { color: '#fff', size: 11 },
-    hovertemplate: '%{y}<br>BEI: %{x:.0f}<br>%{customdata} matches<extra></extra>',
-    customdata: players.map(p => p.matches),
+    hovertemplate: '%{y}<br>Rating: %{customdata[0]}<br>BEI: %{x:.0f} · %{customdata[1]} matches<extra></extra>',
+    customdata: players.map(p => [p.bat_rating, p.matches]),
   }];
 
   const layout = plotlyLayout({
@@ -175,15 +177,15 @@ function renderBattingChart() {
 
 function renderBowlingChart() {
   const players = [...DATA.bowling_top25].reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
+  const labels = players.map(p => `${getFlag(p.country)} ${p.name} (${p.bowl_rating})`);
 
   const traces = [{
     y: labels, x: players.map(p => p.BoEI), type: 'bar', orientation: 'h',
     marker: { color: COLORS.bowl },
     text: players.map(p => Math.round(p.BoEI)), textposition: 'inside',
     textfont: { color: '#fff', size: 11 },
-    hovertemplate: '%{y}<br>BoEI: %{x:.0f}<br>%{customdata} matches<extra></extra>',
-    customdata: players.map(p => p.matches),
+    hovertemplate: '%{y}<br>Rating: %{customdata[0]}<br>BoEI: %{x:.0f} · %{customdata[1]} matches<extra></extra>',
+    customdata: players.map(p => [p.bowl_rating, p.matches]),
   }];
 
   const layout = plotlyLayout({
@@ -213,12 +215,12 @@ function renderAllrounderTable() {
         <div class="lb-country">${p.country} · ${p.matches} matches</div>
       </div>
       <div class="lb-scores">
-        <div class="lb-score-item"><span class="lb-score-label">BEI</span><span class="lb-score-val bei">${Math.round(p.BEI)}</span></div>
-        <div class="lb-score-item"><span class="lb-score-label">BoEI</span><span class="lb-score-val boei">${Math.round(p.BoEI)}</span></div>
+        <div class="lb-score-item"><span class="lb-score-label">Bat</span><span class="lb-score-val bei">${p.bat_rating}</span></div>
+        <div class="lb-score-item"><span class="lb-score-label">Bowl</span><span class="lb-score-val boei">${p.bowl_rating}</span></div>
       </div>
       <div class="lb-primary">
-        <div class="lb-primary-val">${Math.round(p.AEI)}</div>
-        <div class="lb-primary-label">AEI</div>
+        <div class="lb-primary-val">${p.ar_rating}</div>
+        <div class="lb-primary-label">Rating</div>
       </div>
     </div>
   `).join('');
@@ -236,8 +238,8 @@ function renderBattingTable() {
         <div class="lb-country">${p.country} · ${p.matches} matches</div>
       </div>
       <div class="lb-primary">
-        <div class="lb-primary-val">${Math.round(p.BEI)}</div>
-        <div class="lb-primary-label">BEI</div>
+        <div class="lb-primary-val">${p.bat_rating}</div>
+        <div class="lb-primary-label">Rating</div>
       </div>
     </div>
   `).join('');
@@ -255,8 +257,8 @@ function renderBowlingTable() {
         <div class="lb-country">${p.country} · ${p.matches} matches</div>
       </div>
       <div class="lb-primary">
-        <div class="lb-primary-val">${Math.round(p.BoEI)}</div>
-        <div class="lb-primary-label">BoEI</div>
+        <div class="lb-primary-val">${p.bowl_rating}</div>
+        <div class="lb-primary-label">Rating</div>
       </div>
     </div>
   `).join('');
@@ -415,8 +417,8 @@ function showPlayer(name) {
       <div class="ph-country">${player.country} · ${player.matches} matches</div>
     </div>
     <div class="ph-stats">
-      <div class="ph-stat"><div class="label">BEI</div><div class="value bei">${Math.round(player.BEI)}</div></div>
-      <div class="ph-stat"><div class="label">BoEI</div><div class="value boei">${Math.round(player.BoEI)}</div></div>
+      ${player.bat_rating > 0 ? `<div class="ph-stat"><div class="label">Bat Rating</div><div class="value bei">${player.bat_rating}</div></div>` : ''}
+      ${player.bowl_rating > 0 ? `<div class="ph-stat"><div class="label">Bowl Rating</div><div class="value boei">${player.bowl_rating}</div></div>` : ''}
     </div>
   `;
 
