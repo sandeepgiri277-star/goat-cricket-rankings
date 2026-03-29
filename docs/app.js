@@ -128,7 +128,7 @@ function renderMeta() {
 // ─── Allrounder Chart ───────────────────────────────────────────────────────
 
 function renderAllrounderChart() {
-  const players = [...DATA.allrounder_top25].reverse();
+  const players = [...DATA.allrounder_top25].slice(0, 25).reverse();
   const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
@@ -153,7 +153,7 @@ function renderAllrounderChart() {
 // ─── Batting Chart ──────────────────────────────────────────────────────────
 
 function renderBattingChart() {
-  const players = [...DATA.batting_top25].reverse();
+  const players = [...DATA.batting_top25].slice(0, 25).reverse();
   const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
@@ -178,7 +178,7 @@ function renderBattingChart() {
 // ─── Bowling Chart ──────────────────────────────────────────────────────────
 
 function renderBowlingChart() {
-  const players = [...DATA.bowling_top25].reverse();
+  const players = [...DATA.bowling_top25].slice(0, 25).reverse();
   const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{

@@ -33,7 +33,7 @@ ALPHA = 0.70
 MIN_ALLROUNDER_BALANCE = 0.25
 MIN_MATCHES = 20
 STINT_SIZE = 10
-TOP_N = 25
+TOP_N = 100
 RATING_K = 270  # sqrt-compressed z-score multiplier (Bradman ≈ 1087, elite ≈ 930-970)
 
 CACHE_DIR = Path(__file__).parent / "cricket_cache"
