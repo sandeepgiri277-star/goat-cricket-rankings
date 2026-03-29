@@ -27,8 +27,8 @@ from scipy.stats import gaussian_kde
 # ─── Constants ───────────────────────────────────────────────────────────────
 
 BOWL_K = 1000
-MIN_STINT_DISM = 10
-MIN_STINT_WKTS = 10
+MIN_STINT_BAT_INN = 10
+MIN_STINT_BOWL_INN = 10
 ALPHA = 0.70
 MIN_ALLROUNDER_BALANCE = 0.25
 MIN_MATCHES = 20
@@ -46,6 +46,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 BAT_AGG_PATH = CACHE_DIR / "batting_aggregate.pkl"
 BOWL_AGG_PATH = CACHE_DIR / "bowling_aggregate.pkl"
 ALLROUND_CACHE_PATH = CACHE_DIR / "allround_cache.pkl"
+INNINGS_CACHE_PATH = CACHE_DIR / "innings_cache.pkl"
 
 # ─── Scraping ────────────────────────────────────────────────────────────────
 
@@ -192,6 +193,55 @@ def scrape_player_allround(player_id: int) -> pd.DataFrame | None:
         return None
 
 
+def _scrape_cumulative_innings(player_id: int, stat_type: str) -> dict[int, int] | None:
+    """Scrape cumulative innings from batting or bowling view. Returns {match_num: cumulative_innings}."""
+    url = (
+        f"https://stats.espncricinfo.com/ci/engine/player/{player_id}.html?"
+        f"class=1;template=results;type={stat_type};view=cumulative"
+    )
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        tables = soup.select("table.engineTable")
+        if not tables:
+            return None
+        data_table = max(tables, key=lambda t: len(t.find_all("tr")))
+        all_rows = data_table.find_all("tr")
+        if len(all_rows) < 2:
+            return None
+        header_tr = data_table.select_one("tr.headlinks") or all_rows[0]
+        cols = [c.get_text(strip=True) for c in header_tr.find_all(["th", "td"])]
+        if "Mat" not in cols or "Inns" not in cols:
+            return None
+        mat_idx = cols.index("Mat")
+        inn_idx = cols.index("Inns")
+        result = {}
+        for tr in all_rows:
+            if tr is header_tr:
+                continue
+            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+            if len(cells) <= max(mat_idx, inn_idx):
+                continue
+            try:
+                mat = int(cells[mat_idx])
+                inn = int(cells[inn_idx])
+                result[mat] = inn
+            except (ValueError, TypeError):
+                continue
+        return result if result else None
+    except Exception:
+        return None
+
+
+def scrape_player_innings(player_id: int) -> dict:
+    """Returns {'bat': {mat: cum_inn}, 'bowl': {mat: cum_inn}} for a player."""
+    bat = _scrape_cumulative_innings(player_id, "batting") or {}
+    time.sleep(0.2)
+    bowl = _scrape_cumulative_innings(player_id, "bowling") or {}
+    return {"bat": bat, "bowl": bowl}
+
+
 # ─── Caching ─────────────────────────────────────────────────────────────────
 
 
@@ -204,6 +254,18 @@ def load_allround_cache() -> dict:
 
 def save_allround_cache(cache: dict):
     with open(ALLROUND_CACHE_PATH, "wb") as f:
+        pickle.dump(cache, f)
+
+
+def load_innings_cache() -> dict:
+    if INNINGS_CACHE_PATH.exists():
+        with open(INNINGS_CACHE_PATH, "rb") as f:
+            return pickle.load(f)
+    return {}
+
+
+def save_innings_cache(cache: dict):
+    with open(INNINGS_CACHE_PATH, "wb") as f:
         pickle.dump(cache, f)
 
 
@@ -264,13 +326,59 @@ def scrape_all_players(player_ids: list[int], delay: float = 0.3) -> dict:
     return cache
 
 
+def scrape_all_innings(player_ids: list[int], delay: float = 0.3) -> dict:
+    cache = load_innings_cache()
+    to_scrape = [pid for pid in player_ids if pid not in cache]
+
+    print(f"Innings cache has {len(cache)} players. Need to scrape {len(to_scrape)} more.")
+    if not to_scrape:
+        print("All innings already cached!")
+        return cache
+
+    failed = []
+    for i, pid in enumerate(to_scrape, 1):
+        data = scrape_player_innings(pid)
+        if data["bat"] or data["bowl"]:
+            cache[pid] = data
+        else:
+            failed.append(pid)
+
+        if i % 50 == 0 or i == len(to_scrape):
+            save_innings_cache(cache)
+            print(f"  Innings progress: {i}/{len(to_scrape)}, {len(failed)} failed")
+        time.sleep(delay)
+
+    save_innings_cache(cache)
+    print(f"Innings done! Cache: {len(cache)} players. {len(failed)} failures.")
+    return cache
+
+
 # ─── Computation ─────────────────────────────────────────────────────────────
 
 
-def compute_stints(df: pd.DataFrame, stint_size: int = STINT_SIZE) -> list[dict]:
+def compute_stints(
+    df: pd.DataFrame,
+    innings_data: dict | None = None,
+    stint_size: int = STINT_SIZE,
+) -> list[dict]:
     df = df.copy()
     df["_bat_dism"] = np.where(df["Bat Av"] > 0, df["Runs"] / df["Bat Av"], 0)
     df["_bowl_runs"] = np.where(df["Wkts"] > 0, df["Bowl Av"].fillna(0) * df["Wkts"], 0)
+
+    bat_inn_map = innings_data.get("bat", {}) if innings_data else {}
+    bowl_inn_map = innings_data.get("bowl", {}) if innings_data else {}
+
+    def _get_cum_inn(inn_map, mat_num):
+        """Look up cumulative innings for a match number."""
+        if not inn_map:
+            return None
+        m = int(mat_num)
+        if m in inn_map:
+            return inn_map[m]
+        closest = min(inn_map.keys(), key=lambda k: abs(k - m), default=None)
+        if closest is not None and abs(closest - m) <= 1:
+            return inn_map[closest]
+        return None
 
     stints = []
     n = len(df)
@@ -284,11 +392,15 @@ def compute_stints(df: pd.DataFrame, stint_size: int = STINT_SIZE) -> list[dict]
 
         if i == 0:
             p_runs, p_dism, p_wkts, p_br = 0, 0, 0, 0
+            p_bat_inn, p_bowl_inn = 0, 0
         else:
             p = df.iloc[i - 1]
             p_runs, p_dism, p_wkts, p_br = (
                 p["Runs"], p["_bat_dism"], p["Wkts"], p["_bowl_runs"]
             )
+            p_mat = int(p["Mat"])
+            p_bat_inn = _get_cum_inn(bat_inn_map, p_mat) or 0
+            p_bowl_inn = _get_cum_inn(bowl_inn_map, p_mat) or 0
 
         c = df.iloc[end_idx]
         matches = end_idx - i + 1
@@ -297,8 +409,18 @@ def compute_stints(df: pd.DataFrame, stint_size: int = STINT_SIZE) -> list[dict]
         s_wkts = c["Wkts"] - p_wkts
         s_br = c["_bowl_runs"] - p_br
 
-        bat_avg = float(s_runs / s_dism) if s_dism >= MIN_STINT_DISM else None
-        bowl_avg = float(s_br / s_wkts) if s_wkts >= MIN_STINT_WKTS else None
+        c_mat = int(c["Mat"])
+        c_bat_inn = _get_cum_inn(bat_inn_map, c_mat)
+        c_bowl_inn = _get_cum_inn(bowl_inn_map, c_mat)
+
+        s_bat_inn = (c_bat_inn - p_bat_inn) if c_bat_inn is not None else None
+        s_bowl_inn = (c_bowl_inn - p_bowl_inn) if c_bowl_inn is not None else None
+
+        bat_qualifies = s_bat_inn >= MIN_STINT_BAT_INN if s_bat_inn is not None else s_dism >= MIN_STINT_BAT_INN
+        bowl_qualifies = s_bowl_inn >= MIN_STINT_BOWL_INN if s_bowl_inn is not None else s_wkts >= MIN_STINT_BOWL_INN
+
+        bat_avg = float(s_runs / s_dism) if bat_qualifies and s_dism > 0 else None
+        bowl_avg = float(s_br / s_wkts) if bowl_qualifies and s_wkts > 0 else None
         bowl_score = (BOWL_K / bowl_avg) if bowl_avg and bowl_avg > 0 else None
 
         stints.append({
@@ -331,14 +453,15 @@ def excellence_indices(stints: list[dict], boei_scale: float = 1.0) -> dict:
     return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2), "matches": total_matches}
 
 
-def compute_boei_scale(cache: dict) -> float:
+def compute_boei_scale(cache: dict, innings_cache: dict) -> float:
     bat_num = bat_den = bowl_num = bowl_den = 0.0
-    for df in cache.values():
+    for pid, df in cache.items():
         try:
             df_clean = df.dropna(subset=["Mat"])
             if len(df_clean) < 2:
                 continue
-            stints = compute_stints(df_clean)
+            inn_data = innings_cache.get(pid)
+            stints = compute_stints(df_clean, inn_data)
             for s in stints:
                 if s["bat_avg"] is not None:
                     bat_num += s["bat_avg"] * s["matches"]
@@ -353,7 +476,7 @@ def compute_boei_scale(cache: dict) -> float:
     return (bat_num / bat_den) / (bowl_num / bowl_den)
 
 
-def compute_all_players(cache: dict, player_info: pd.DataFrame, boei_scale: float):
+def compute_all_players(cache: dict, innings_cache: dict, player_info: pd.DataFrame, boei_scale: float):
     records = []
     for pid, df in cache.items():
         try:
@@ -361,7 +484,8 @@ def compute_all_players(cache: dict, player_info: pd.DataFrame, boei_scale: floa
             df_clean = df.dropna(subset=["Mat"])
             if len(df_clean) < 2:
                 continue
-            stints = compute_stints(df_clean)
+            inn_data = innings_cache.get(pid)
+            stints = compute_stints(df_clean, inn_data)
             idx = excellence_indices(stints, boei_scale)
             info_row = player_info[player_info["player_id"] == pid]
             country = info_row["country"].values[0] if len(info_row) > 0 else ""
@@ -569,8 +693,8 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
             "boei_scale": round(boei_scale, 4),
             "alpha": ALPHA,
             "bowl_k": BOWL_K,
-            "min_stint_dism": MIN_STINT_DISM,
-            "min_stint_wkts": MIN_STINT_WKTS,
+            "min_stint_bat_inn": MIN_STINT_BAT_INN,
+            "min_stint_bowl_inn": MIN_STINT_BOWL_INN,
             "min_allrounder_balance": MIN_ALLROUNDER_BALANCE,
             "stint_size": STINT_SIZE,
             "rating_k": RATING_K,
@@ -611,16 +735,19 @@ def main():
 
     if do_scrape:
         cache = scrape_all_players(all_ids)
+        innings_cache = scrape_all_innings(all_ids)
     else:
         cache = load_allround_cache()
         print(f"Loaded allround cache: {len(cache)} players")
+        innings_cache = load_innings_cache()
+        print(f"Loaded innings cache: {len(innings_cache)} players")
 
     print("\nComputing BoEI normalization scale...")
-    boei_scale = compute_boei_scale(cache)
+    boei_scale = compute_boei_scale(cache, innings_cache)
     print(f"  BOEI_SCALE = {boei_scale:.4f}")
 
     print("Computing indices for all players...")
-    all_players = compute_all_players(cache, player_info, boei_scale)
+    all_players = compute_all_players(cache, innings_cache, player_info, boei_scale)
     print(f"  Computed indices for {len(all_players)} players")
 
     print("Building rankings JSON...")
