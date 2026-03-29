@@ -669,9 +669,12 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSearch();
   loadData();
 
-  let resizeTimer;
+  let lastWidth = window.innerWidth;
   window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (DATA) renderAll(); }, 250);
+    const newWidth = window.innerWidth;
+    if (newWidth !== lastWidth) {
+      lastWidth = newWidth;
+      if (DATA) renderAll();
+    }
   });
 });
