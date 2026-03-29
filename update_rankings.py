@@ -34,7 +34,7 @@ MIN_ALLROUNDER_BALANCE = 0.25
 MIN_MATCHES = 20
 STINT_SIZE = 10
 TOP_N = 25
-RATING_K = 110  # z-score multiplier for 0-1000 scale (Bradman ≈ 1020)
+RATING_K = 270  # sqrt-compressed z-score multiplier (Bradman ≈ 1087, elite ≈ 930-970)
 
 CACHE_DIR = Path(__file__).parent / "cricket_cache"
 CACHE_DIR.mkdir(exist_ok=True)
@@ -412,7 +412,11 @@ def compute_ratings(all_players: list[dict]) -> dict:
                 sigma = 1
             val = p[metric]
             if val > 0:
-                rating = max(0, int(round(500 + (val - mu) / sigma * RATING_K)))
+                z = (val - mu) / sigma
+                if z >= 0:
+                    rating = max(0, int(round(500 + RATING_K * np.sqrt(z))))
+                else:
+                    rating = max(0, int(round(500 - RATING_K * np.sqrt(-z))))
             else:
                 rating = 0
             p[f"{metric}_rating"] = rating
