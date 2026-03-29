@@ -525,20 +525,20 @@ function renderPlayerCareer(player) {
     }
   }
 
-  // Dynamic domain allocation with generous gaps for titles
+  // Dynamic domain allocation with generous gaps for titles + subtitles
   const totalRows = rows.length;
-  const gap = totalRows === 3 ? 0.12 : 0.10;
+  const gap = totalRows === 3 ? 0.16 : 0.12;
 
   const domains = [];
   let cursor = 1;
   for (let ri = 0; ri < totalRows; ri++) {
     let frac;
     if (totalRows === 3) {
-      frac = [0.30, 0.30, 0.20][ri];
+      frac = [0.26, 0.26, 0.17][ri];
     } else if (totalRows === 2) {
-      frac = 0.43;
+      frac = 0.40;
     } else {
-      frac = 0.92;
+      frac = 0.90;
     }
     const top = cursor;
     const bottom = cursor - frac;
@@ -551,10 +551,10 @@ function renderPlayerCareer(player) {
 
   const layout = {
     ...plotlyLayout(),
-    height: totalRows === 1 ? 350 : totalRows === 2 ? 600 : 820,
+    height: totalRows === 1 ? 350 : totalRows === 2 ? 650 : 950,
     showlegend: hasKDE,
-    legend: { orientation: 'h', y: -0.06, x: 0.5, xanchor: 'center' },
-    margin: { l: 60, r: 30, t: 45, b: 60 },
+    legend: { orientation: 'h', y: -0.05, x: 0.5, xanchor: 'center' },
+    margin: { l: 60, r: 30, t: 60, b: 55 },
     annotations: [],
   };
 
@@ -569,8 +569,8 @@ function renderPlayerCareer(player) {
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
     const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
-    const titleY = domains[ri][1] + 0.04;
-    const subtitleY = domains[ri][1] + 0.015;
+    const titleY = domains[ri][1] + 0.06;
+    const subtitleY = domains[ri][1] + 0.03;
 
     if (r === 'bat') {
       layout[yName].title = '';
