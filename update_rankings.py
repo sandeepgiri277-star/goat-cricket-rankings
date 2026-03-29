@@ -511,6 +511,24 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 "matches": total,
             })
 
+        # Compute ratings for this alpha's distribution
+        for metric in ["BEI", "BoEI", "AEI"]:
+            vals = [r[metric] for r in recomputed if r[metric] > 0]
+            if len(vals) < 2:
+                continue
+            mu, sigma = float(np.mean(vals)), float(np.std(vals))
+            if sigma == 0:
+                sigma = 1.0
+            for r in recomputed:
+                v = r[metric]
+                if v > 0:
+                    z = (v - mu) / sigma
+                    r[f"{metric}_rating"] = max(0, int(round(
+                        500 + RATING_K * np.sqrt(z) if z >= 0 else 500 - RATING_K * np.sqrt(-z)
+                    )))
+                else:
+                    r[f"{metric}_rating"] = 0
+
         bat_top = sorted(recomputed, key=lambda x: x["BEI"], reverse=True)[:15]
         bowl_top = sorted(recomputed, key=lambda x: x["BoEI"], reverse=True)[:15]
         ar_candidates = [

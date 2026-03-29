@@ -75,31 +75,34 @@
         <h2>Methodology</h2>
 
         <h3>The Problem with Career Averages</h3>
-        <p>Traditional career averages are <strong>cumulative</strong> &mdash; they smooth over an entire career into a single number. This hides crucial information: how <em>consistently</em> did a player perform across different phases of their career? A player who averaged 50 for their first 30 tests then 25 for the next 70 looks the same as someone who averaged 32 throughout.</p>
+        <p>A player who averages 50 over 20 Tests is <strong>not</strong> the same as someone who averages 50 over 180 Tests. The second player sustained that level for nine times longer &mdash; through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
 
         <h3>Stint-Based Approach</h3>
-        <p>We divide every career into <strong>10-match stints</strong> and compute batting and bowling averages independently for each stint. If the final leftover is shorter than 10 matches, it gets absorbed into the previous stint (e.g., 71 matches &rarr; stints of 10, 10, 10, 10, 10, 10, 11).</p>
+        <p>We divide every career into <strong>10-match windows</strong> and compute batting and bowling averages independently for each window. If the final leftover is shorter than 10 matches, it merges into the previous window (e.g., 71 matches &rarr; stints of 10, 10, 10, 10, 10, 10, 11). This gives us a picture of how a player performed at each stage of their career &mdash; not just one blended number.</p>
 
         <h3>Minimum Qualification</h3>
-        <p>Each stint requires &ge; <strong>10 dismissals</strong> for the batting average to count, and &ge; <strong>10 wickets</strong> for the bowling average to count. This filters out part-time batsmen/bowlers and naturally caps outlier stints from not-out inflation.</p>
+        <p>Each stint requires &ge; <strong>10 dismissals</strong> (batting) or &ge; <strong>10 wickets</strong> (bowling) to count. This filters out part-time players and prevents not-out inflation from producing misleading averages.</p>
+
+        <h3>How the Index Works</h3>
+        <p>Think of it as the <strong>area under the curve</strong> of a player's stint scores plotted over their career. A player who bats well for 15 stints accumulates more area than someone equally skilled over 5 stints. This integral naturally rewards both quality <em>and</em> longevity.</p>
 
         <h3>Batting Excellence Index (BEI)</h3>
         <div class="formula">
           BEI = (&sum; stint_bat_avg &times; stint_matches) / M<sup>0.75</sup>
         </div>
-        <p>The integral of batting score over matches, adjusted for career length. Higher batting averages sustained over more matches produce a bigger area under the curve.</p>
+        <p>The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.</p>
 
         <h3>Bowling Score Transformation</h3>
-        <p>Bowling averages are "lower is better," so we transform them: <strong>bowl_score = 1000 / bowl_avg</strong>. This maps bowling averages to a scale where higher is better: avg 20 &rarr; score 50, avg 25 &rarr; 40, avg 30 &rarr; 33.</p>
+        <p>Bowling averages are "lower is better," so we flip them: <strong>bowl_score = 1000 &divide; bowl_avg</strong>. A bowling average of 20 becomes a score of 50; an average of 25 becomes 40. Now higher is better, just like batting.</p>
 
         <h3>Bowling Excellence Index (BoEI)</h3>
         <div class="formula">
           BoEI = (&sum; bowl_score &times; stint_matches) &times; scale / M<sup>0.75</sup>
         </div>
-        <p>The raw BoEI is rescaled by a data-driven factor (<span id="boei-scale-display"></span>) so that the average qualifying bowling stint contributes equally to the average qualifying batting stint. This factor is computed from match-weighted means across all players.</p>
+        <p>Same integral concept as BEI, but for bowling scores. A data-driven scaling factor (<span id="boei-scale-display"></span>) ensures that the average bowling stint contributes equally to the average batting stint, so the two indices are comparable.</p>
 
-        <h3>Career-Length Adjustment (M<sup>0.75</sup>)</h3>
-        <p>All indices are divided by M<sup>&alpha;</sup> where &alpha; = 0.75. This means quality per match matters more than sheer longevity, but long careers are still rewarded. At &alpha; = 0.5 (&radic;M), long careers dominate; at &alpha; = 1.0, it's purely per-match average and career length is irrelevant.</p>
+        <h3>Why M<sup>0.75</sup>?</h3>
+        <p>The raw integral grows with career length, so we divide by M<sup>&alpha;</sup> (where &alpha; = 0.75) to control <em>how much</em> longevity matters. At &alpha; = 1.0, a 20-Test player averaging 50 and a 180-Test player averaging 50 would rate equally &mdash; career length wouldn't matter at all. At &alpha; = 0.5, the 180-Test player would rate 3&times; higher &mdash; longevity dominates. At &alpha; = 0.75, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.</p>
 
         <div class="alpha-section">
           <h4>Alpha Sensitivity</h4>

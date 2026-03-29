@@ -338,7 +338,8 @@ function renderAlphaTable(category) {
       if (rank < list.length) {
         const p = list[rank];
         const name = p.name.length > 16 ? p.name.slice(0, 15) + '\u2026' : p.name;
-        rows += `<td class="${a === '0.75' ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${Math.round(p[metricKey])}</span></td>`;
+        const rating = p[metricKey + '_rating'] || Math.round(p[metricKey]);
+        rows += `<td class="${a === '0.75' ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${rating}</span></td>`;
       } else {
         rows += '<td></td>';
       }
