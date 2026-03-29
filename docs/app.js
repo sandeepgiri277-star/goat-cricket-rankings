@@ -543,14 +543,14 @@ function renderPlayerCareer(player) {
       layout[yName].range = [0, batMax * 1.3];
       layout.annotations.push(
         { text: 'Batting Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
-        { text: 'Average for each 10-match window (min. 10 dismissals to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+        { text: 'Average for each 10-match window (min. 10 batting innings to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
       );
     } else if (r === 'bowl') {
       layout[yName].title = '';
       layout[yName].range = [0, bowlMax * 1.3];
       layout.annotations.push(
         { text: 'Bowling Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
-        { text: 'Average for each 10-match window (min. 10 wickets to qualify) \u2014 lower is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+        { text: 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
       );
     }
   }

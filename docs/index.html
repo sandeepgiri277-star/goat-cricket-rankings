@@ -81,7 +81,7 @@
         <p>We divide every career into <strong>10-match windows</strong> and compute batting and bowling averages independently for each window. If the final leftover is shorter than 10 matches, it merges into the previous window (e.g., 71 matches &rarr; stints of 10, 10, 10, 10, 10, 10, 11). This gives us a picture of how a player performed at each stage of their career &mdash; not just one blended number.</p>
 
         <h3>Minimum Qualification</h3>
-        <p>Each stint requires &ge; <strong>10 dismissals</strong> (batting) or &ge; <strong>10 wickets</strong> (bowling) to count. This filters out part-time players and prevents not-out inflation from producing misleading averages.</p>
+        <p>Each stint requires &ge; <strong>10 batting innings</strong> (batting) or &ge; <strong>10 bowling innings</strong> (bowling) to count. This filters out part-time players and prevents small samples from producing misleading averages.</p>
 
         <h3>How the Index Works</h3>
         <p>Think of it as the <strong>area under the curve</strong> of a player's stint scores plotted over their career. A player who bats well for 15 stints accumulates more area than someone equally skilled over 5 stints. This integral naturally rewards both quality <em>and</em> longevity.</p>
