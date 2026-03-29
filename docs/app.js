@@ -13,6 +13,8 @@ const COLORS = {
 
 const plotlyConfig = { responsive: true, displayModeBar: false };
 
+function isMobile() { return window.innerWidth <= 700; }
+
 // Country code → flag emoji
 const FLAGS = {
   AUS: '\u{1F1E6}\u{1F1FA}', ENG: '\u{1F1EC}\u{1F1E7}', IND: '\u{1F1EE}\u{1F1F3}',
@@ -128,22 +130,25 @@ function renderMeta() {
 // ─── Allrounder Chart ───────────────────────────────────────────────────────
 
 function renderAllrounderChart() {
-  const players = [...DATA.allrounder_top25].slice(0, 25).reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
+  const mobile = isMobile();
+  const n = mobile ? 15 : 25;
+  const players = [...DATA.allrounder_top25].slice(0, n).reverse();
+  const labels = players.map(p => mobile ? p.name.split(' ').pop() : `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
     y: labels, x: players.map(p => p.ar_rating), type: 'bar', orientation: 'h',
     marker: { color: players.map(p => p.ar_rating >= 1000 ? COLORS.aei : COLORS.bat) },
     text: players.map(p => p.ar_rating), textposition: 'inside',
-    textfont: { color: '#fff', size: 12, weight: 700 },
+    textfont: { color: '#fff', size: mobile ? 10 : 12, weight: 700 },
     hovertemplate: '%{y}<br>Rating: %{x}<br>Bat: %{customdata[0]} · Bowl: %{customdata[1]}<extra></extra>',
     customdata: players.map(p => [p.bat_rating, p.bowl_rating]),
   }];
 
   const layout = plotlyLayout({
-    height: Math.max(550, players.length * 30 + 80),
-    margin: { l: 220, r: 60, t: 10, b: 30 },
+    height: Math.max(mobile ? 400 : 550, players.length * (mobile ? 26 : 30) + 80),
+    margin: { l: mobile ? 100 : 220, r: mobile ? 10 : 60, t: 10, b: 30 },
     xaxis: { title: 'Rating' },
+    yaxis: { tickfont: { size: mobile ? 10 : 12 } },
     showlegend: false,
   });
 
@@ -153,22 +158,25 @@ function renderAllrounderChart() {
 // ─── Batting Chart ──────────────────────────────────────────────────────────
 
 function renderBattingChart() {
-  const players = [...DATA.batting_top25].slice(0, 25).reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
+  const mobile = isMobile();
+  const n = mobile ? 15 : 25;
+  const players = [...DATA.batting_top25].slice(0, n).reverse();
+  const labels = players.map(p => mobile ? p.name.split(' ').pop() : `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
     y: labels, x: players.map(p => p.bat_rating), type: 'bar', orientation: 'h',
     marker: { color: players.map(p => p.bat_rating >= 1000 ? COLORS.aei : COLORS.bat) },
     text: players.map(p => p.bat_rating), textposition: 'inside',
-    textfont: { color: '#fff', size: 12, weight: 700 },
+    textfont: { color: '#fff', size: mobile ? 10 : 12, weight: 700 },
     hovertemplate: '%{y}<br>Rating: %{x}<br>%{customdata} matches<extra></extra>',
     customdata: players.map(p => p.matches),
   }];
 
   const layout = plotlyLayout({
-    height: Math.max(550, players.length * 30 + 80),
-    margin: { l: 220, r: 60, t: 10, b: 30 },
+    height: Math.max(mobile ? 400 : 550, players.length * (mobile ? 26 : 30) + 80),
+    margin: { l: mobile ? 100 : 220, r: mobile ? 10 : 60, t: 10, b: 30 },
     xaxis: { title: 'Rating' },
+    yaxis: { tickfont: { size: mobile ? 10 : 12 } },
     showlegend: false,
   });
 
@@ -178,22 +186,25 @@ function renderBattingChart() {
 // ─── Bowling Chart ──────────────────────────────────────────────────────────
 
 function renderBowlingChart() {
-  const players = [...DATA.bowling_top25].slice(0, 25).reverse();
-  const labels = players.map(p => `${getFlag(p.country)} ${p.name}`);
+  const mobile = isMobile();
+  const n = mobile ? 15 : 25;
+  const players = [...DATA.bowling_top25].slice(0, n).reverse();
+  const labels = players.map(p => mobile ? p.name.split(' ').pop() : `${getFlag(p.country)} ${p.name}`);
 
   const traces = [{
     y: labels, x: players.map(p => p.bowl_rating), type: 'bar', orientation: 'h',
     marker: { color: players.map(p => p.bowl_rating >= 1000 ? COLORS.aei : COLORS.bowl) },
     text: players.map(p => p.bowl_rating), textposition: 'inside',
-    textfont: { color: '#fff', size: 12, weight: 700 },
+    textfont: { color: '#fff', size: mobile ? 10 : 12, weight: 700 },
     hovertemplate: '%{y}<br>Rating: %{x}<br>%{customdata} matches<extra></extra>',
     customdata: players.map(p => p.matches),
   }];
 
   const layout = plotlyLayout({
-    height: Math.max(550, players.length * 30 + 80),
-    margin: { l: 220, r: 60, t: 10, b: 30 },
+    height: Math.max(mobile ? 400 : 550, players.length * (mobile ? 26 : 30) + 80),
+    margin: { l: mobile ? 100 : 220, r: mobile ? 10 : 60, t: 10, b: 30 },
     xaxis: { title: 'Rating' },
+    yaxis: { tickfont: { size: mobile ? 10 : 12 } },
     showlegend: false,
   });
 
@@ -302,12 +313,13 @@ function renderKDE() {
     });
   }
 
+  const mobile = isMobile();
   const layout = plotlyLayout({
-    height: 350,
-    xaxis: { title: 'Index Value' },
+    height: mobile ? 280 : 350,
+    xaxis: { title: 'Index Value', tickfont: { size: mobile ? 9 : 12 } },
     yaxis: { title: 'Density', showticklabels: false },
-    legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center' },
-    margin: { t: 20, b: 50 },
+    legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: mobile ? 10 : 12 } },
+    margin: { l: mobile ? 30 : 50, r: mobile ? 10 : 30, t: 20, b: mobile ? 40 : 50 },
   });
 
   Plotly.newPlot('chart-kde', traces, layout, plotlyConfig);
@@ -517,11 +529,13 @@ function renderPlayerCareer(player) {
   const batMax = hasBat ? Math.max(...batVals.filter(v => v != null), 10) : 10;
   const bowlMax = hasBowl ? Math.max(...bowlVals.filter(v => v != null), 10) : 10;
 
+  const mobile = isMobile();
+
   const layout = {
     ...plotlyLayout(),
-    height: totalRows === 1 ? 380 : 700,
+    height: totalRows === 1 ? (mobile ? 300 : 380) : (mobile ? 550 : 700),
     showlegend: false,
-    margin: { l: 60, r: 30, t: 60, b: 40 },
+    margin: { l: mobile ? 40 : 60, r: mobile ? 15 : 30, t: mobile ? 50 : 60, b: mobile ? 30 : 40 },
     annotations: [],
   };
 
@@ -531,26 +545,28 @@ function renderPlayerCareer(player) {
     const xName = n === 1 ? 'xaxis' : `xaxis${n}`;
     const yName = n === 1 ? 'yaxis' : `yaxis${n}`;
 
-    layout[xName] = { gridcolor: gc, domain: [0, 1], anchor: n === 1 ? 'y' : `y${n}` };
+    layout[xName] = { gridcolor: gc, domain: [0, 1], anchor: n === 1 ? 'y' : `y${n}`, tickfont: { size: mobile ? 9 : 12 } };
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
     const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
     const titleY = domains[ri][1] + 0.055;
     const subtitleY = domains[ri][1] + 0.025;
+    const titleSize = mobile ? 11 : 13;
+    const subSize = mobile ? 8 : 10;
 
     if (r === 'bat') {
       layout[yName].title = '';
       layout[yName].range = [0, batMax * 1.3];
       layout.annotations.push(
-        { text: 'Batting Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
-        { text: 'Average for each 10-match window (min. 10 batting innings to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+        { text: 'Batting Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: titleSize, color: textColor } },
+        { text: mobile ? 'Per 10-match window (min. 10 innings)' : 'Average for each 10-match window (min. 10 batting innings to qualify)', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: subSize, color: mutedColor } },
       );
     } else if (r === 'bowl') {
       layout[yName].title = '';
       layout[yName].range = [0, bowlMax * 1.3];
       layout.annotations.push(
-        { text: 'Bowling Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: 13, color: textColor } },
-        { text: 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: 10, color: mutedColor } },
+        { text: 'Bowling Average per Stint', xref: 'paper', yref: 'paper', x: 0.5, y: titleY, showarrow: false, font: { size: titleSize, color: textColor } },
+        { text: mobile ? 'Per 10-match window (min. 10 innings) \u2014 lower is better' : 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better', xref: 'paper', yref: 'paper', x: 0.5, y: subtitleY, showarrow: false, font: { size: subSize, color: mutedColor } },
       );
     }
   }
@@ -637,4 +653,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setupTabs();
   setupSearch();
   loadData();
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (DATA) renderAll(); }, 250);
+  });
 });
