@@ -30,11 +30,12 @@ BOWL_K = 1000
 MIN_STINT_BAT_INN = 10
 MIN_STINT_BOWL_INN = 10
 ALPHA = 0.70
-MIN_ALLROUNDER_BALANCE = 0.25
 MIN_MATCHES = 20
 STINT_SIZE = 10
 TOP_N = 100
-RATING_K = 270  # sqrt-compressed z-score multiplier (Bradman ≈ 1087, elite ≈ 930-970)
+RATING_BASE = 350
+RATING_K = 351  # sqrt-compressed: 900+=elite, 800+=great, 700+=very good
+MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder
 
 CACHE_DIR = Path(__file__).parent / "cricket_cache"
 CACHE_DIR.mkdir(exist_ok=True)
@@ -509,42 +510,57 @@ def compute_all_players(cache: dict, innings_cache: dict, player_info: pd.DataFr
 # ─── JSON Output ─────────────────────────────────────────────────────────────
 
 
-def compute_ratings(all_players: list[dict]) -> dict:
-    """Compute ICC-style 0-1000 ratings using z-scores within each metric.
+def _z_to_rating(z: float) -> int:
+    if z >= 0:
+        return max(0, int(round(RATING_BASE + RATING_K * np.sqrt(z))))
+    return max(0, int(round(RATING_BASE - RATING_K * np.sqrt(-z))))
 
-    rating = 500 + z * RATING_K, floored at 0.
-    BEI ratings use all players with BEI > 0.
-    BoEI ratings use all players with BoEI > 0.
-    AEI ratings use allrounder-qualifying players only.
+
+def compute_ratings(all_players: list[dict]) -> dict:
+    """Two-pass rating computation.
+
+    Pass 1: compute BEI / BoEI ratings for every player.
+    Pass 2: identify allrounders (min rating in both >= MIN_AR_RATING),
+            compute AEI stats from that population, then assign AEI ratings.
     """
     bei_vals = np.array([p["BEI"] for p in all_players if p["BEI"] > 0])
     boei_vals = np.array([p["BoEI"] for p in all_players if p["BoEI"] > 0])
-    ar_vals = np.array([
-        p["AEI"] for p in all_players
-        if p["AEI"] > 0 and min(p["BEI"], p["BoEI"]) / p["AEI"] >= MIN_ALLROUNDER_BALANCE
-    ])
 
     stats = {
         "BEI": (float(bei_vals.mean()), float(bei_vals.std())),
         "BoEI": (float(boei_vals.mean()), float(boei_vals.std())),
-        "AEI": (float(ar_vals.mean()), float(ar_vals.std())) if len(ar_vals) > 1 else (0, 1),
     }
 
+    # Pass 1: BEI and BoEI ratings
     for p in all_players:
-        for metric in ["BEI", "BoEI", "AEI"]:
+        for metric in ["BEI", "BoEI"]:
             mu, sigma = stats[metric]
             if sigma == 0:
                 sigma = 1
             val = p[metric]
             if val > 0:
-                z = (val - mu) / sigma
-                if z >= 0:
-                    rating = max(0, int(round(500 + RATING_K * np.sqrt(z))))
-                else:
-                    rating = max(0, int(round(500 - RATING_K * np.sqrt(-z))))
+                p[f"{metric}_rating"] = _z_to_rating((val - mu) / sigma)
             else:
-                rating = 0
-            p[f"{metric}_rating"] = rating
+                p[f"{metric}_rating"] = 0
+
+    # Pass 2: AEI ratings (population = players meeting MIN_AR_RATING in both)
+    ar_vals = np.array([
+        p["AEI"] for p in all_players
+        if p["AEI"] > 0
+        and p["BEI_rating"] >= MIN_AR_RATING
+        and p["BoEI_rating"] >= MIN_AR_RATING
+    ])
+    stats["AEI"] = (float(ar_vals.mean()), float(ar_vals.std())) if len(ar_vals) > 1 else (0.0, 1.0)
+
+    mu, sigma = stats["AEI"]
+    if sigma == 0:
+        sigma = 1
+    for p in all_players:
+        val = p["AEI"]
+        if val > 0:
+            p["AEI_rating"] = _z_to_rating((val - mu) / sigma)
+        else:
+            p["AEI_rating"] = 0
 
     return stats
 
@@ -559,8 +575,8 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
     for p in all_players:
         if p["AEI"] <= 0:
             continue
-        balance = min(p["BEI"], p["BoEI"]) / p["AEI"]
-        if balance >= MIN_ALLROUNDER_BALANCE:
+        if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
+            balance = min(p["BEI"], p["BoEI"]) / p["AEI"]
             allrounders.append({**p, "balance": round(balance * 100, 1)})
     allrounders.sort(key=lambda p: p["AEI"], reverse=True)
 
@@ -649,7 +665,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 if v > 0:
                     z = (v - mu) / sigma
                     r[f"{metric}_rating"] = max(0, int(round(
-                        500 + RATING_K * np.sqrt(z) if z >= 0 else 500 - RATING_K * np.sqrt(-z)
+                        RATING_BASE + RATING_K * np.sqrt(z) if z >= 0 else RATING_BASE - RATING_K * np.sqrt(-z)
                     )))
                 else:
                     r[f"{metric}_rating"] = 0
@@ -658,7 +674,9 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
         bowl_top = sorted(recomputed, key=lambda x: x["BoEI"], reverse=True)[:15]
         ar_candidates = [
             r for r in recomputed
-            if r["AEI"] > 0 and min(r["BEI"], r["BoEI"]) / r["AEI"] >= MIN_ALLROUNDER_BALANCE
+            if r["AEI"] > 0
+            and r.get("BEI_rating", 0) >= MIN_AR_RATING
+            and r.get("BoEI_rating", 0) >= MIN_AR_RATING
         ]
         ar_top = sorted(ar_candidates, key=lambda x: x["AEI"], reverse=True)[:15]
 
@@ -668,8 +686,19 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
             "allrounder": ar_top,
         }
 
-    # All players for search (without stints to keep size manageable in the index,
-    # stints stored separately)
+    # Compute global ranks for every player
+    bat_rank_map = {}
+    for rank, p in enumerate(bei_sorted, 1):
+        bat_rank_map[p["player_name"]] = rank if p["BEI"] > 0 else None
+
+    bowl_rank_map = {}
+    for rank, p in enumerate(boei_sorted, 1):
+        bowl_rank_map[p["player_name"]] = rank if p["BoEI"] > 0 else None
+
+    ar_rank_map = {}
+    for rank, p in enumerate(allrounders, 1):
+        ar_rank_map[p["player_name"]] = rank
+
     all_players_index = [
         {
             "name": p["player_name"],
@@ -681,6 +710,9 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
             "bat_rating": p["BEI_rating"],
             "bowl_rating": p["BoEI_rating"],
             "ar_rating": p["AEI_rating"],
+            "bat_rank": bat_rank_map.get(p["player_name"]),
+            "bowl_rank": bowl_rank_map.get(p["player_name"]),
+            "ar_rank": ar_rank_map.get(p["player_name"]),
             "stints": p["stints"],
         }
         for p in all_players
@@ -695,8 +727,9 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
             "bowl_k": BOWL_K,
             "min_stint_bat_inn": MIN_STINT_BAT_INN,
             "min_stint_bowl_inn": MIN_STINT_BOWL_INN,
-            "min_allrounder_balance": MIN_ALLROUNDER_BALANCE,
+            "min_ar_rating": MIN_AR_RATING,
             "stint_size": STINT_SIZE,
+            "rating_base": RATING_BASE,
             "rating_k": RATING_K,
         },
         "batting_top25": [player_summary(p) for p in bei_sorted[:TOP_N]],

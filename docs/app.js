@@ -422,21 +422,17 @@ function showPlayer(name) {
   const card = document.getElementById('player-card');
   card.classList.remove('hidden');
 
-  const batRank = DATA.batting_top25.findIndex(p => p.name === name);
-  const bowlRank = DATA.bowling_top25.findIndex(p => p.name === name);
-  const arRank = DATA.allrounder_top25.findIndex(p => p.name === name);
-
   let stats = '';
   if (player.bat_rating > 0) {
-    const rankLabel = batRank >= 0 ? ` (#${batRank + 1})` : '';
+    const rankLabel = player.bat_rank ? ` (#${player.bat_rank})` : '';
     stats += `<div class="ph-stat"><div class="label">Bat Rating</div><div class="value bei">${player.bat_rating}${rankLabel}</div></div>`;
   }
   if (player.bowl_rating > 0) {
-    const rankLabel = bowlRank >= 0 ? ` (#${bowlRank + 1})` : '';
+    const rankLabel = player.bowl_rank ? ` (#${player.bowl_rank})` : '';
     stats += `<div class="ph-stat"><div class="label">Bowl Rating</div><div class="value boei">${player.bowl_rating}${rankLabel}</div></div>`;
   }
-  if (arRank >= 0) {
-    stats += `<div class="ph-stat"><div class="label">Allrounder</div><div class="value">${player.ar_rating} (#${arRank + 1})</div></div>`;
+  if (player.ar_rank) {
+    stats += `<div class="ph-stat"><div class="label">Allrounder</div><div class="value">${player.ar_rating} (#${player.ar_rank})</div></div>`;
   }
 
   document.getElementById('player-header').innerHTML = `

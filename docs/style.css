@@ -409,6 +409,7 @@ a:hover { text-decoration: underline; }
 
 .methodology {
   max-width: 800px;
+  margin: 0 auto;
 }
 
 .methodology h3 {
