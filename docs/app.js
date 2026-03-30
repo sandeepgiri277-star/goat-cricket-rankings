@@ -110,14 +110,16 @@ async function loadData() {
 }
 
 function restoreFromHash() {
-  const hash = decodeURIComponent(location.hash.slice(1));
-  if (!hash) return;
+  const raw = location.hash.slice(1);
+  if (!raw) return;
+  const hash = decodeURIComponent(raw);
 
   if (hash.startsWith('player/')) {
     const name = hash.slice(7);
     switchTab('player-lookup', false);
     document.getElementById('player-search').value = name;
-    showPlayer(name, false);
+    // Delay so the panel is visible and laid out before Plotly renders
+    setTimeout(() => showPlayer(name, false), 120);
   } else {
     const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'methodology'];
     if (validTabs.includes(hash)) {

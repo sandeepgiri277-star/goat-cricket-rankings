@@ -578,6 +578,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
         if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
             balance = min(p["BEI"], p["BoEI"]) / p["AEI"]
             allrounders.append({**p, "balance": round(balance * 100, 1)})
+    allrounders = [p for p in allrounders if p["AEI_rating"] > 0]
     allrounders.sort(key=lambda p: p["AEI"], reverse=True)
 
     def player_summary(p, extra_fields=None):
