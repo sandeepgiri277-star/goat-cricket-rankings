@@ -210,9 +210,13 @@ async function restoreFromHash() {
 
 function updateFormatLabels() {
   const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
+  const isODI = CURRENT_FORMAT === 'odis';
+  const stintDesc = isODI ? `${DATA.metadata.stint_innings}-innings stints` : `${DATA.metadata.stint_size}-match stints`;
   document.getElementById('heading-allrounders').textContent = `Top 100 ${label} Allrounders`;
   document.getElementById('heading-batting').textContent = `Top 100 ${label} Batters`;
   document.getElementById('heading-bowling').textContent = `Top 100 ${label} Bowlers`;
+  document.querySelector('#panel-batting .panel-desc').textContent = `The greatest batsmen in ${label} cricket history, ranked by sustained batting excellence across ${stintDesc}. Click any player to explore their career.`;
+  document.querySelector('#panel-bowling .panel-desc').textContent = `The greatest bowlers in ${label} cricket history, ranked by sustained bowling excellence across ${stintDesc}. Click any player to explore their career.`;
 }
 
 function renderAll() {
@@ -224,31 +228,7 @@ function renderAll() {
   renderBattingTable();
   renderBowlingChart();
   renderBowlingTable();
-
-  const hasDistributions = DATA.distributions;
-  const kdeEl = document.getElementById('chart-kde');
-  if (hasDistributions && kdeEl) {
-    renderKDE();
-    kdeEl.style.display = '';
-  } else if (kdeEl) {
-    kdeEl.style.display = 'none';
-  }
-
-  const alphaSection = document.querySelector('.alpha-section');
-  if (DATA.alpha_comparison && alphaSection) {
-    renderAlphaTable('allrounder');
-    alphaSection.style.display = '';
-  } else if (alphaSection) {
-    alphaSection.style.display = 'none';
-  }
-
-  const boeiEl = document.getElementById('boei-scale-display');
-  if (boeiEl) boeiEl.textContent = `\u00d7${DATA.metadata.boei_scale}`;
-
-  const allTimeEl = document.getElementById('all-time-avg-display');
-  if (allTimeEl && DATA.metadata.all_time_avg) {
-    allTimeEl.textContent = DATA.metadata.all_time_avg.toFixed(2);
-  }
+  renderMethodology();
 }
 
 function renderMeta() {
@@ -417,6 +397,162 @@ function addRowClickHandlers(container) {
 
 // ─── KDE Distribution ───────────────────────────────────────────────────────
 
+// ─── Methodology ────────────────────────────────────────────────────────────
+
+function renderMethodology() {
+  const el = document.getElementById('methodology-content');
+  if (!el) return;
+  const m = DATA.metadata;
+  const isODI = CURRENT_FORMAT === 'odis';
+  const label = isODI ? 'ODI' : 'Test';
+  const alpha = m.alpha;
+
+  const stintDesc = isODI
+    ? `We divide every career into <strong>${m.stint_innings}-innings windows</strong> — separately for batting and bowling. Because ODIs can include matches where a player doesn't bat or bowl, we track <em>innings played</em> rather than matches. If the final window is shorter than ${m.stint_innings} innings, it merges into the previous one.`
+    : `We divide every career into <strong>${m.stint_size}-match windows</strong> and compute batting and bowling averages independently for each window. If the final leftover is shorter than ${m.stint_size} matches, it merges into the previous window (e.g., 71 matches → stints of 10, 10, 10, 10, 10, 10, 11). This gives us a picture of how a player performed at each stage of their career — not just one blended number.`;
+
+  const minQualDesc = isODI
+    ? `Players must have played at least <strong>${m.min_matches} matches</strong> to qualify. Each stint requires ≥ <strong>${m.stint_innings} batting innings</strong> (batting) or ≥ <strong>${m.stint_innings} bowling innings</strong> (bowling) to count. Only ICC Full Member nations are included in the rankings.`
+    : `Each stint requires ≥ <strong>${m.min_stint_bat_inn} batting innings</strong> (batting) or ≥ <strong>${m.min_stint_bowl_inn} bowling innings</strong> (bowling) to count. This filters out part-time players and prevents small samples from producing misleading averages.`;
+
+  const batFormula = isODI
+    ? `bat_metric = batting_avg × (strike_rate / 100)`
+    : `bat_metric = batting_avg`;
+
+  const batFormulaDesc = isODI
+    ? `In limited-overs cricket, <strong>how fast</strong> you score matters as much as <strong>how many</strong> you score. A player averaging 40 at a strike rate of 95 is far more valuable than one averaging 40 at 65. The batting metric captures both dimensions.`
+    : `The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.`;
+
+  const bowlFormula = isODI
+    ? `bowl_score = (${m.bowl_k} / (bowl_avg × economy / 6)) × √(wpm / baseline_wpm)`
+    : `bowl_score = (${m.bowl_k} / bowl_avg) × √(wpm / baseline_wpm)`;
+
+  const bowlFormulaDesc = isODI
+    ? `In ODIs, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently.`
+    : `This captures both <strong>quality</strong> (average) and <strong>volume</strong> (wickets per match). A bowler averaging 22 and taking 5 wickets per match scores far higher than one averaging 22 but taking only 1 per match. The square root dampens the volume factor so quality still dominates.`;
+
+  const beiFormula = isODI
+    ? `BEI = (∑ bat_metric × stint_matches) / M<sup>${alpha}</sup>`
+    : `BEI = (∑ stint_bat_avg × stint_matches) / M<sup>${alpha}</sup>`;
+
+  const alphaDesc = isODI
+    ? `At α = ${alpha}, sustaining ODI excellence over a long career is rewarded, but slightly less than in Tests (α = 0.70) — reflecting that ODI careers tend to be longer and format-specific peaks matter more.`
+    : `At α = ${alpha}, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.`;
+
+  const eraDesc = isODI
+    ? `<p>For each player, we look up the <strong>overall ODI batting average</strong> and <strong>runs per over</strong> across all matches during their career span, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
+      <div class="formula">
+        Batting factor = (All-time avg / Era avg) × (All-time RPO / Era RPO)<br>
+        Bowling factor = (Era avg / All-time avg) × (Era RPO / All-time RPO)
+      </div>
+      <p>This double normalization ensures that a player from a low-scoring, slow-scoring era gets a batting boost, while a player from a high-scoring, fast-scoring era gets a bowling boost. Both dimensions — average and scoring rate — are accounted for.</p>`
+    : `<p>For each player, we look up the <strong>overall Test average</strong> (total runs ÷ total wickets) across all matches played during their career span. We then compare it to the all-time average (${m.all_time_avg}):</p>
+      <div class="formula">
+        Batting factor = All-time avg / Era avg<br>
+        Bowling factor = Era avg / All-time avg
+      </div>
+      <p>A player from a low-scoring era (e.g., era avg = 28) gets a batting boost of ~1.14× and a bowling penalty of ~0.88×. A player from a high-scoring era (e.g., era avg = 34) gets a batting penalty of ~0.94× and a bowling boost of ~1.07×.</p>`;
+
+  const arDesc = isODI
+    ? `<p>Since BoEI already incorporates wickets per match and economy, the straight sum captures overall allrounder contribution. However, ODI allrounders are <strong>ranked by the geometric mean</strong> of their batting and bowling ratings — √(bat_rating × bowl_rating) — which naturally rewards <strong>balance</strong> between the two disciplines. A player must achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`
+    : `<p>Since BoEI already incorporates wickets per match, the straight sum naturally rewards players who contribute with <strong>both</strong> bat and ball. A part-time bowler who barely takes wickets will have a negligible BoEI regardless of their bowling average. A genuine allrounder must also achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`;
+
+  const arRankFormula = isODI
+    ? `AEI = BEI + BoEI<br>Ranking metric = √(bat_rating × bowl_rating)`
+    : `AEI = BEI + BoEI`;
+
+  let html = `
+    <h2>${label} Methodology</h2>
+
+    <h3>The Problem with Career Averages</h3>
+    <p>A player who averages 50 over 20 ${label}s is <strong>not</strong> the same as someone who averages 50 over 180 ${label}s. The second player sustained that level for nine times longer — through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
+
+    <h3>Stint-Based Approach</h3>
+    <p>${stintDesc}</p>
+
+    <h3>Minimum Qualification</h3>
+    <p>${minQualDesc}</p>
+
+    <h3>How the Index Works</h3>
+    <p>Think of it as the <strong>area under the curve</strong> of a player's stint scores plotted over their career. A player who bats well for 15 stints accumulates more area than someone equally skilled over 5 stints. This integral naturally rewards both quality <em>and</em> longevity.</p>
+
+    <h3>Batting Excellence Index (BEI)</h3>
+    <div class="formula">${beiFormula}</div>
+    <div class="formula">${batFormula}</div>
+    <p>${batFormulaDesc}</p>
+
+    <h3>Bowling Score Transformation</h3>
+    <p>Bowling averages are "lower is better," so we flip them and factor in <strong>wickets per match</strong>${isODI ? ' and <strong>economy rate</strong>' : ''}:</p>
+    <div class="formula">${bowlFormula}</div>
+    <p>${bowlFormulaDesc}</p>
+
+    <h3>Bowling Excellence Index (BoEI)</h3>
+    <div class="formula">
+      BoEI = (∑ bowl_score × stint_matches) × scale / M<sup>${alpha}</sup>
+    </div>
+    <p>Same integral concept as BEI, but for bowling scores. A data-driven scaling factor (×${m.boei_scale}) ensures that the average bowling stint contributes equally to the average batting stint, so the two indices are comparable.</p>
+
+    <h3>Why M<sup>${alpha}</sup>?</h3>
+    <p>The raw integral grows with career length, so we divide by M<sup>α</sup> (where α = ${alpha}) to control <em>how much</em> longevity matters. At α = 1.0, two players with the same per-stint quality would rate equally regardless of career length. At α = 0.5, the longer career would dominate. ${alphaDesc}</p>
+
+    ${DATA.alpha_comparison ? `
+    <div class="alpha-section">
+      <h4>Alpha Sensitivity</h4>
+      <p>How do the top 15 rankings change as α varies from 0.5 to 1.0?</p>
+      <div class="alpha-tabs" id="alpha-tabs">
+        <button class="alpha-tab active" data-category="allrounder">Allrounders</button>
+        <button class="alpha-tab" data-category="batting">Batting</button>
+        <button class="alpha-tab" data-category="bowling">Bowling</button>
+      </div>
+      <div class="table-wrap">
+        <table class="alpha-table" id="alpha-table">
+          <thead id="alpha-thead"></thead>
+          <tbody id="alpha-tbody"></tbody>
+        </table>
+      </div>
+    </div>` : ''}
+
+    <h3>Allrounder Excellence Index (AEI)</h3>
+    <div class="formula">${arRankFormula}</div>
+    ${arDesc}
+
+    ${DATA.distributions ? `
+    <h3>Distribution Overview</h3>
+    <p>The density curves below show where all qualifying ${label} players fall across BEI, BoEI, and AEI.</p>
+    <div class="chart-container" id="chart-kde"></div>` : ''}
+
+    <h3>Era Adjustment</h3>
+    <p>Not all eras are created equal. Averaging 50 in a low-scoring era is a far greater achievement than averaging 50 in a high-scoring one. We normalize for this.</p>
+    ${eraDesc}
+    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of their era</em>.</p>
+
+    <h3>Rating Scale (0–1000)</h3>
+    <p>Era-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
+    <div class="formula">
+      Rating = ${m.rating_base} + ${m.rating_k} × √z &nbsp;&nbsp; where z = (value − μ) / σ
+    </div>
+    <p>The square root compresses extreme outliers. Ratings above <strong>900</strong> represent all-time elite players, <strong>800+</strong> is great, and <strong>700+</strong> is very good.</p>
+  `;
+
+  el.innerHTML = html;
+
+  if (DATA.distributions) renderKDE();
+  if (DATA.alpha_comparison) {
+    renderAlphaTable('allrounder');
+    setupAlphaTabs();
+  }
+}
+
+function setupAlphaTabs() {
+  document.querySelectorAll('.alpha-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.alpha-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderAlphaTable(tab.dataset.category);
+    });
+  });
+}
+
 function renderKDE() {
   const traces = [];
   const items = [
@@ -461,7 +597,9 @@ function renderAlphaTable(category) {
   const alphas = Object.keys(DATA.alpha_comparison);
   const thead = document.getElementById('alpha-thead');
   const tbody = document.getElementById('alpha-tbody');
+  if (!thead || !tbody) return;
 
+  const currentAlpha = String(DATA.metadata.alpha);
   const metricKey = category === 'batting' ? 'BEI' : category === 'bowling' ? 'BoEI' : 'AEI';
   const dataSets = {};
   for (const a of alphas) {
@@ -469,7 +607,7 @@ function renderAlphaTable(category) {
   }
 
   thead.innerHTML = `<tr><th></th>${alphas.map(a =>
-    `<th class="${a === '0.7' ? 'alpha-current' : ''}">\u03b1=${a}</th>`
+    `<th class="${a === currentAlpha ? 'alpha-current' : ''}">\u03b1=${a}</th>`
   ).join('')}</tr>`;
 
   let rows = '';
@@ -481,7 +619,7 @@ function renderAlphaTable(category) {
         const p = list[rank];
         const name = p.name.length > 16 ? p.name.slice(0, 15) + '\u2026' : p.name;
         const rating = p[metricKey + '_rating'] || Math.round(p[metricKey]);
-        rows += `<td class="${a === '0.7' ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${rating}</span></td>`;
+        rows += `<td class="${a === currentAlpha ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${rating}</span></td>`;
       } else {
         rows += '<td></td>';
       }
@@ -866,14 +1004,6 @@ function switchTab(tabId, updateHash = true) {
 function setupTabs() {
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-  });
-
-  document.querySelectorAll('.alpha-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.alpha-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      renderAlphaTable(tab.dataset.category);
-    });
   });
 }
 
