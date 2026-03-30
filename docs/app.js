@@ -1,6 +1,18 @@
 /* ─── GOAT Cricket Rankings — Frontend ──────────────────────────────────── */
 
+const ALL_DATA = {};
 let DATA = null;
+let CURRENT_FORMAT = 'tests';
+
+const FORMAT_FILES = {
+  tests: 'rankings.json',
+  odis: 'odi_rankings.json',
+};
+
+const FORMAT_LABELS = {
+  tests: 'Test',
+  odis: 'ODI',
+};
 
 const COLORS = {
   bat: '#636EFA',
@@ -95,50 +107,142 @@ function plotlyLayout(overrides = {}) {
 
 // ─── Data Loading ───────────────────────────────────────────────────────────
 
+async function loadFormatData(format) {
+  const file = FORMAT_FILES[format];
+  if (!file) return null;
+  if (ALL_DATA[format]) return ALL_DATA[format];
+  try {
+    const resp = await fetch(file);
+    if (!resp.ok) return null;
+    ALL_DATA[format] = await resp.json();
+    return ALL_DATA[format];
+  } catch (e) {
+    return null;
+  }
+}
+
 async function loadData() {
   try {
-    const resp = await fetch('rankings.json');
-    DATA = await resp.json();
+    ALL_DATA.tests = await loadFormatData('tests');
+    DATA = ALL_DATA.tests;
+    if (!DATA) throw new Error('No data');
     buildNameIndex();
     renderAll();
     restoreFromHash();
     document.body.classList.add('loaded');
+    loadFormatData('odis');
   } catch (e) {
     document.querySelector('.content').innerHTML =
       '<p style="text-align:center;padding:3rem;color:var(--accent3)">Failed to load rankings data. Make sure rankings.json is available.</p>';
   }
 }
 
-function restoreFromHash() {
+async function switchFormat(format) {
+  if (format === CURRENT_FORMAT) return;
+  const data = await loadFormatData(format);
+  if (!data) {
+    alert(`${FORMAT_LABELS[format]} rankings data not yet available.`);
+    return;
+  }
+  CURRENT_FORMAT = format;
+  DATA = data;
+
+  document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.format-btn[data-format="${format}"]`).classList.add('active');
+
+  buildNameIndex();
+  updateFormatLabels();
+  renderAll();
+
+  document.getElementById('player-card').classList.add('hidden');
+  document.getElementById('player-search').value = '';
+
+  const activeTab = document.querySelector('.tab.active');
+  const tabId = activeTab ? activeTab.dataset.tab : 'allrounders';
+  history.pushState(null, '', `#${format}/${tabId}`);
+}
+
+async function restoreFromHash() {
   const raw = location.hash.slice(1);
   if (!raw) return;
   const hash = decodeURIComponent(raw);
 
-  if (hash.startsWith('player/')) {
-    const name = hash.slice(7);
+  let format = CURRENT_FORMAT;
+  let rest = hash;
+
+  const formatPrefixes = Object.keys(FORMAT_FILES);
+  for (const f of formatPrefixes) {
+    if (hash === f || hash.startsWith(f + '/')) {
+      format = f;
+      rest = hash.slice(f.length + 1) || 'allrounders';
+      break;
+    }
+  }
+
+  if (format !== CURRENT_FORMAT) {
+    const data = await loadFormatData(format);
+    if (data) {
+      CURRENT_FORMAT = format;
+      DATA = data;
+      document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.querySelector(`.format-btn[data-format="${format}"]`);
+      if (btn) btn.classList.add('active');
+      buildNameIndex();
+      updateFormatLabels();
+      renderAll();
+    }
+  }
+
+  if (rest.startsWith('player/')) {
+    const name = rest.slice(7);
     switchTab('player-lookup', false);
     document.getElementById('player-search').value = name;
-    // Delay so the panel is visible and laid out before Plotly renders
     setTimeout(() => showPlayer(name, false), 120);
   } else {
     const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'methodology'];
-    if (validTabs.includes(hash)) {
-      switchTab(hash, false);
+    if (validTabs.includes(rest)) {
+      switchTab(rest, false);
     }
   }
 }
 
+function updateFormatLabels() {
+  const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
+  document.getElementById('heading-allrounders').textContent = `Top 100 ${label} Allrounders`;
+  document.getElementById('heading-batting').textContent = `Top 100 ${label} Batters`;
+  document.getElementById('heading-bowling').textContent = `Top 100 ${label} Bowlers`;
+}
+
 function renderAll() {
   renderMeta();
+  updateFormatLabels();
   renderAllrounderChart();
   renderAllrounderTable();
   renderBattingChart();
   renderBattingTable();
   renderBowlingChart();
   renderBowlingTable();
-  renderKDE();
-  renderAlphaTable('allrounder');
-  document.getElementById('boei-scale-display').textContent = `\u00d7${DATA.metadata.boei_scale}`;
+
+  const hasDistributions = DATA.distributions;
+  const kdeEl = document.getElementById('chart-kde');
+  if (hasDistributions && kdeEl) {
+    renderKDE();
+    kdeEl.style.display = '';
+  } else if (kdeEl) {
+    kdeEl.style.display = 'none';
+  }
+
+  const alphaSection = document.querySelector('.alpha-section');
+  if (DATA.alpha_comparison && alphaSection) {
+    renderAlphaTable('allrounder');
+    alphaSection.style.display = '';
+  } else if (alphaSection) {
+    alphaSection.style.display = 'none';
+  }
+
+  const boeiEl = document.getElementById('boei-scale-display');
+  if (boeiEl) boeiEl.textContent = `\u00d7${DATA.metadata.boei_scale}`;
+
   const allTimeEl = document.getElementById('all-time-avg-display');
   if (allTimeEl && DATA.metadata.all_time_avg) {
     allTimeEl.textContent = DATA.metadata.all_time_avg.toFixed(2);
@@ -444,7 +548,7 @@ function showPlayer(name, updateHash = true) {
   if (!player) return;
 
   if (updateHash) {
-    history.pushState(null, '', `#player/${encodeURIComponent(name)}`);
+    history.pushState(null, '', `#${CURRENT_FORMAT}/player/${encodeURIComponent(name)}`);
   }
 
   const card = document.getElementById('player-card');
@@ -468,7 +572,8 @@ function showPlayer(name, updateHash = true) {
     const eraAvg = player.era_avg.toFixed(1);
     const batF = player.bat_era_factor.toFixed(2);
     const bowlF = player.bowl_era_factor.toFixed(2);
-    eraInfo = `<div class="ph-era">Era avg: ${eraAvg} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
+    const rpoLabel = player.era_rpo ? ` · Era RPO: ${player.era_rpo.toFixed(2)}` : '';
+    eraInfo = `<div class="ph-era">Era avg: ${eraAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
   }
 
   document.getElementById('player-header').innerHTML = `
@@ -484,10 +589,26 @@ function showPlayer(name, updateHash = true) {
 }
 
 function renderPlayerCareer(player) {
-  const stints = player.stints;
-  const labels = stints.map(s => s.label);
-  const batVals = stints.map(s => s.bat_avg);
-  const bowlVals = stints.map(s => s.bowl_avg);
+  const isLOI = CURRENT_FORMAT !== 'tests';
+
+  let batLabels, batVals, bowlLabels, bowlVals, batSRVals, econVals;
+
+  if (isLOI && player.bat_stints) {
+    batLabels = player.bat_stints.map(s => s.label);
+    batVals = player.bat_stints.map(s => s.bat_avg);
+    batSRVals = player.bat_stints.map(s => s.bat_sr);
+    bowlLabels = (player.bowl_stints || []).map(s => s.label);
+    bowlVals = (player.bowl_stints || []).map(s => s.bowl_avg);
+    econVals = (player.bowl_stints || []).map(s => s.econ);
+  } else {
+    const stints = player.stints || [];
+    batLabels = stints.map(s => s.label);
+    batVals = stints.map(s => s.bat_avg);
+    bowlLabels = stints.map(s => s.label);
+    bowlVals = stints.map(s => s.bowl_avg);
+    batSRVals = null;
+    econVals = null;
+  }
 
   const hasBat = batVals.some(v => v != null);
   const hasBowl = bowlVals.some(v => v != null);
@@ -506,8 +627,8 @@ function renderPlayerCareer(player) {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const gc = isDark ? '#2a2e3d' : '#dfe1e8';
   const textColor = isDark ? '#e4e6ed' : '#1a1d27';
+  const srColor = '#AB63FA';
 
-  // Build axis assignments dynamically
   let axisIdx = 0;
   const axisMap = {};
   for (const r of rows) {
@@ -519,44 +640,86 @@ function renderPlayerCareer(player) {
   function yKey(r) { return axisMap[r] === 1 ? 'y' : `y${axisMap[r]}`; }
 
   if (hasBat) {
+    const hoverFn = isLOI
+      ? (v, i) => v != null ? `Matches ${batLabels[i]}<br>Avg: ${v.toFixed(1)}${batSRVals[i] != null ? `<br>SR: ${batSRVals[i].toFixed(1)}` : ''}` : ''
+      : (v, i) => v != null ? `Matches ${batLabels[i]}<br>Batting Avg: ${v.toFixed(1)}` : '';
+
     traces.push({
-      x: labels, y: batVals, type: 'bar', name: 'Batting Avg',
+      x: batLabels, y: batVals, type: 'bar', name: 'Batting Avg',
       marker: { color: batVals.map(v => v != null ? COLORS.bat : '#555') },
       opacity: 0.4, text: batVals.map(v => v != null ? v.toFixed(1) : ''),
       textposition: 'outside', cliponaxis: false, showlegend: false,
-      hovertemplate: '%{x}<br>Batting Avg: %{y:.1f}<extra></extra>',
+      hovertext: batVals.map((v, i) => hoverFn(v, i)),
+      hoverinfo: 'text',
       xaxis: xKey('bat'), yaxis: yKey('bat'),
     });
     const valid = batVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
     if (valid.length >= 2) {
       traces.push({
-        x: valid.map(([i]) => labels[i]), y: valid.map(([, v]) => v),
+        x: valid.map(([i]) => batLabels[i]), y: valid.map(([, v]) => v),
         type: 'scatter', mode: 'lines',
         line: { color: COLORS.bat, width: 3, shape: 'spline' }, showlegend: false,
-        hovertemplate: 'Batting Avg: %{y:.1f}<extra></extra>',
+        hoverinfo: 'skip',
         xaxis: xKey('bat'), yaxis: yKey('bat'),
       });
+    }
+
+    if (isLOI && batSRVals && batSRVals.some(v => v != null)) {
+      const srValid = batSRVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
+      if (srValid.length >= 2) {
+        const yAxisSR = `y${axisMap['bat'] * 10}`;
+        traces.push({
+          x: srValid.map(([i]) => batLabels[i]), y: srValid.map(([, v]) => v),
+          type: 'scatter', mode: 'lines+markers',
+          line: { color: srColor, width: 2, dash: 'dot' },
+          marker: { size: 5, color: srColor },
+          name: 'Strike Rate', showlegend: true,
+          hoverinfo: 'skip',
+          xaxis: xKey('bat'), yaxis: yAxisSR,
+        });
+      }
     }
   }
 
   if (hasBowl) {
+    const hoverFn = isLOI
+      ? (v, i) => v != null ? `Matches ${bowlLabels[i]}<br>Avg: ${v.toFixed(1)}${econVals[i] != null ? `<br>Econ: ${econVals[i].toFixed(2)}` : ''}` : ''
+      : (v, i) => v != null ? `Matches ${bowlLabels[i]}<br>Bowling Avg: ${v.toFixed(1)}` : '';
+
     traces.push({
-      x: labels, y: bowlVals, type: 'bar', name: 'Bowling Avg',
+      x: bowlLabels, y: bowlVals, type: 'bar', name: 'Bowling Avg',
       marker: { color: bowlVals.map(v => v != null ? COLORS.bowl : '#555') },
       opacity: 0.4, text: bowlVals.map(v => v != null ? v.toFixed(1) : ''),
       textposition: 'outside', cliponaxis: false, showlegend: false,
-      hovertemplate: '%{x}<br>Bowling Avg: %{y:.1f}<extra></extra>',
+      hovertext: bowlVals.map((v, i) => hoverFn(v, i)),
+      hoverinfo: 'text',
       xaxis: xKey('bowl'), yaxis: yKey('bowl'),
     });
     const valid = bowlVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
     if (valid.length >= 2) {
       traces.push({
-        x: valid.map(([i]) => labels[i]), y: valid.map(([, v]) => v),
+        x: valid.map(([i]) => bowlLabels[i]), y: valid.map(([, v]) => v),
         type: 'scatter', mode: 'lines',
         line: { color: COLORS.bowl, width: 3, shape: 'spline' }, showlegend: false,
-        hovertemplate: 'Bowling Avg: %{y:.1f}<extra></extra>',
+        hoverinfo: 'skip',
         xaxis: xKey('bowl'), yaxis: yKey('bowl'),
       });
+    }
+
+    if (isLOI && econVals && econVals.some(v => v != null)) {
+      const econValid = econVals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
+      if (econValid.length >= 2) {
+        const yAxisEcon = `y${axisMap['bowl'] * 10}`;
+        traces.push({
+          x: econValid.map(([i]) => bowlLabels[i]), y: econValid.map(([, v]) => v),
+          type: 'scatter', mode: 'lines+markers',
+          line: { color: '#FF6692', width: 2, dash: 'dot' },
+          marker: { size: 5, color: '#FF6692' },
+          name: 'Economy', showlegend: true,
+          hoverinfo: 'skip',
+          xaxis: xKey('bowl'), yaxis: yAxisEcon,
+        });
+      }
     }
   }
 
@@ -581,8 +744,9 @@ function renderPlayerCareer(player) {
   const layout = {
     ...plotlyLayout(),
     height: totalRows === 1 ? (mobile ? 350 : 420) : (mobile ? 600 : 750),
-    showlegend: false,
-    margin: { l: mobile ? 40 : 60, r: mobile ? 15 : 30, t: mobile ? 10 : 10, b: mobile ? 30 : 40 },
+    showlegend: isLOI,
+    legend: isLOI ? { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 11 } } : undefined,
+    margin: { l: mobile ? 40 : 60, r: isLOI ? (mobile ? 50 : 70) : (mobile ? 15 : 30), t: mobile ? 10 : 10, b: mobile ? 30 : 40 },
     annotations: [],
   };
 
@@ -607,15 +771,43 @@ function renderPlayerCareer(player) {
         xref: 'paper', yref: 'paper', x: 0.5, y: annoY, showarrow: false,
         font: { size: mobile ? 12 : 14, color: textColor },
       });
+
+      if (isLOI && batSRVals && batSRVals.some(v => v != null)) {
+        const srAxisName = `yaxis${axisMap['bat'] * 10}`;
+        const srMax = Math.max(...batSRVals.filter(v => v != null), 50);
+        layout[srAxisName] = {
+          gridcolor: 'rgba(0,0,0,0)', domain: domains[ri],
+          anchor: 'free', overlaying: n === 1 ? 'y' : `y${n}`,
+          side: 'right', position: 1,
+          title: { text: 'SR', font: { color: srColor, size: 11 } },
+          tickfont: { color: srColor, size: 10 },
+          range: [0, srMax * 1.3], showgrid: false,
+        };
+      }
     } else if (r === 'bowl') {
       layout[yName].title = '';
       layout[yName].range = [0, bowlMax * 1.3];
-      const sub = mobile ? 'Per 10-match window (min. 10 innings) \u2014 lower is better' : 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better';
+      const sub = mobile
+        ? 'Per 10-match window (min. 10 innings) \u2014 lower is better'
+        : 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better';
       layout.annotations.push({
         text: `<b>Bowling Average per Stint</b><br><span style="color:${mutedColor};font-size:${mobile ? 9 : 11}px">${sub}</span>`,
         xref: 'paper', yref: 'paper', x: 0.5, y: annoY, showarrow: false,
         font: { size: mobile ? 12 : 14, color: textColor },
       });
+
+      if (isLOI && econVals && econVals.some(v => v != null)) {
+        const econAxisName = `yaxis${axisMap['bowl'] * 10}`;
+        const econMax = Math.max(...econVals.filter(v => v != null), 3);
+        layout[econAxisName] = {
+          gridcolor: 'rgba(0,0,0,0)', domain: domains[ri],
+          anchor: 'free', overlaying: n === 1 ? 'y' : `y${n}`,
+          side: 'right', position: 1,
+          title: { text: 'Econ', font: { color: '#FF6692', size: 11 } },
+          tickfont: { color: '#FF6692', size: 10 },
+          range: [0, econMax * 1.3], showgrid: false,
+        };
+      }
     }
   }
 
@@ -658,8 +850,7 @@ function switchTab(tabId, updateHash = true) {
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
   if (updateHash) {
-    const hash = tabId === 'allrounders' ? '' : `#${tabId}`;
-    history.pushState(null, '', hash || location.pathname);
+    history.pushState(null, '', `#${CURRENT_FORMAT}/${tabId}`);
   }
 
   setTimeout(() => {
@@ -701,8 +892,15 @@ function setupTheme() {
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
+function setupFormatBar() {
+  document.querySelectorAll('.format-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchFormat(btn.dataset.format));
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setupTheme();
+  setupFormatBar();
   setupTabs();
   setupSearch();
   loadData();

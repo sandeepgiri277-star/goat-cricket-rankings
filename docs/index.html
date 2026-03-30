@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test Cricket GOAT Rankings</title>
+  <title>GOAT Cricket Rankings</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,8 +12,8 @@
 <body>
   <header class="hero">
     <div class="hero-inner">
-      <h1>Test Cricket GOAT Rankings</h1>
-      <p class="subtitle">Who are the greatest Test cricketers of all time? A data-driven answer.</p>
+      <h1 id="hero-title">GOAT Cricket Rankings</h1>
+      <p class="subtitle" id="hero-subtitle">Who are the greatest cricketers of all time? A data-driven answer.</p>
       <p class="updated" id="last-updated"></p>
       <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
         <span class="icon-sun">&#9788;</span>
@@ -21,6 +21,11 @@
       </button>
     </div>
   </header>
+
+  <nav class="format-bar" id="format-bar">
+    <button class="format-btn active" data-format="tests">Tests</button>
+    <button class="format-btn" data-format="odis">ODIs</button>
+  </nav>
 
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="allrounders">Allrounders</button>
@@ -33,7 +38,7 @@
   <main class="content">
     <!-- Allrounders Tab -->
     <section class="tab-panel active" id="panel-allrounders">
-      <h2>Top 100 Test Allrounders</h2>
+      <h2 id="heading-allrounders">Top 100 Test Allrounders</h2>
       <p class="panel-desc">Players who excelled with both bat and ball across their careers. Click any player to explore their stint-by-stint breakdown.</p>
       <div class="lb-container" id="table-allrounders"></div>
       <div class="chart-container" id="chart-allrounders"></div>
@@ -41,16 +46,16 @@
 
     <!-- Batting Tab -->
     <section class="tab-panel" id="panel-batting">
-      <h2>Top 100 Test Batters</h2>
-      <p class="panel-desc">The greatest batsmen in Test history, ranked by sustained batting excellence across 10-match stints. Click any player to explore their career.</p>
+      <h2 id="heading-batting">Top 100 Test Batters</h2>
+      <p class="panel-desc">The greatest batsmen in cricket history, ranked by sustained batting excellence across 10-match stints. Click any player to explore their career.</p>
       <div class="lb-container" id="table-batting"></div>
       <div class="chart-container" id="chart-batting"></div>
     </section>
 
     <!-- Bowling Tab -->
     <section class="tab-panel" id="panel-bowling">
-      <h2>Top 100 Test Bowlers</h2>
-      <p class="panel-desc">The greatest bowlers in Test history, ranked by sustained bowling excellence across 10-match stints. Click any player to explore their career.</p>
+      <h2 id="heading-bowling">Top 100 Test Bowlers</h2>
+      <p class="panel-desc">The greatest bowlers in cricket history, ranked by sustained bowling excellence across 10-match stints. Click any player to explore their career.</p>
       <div class="lb-container" id="table-bowling"></div>
       <div class="chart-container" id="chart-bowling"></div>
     </section>
@@ -58,7 +63,7 @@
     <!-- Player Lookup Tab -->
     <section class="tab-panel" id="panel-player-lookup">
       <h2>Player Lookup</h2>
-      <p class="panel-desc">Search any Test player by name to see their stint-by-stint career breakdown.</p>
+      <p class="panel-desc" id="desc-player-lookup">Search any player by name to see their stint-by-stint career breakdown.</p>
       <div class="search-wrap">
         <input type="text" id="player-search" placeholder="Search by name (e.g. Warne, Tendulkar, Imran Khan)..." autocomplete="off">
         <div class="search-results" id="search-results"></div>
@@ -156,7 +161,7 @@
   </main>
 
   <footer>
-    <p>Updated weekly &middot; <span id="player-count"></span> Test players analysed</p>
+    <p>Updated weekly &middot; <span id="player-count"></span> players analysed</p>
   </footer>
 
   <script src="app.js"></script>

@@ -30,12 +30,15 @@ BOWL_K = 1000
 MIN_STINT_BAT_INN = 10
 MIN_STINT_BOWL_INN = 10
 ALPHA = 0.70
+LOI_ALPHA = 0.85
 MIN_MATCHES = 20
+LOI_MIN_MATCHES = 50
 STINT_SIZE = 10
 TOP_N = 100
 RATING_BASE = 350
 RATING_K = 351  # sqrt-compressed: 900+=elite, 800+=great, 700+=very good
-MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder
+MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
+LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
 
 CACHE_DIR = Path(__file__).parent / "cricket_cache"
 CACHE_DIR.mkdir(exist_ok=True)
@@ -50,6 +53,13 @@ ALLROUND_CACHE_PATH = CACHE_DIR / "allround_cache.pkl"
 INNINGS_CACHE_PATH = CACHE_DIR / "innings_cache.pkl"
 ERA_CACHE_PATH = CACHE_DIR / "era_cache.pkl"
 
+# ODI-specific cache paths
+ODI_BAT_AGG_PATH = CACHE_DIR / "odi_bat_agg.pkl"
+ODI_BOWL_AGG_PATH = CACHE_DIR / "odi_bowl_agg.pkl"
+ODI_BAT_CUM_CACHE_PATH = CACHE_DIR / "odi_bat_cum_cache.pkl"
+ODI_BOWL_CUM_CACHE_PATH = CACHE_DIR / "odi_bowl_cum_cache.pkl"
+ODI_ERA_CACHE_PATH = CACHE_DIR / "odi_era_cache.pkl"
+
 # ─── Scraping ────────────────────────────────────────────────────────────────
 
 
@@ -61,11 +71,12 @@ def _parse_player_country(name_str: str) -> tuple[str, str]:
 
 
 def scrape_statsguru_aggregate(
-    stat_type: str = "batting", min_matches: int = 20, page_size: int = 200
+    stat_type: str = "batting", min_matches: int = 20, page_size: int = 200,
+    cricket_class: int = 1,
 ) -> pd.DataFrame:
     base = (
         f"https://stats.espncricinfo.com/ci/engine/stats/index.html?"
-        f"class=1;template=results;type={stat_type};"
+        f"class={cricket_class};template=results;type={stat_type};"
         f"qualmin1={min_matches};qualval1=matches;size={page_size}"
     )
     all_rows = []
@@ -657,6 +668,742 @@ def compute_all_players(
     return records
 
 
+# ─── LOI (Limited-Overs International) Functions ────────────────────────────
+
+
+def overs_to_balls(overs_val) -> int:
+    """Convert overs (e.g. 104.3 = 104 overs 3 balls) to total balls."""
+    try:
+        s = str(overs_val)
+        parts = s.split(".")
+        full = int(parts[0])
+        extra = int(parts[1]) if len(parts) > 1 else 0
+        return full * 6 + extra
+    except (ValueError, TypeError):
+        return 0
+
+
+def _scrape_cumulative_full(
+    player_id: int, stat_type: str, cricket_class: int = 2
+) -> pd.DataFrame | None:
+    """Scrape full cumulative data (batting or bowling view) for a player."""
+    url = (
+        f"https://stats.espncricinfo.com/ci/engine/player/{player_id}.html?"
+        f"class={cricket_class};template=results;type={stat_type};view=cumulative"
+    )
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+
+        tables = soup.select("table.engineTable")
+        if not tables:
+            return None
+
+        data_table = max(tables, key=lambda t: len(t.find_all("tr")))
+        all_rows = data_table.find_all("tr")
+        if len(all_rows) < 2:
+            return None
+
+        header_tr = data_table.select_one("tr.headlinks") or all_rows[0]
+        cols = [c.get_text(strip=True) for c in header_tr.find_all(["th", "td"])]
+
+        seen: dict[str, int] = {}
+        clean_cols = []
+        for c in cols:
+            if c == "":
+                idx = seen.get("", 0)
+                clean_cols.append(f"_blank_{idx}")
+                seen[""] = idx + 1
+            else:
+                clean_cols.append(c)
+
+        data_rows = []
+        for tr in all_rows:
+            if tr is header_tr:
+                continue
+            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+            if len(cells) == len(clean_cols):
+                data_rows.append(cells)
+
+        if not data_rows:
+            return None
+
+        df = pd.DataFrame(data_rows, columns=clean_cols)
+        df = df.loc[:, ~df.columns.str.startswith("_blank_")]
+
+        player_name = "Unknown"
+        for a in soup.find_all("a"):
+            text = a.get_text(strip=True)
+            if text.startswith("Statistics / Statsguru /"):
+                parts = text.split("/")
+                if len(parts) >= 3:
+                    player_name = parts[2].strip()
+                break
+
+        df.attrs["player_name"] = player_name
+        return df
+    except Exception:
+        return None
+
+
+def _load_loi_cache(path: Path) -> dict:
+    if path.exists():
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    return {}
+
+
+def _save_loi_cache(cache: dict, path: Path):
+    with open(path, "wb") as f:
+        pickle.dump(cache, f)
+
+
+def scrape_loi_all_players(
+    player_ids: list[int],
+    cricket_class: int = 2,
+    bat_cache_path: Path = ODI_BAT_CUM_CACHE_PATH,
+    bowl_cache_path: Path = ODI_BOWL_CUM_CACHE_PATH,
+    delay: float = 0.3,
+) -> tuple[dict, dict]:
+    """Scrape batting + bowling cumulative data for all LOI players."""
+    bat_cache = _load_loi_cache(bat_cache_path)
+    bowl_cache = _load_loi_cache(bowl_cache_path)
+
+    to_scrape = [pid for pid in player_ids if pid not in bat_cache]
+    print(f"  LOI cumulative cache: {len(bat_cache)} players. Need {len(to_scrape)} more.")
+
+    if not to_scrape:
+        return bat_cache, bowl_cache
+
+    failed = []
+    for i, pid in enumerate(to_scrape, 1):
+        bat_df = _scrape_cumulative_full(pid, "batting", cricket_class)
+        time.sleep(0.15)
+        bowl_df = _scrape_cumulative_full(pid, "bowling", cricket_class)
+
+        if bat_df is not None:
+            bat_cache[pid] = bat_df
+        else:
+            failed.append(pid)
+        if bowl_df is not None:
+            bowl_cache[pid] = bowl_df
+
+        if i % 50 == 0 or i == len(to_scrape):
+            _save_loi_cache(bat_cache, bat_cache_path)
+            _save_loi_cache(bowl_cache, bowl_cache_path)
+            print(f"    LOI progress: {i}/{len(to_scrape)}, {len(failed)} failed")
+        time.sleep(delay)
+
+    _save_loi_cache(bat_cache, bat_cache_path)
+    _save_loi_cache(bowl_cache, bowl_cache_path)
+    print(f"  LOI done! {len(bat_cache)} bat, {len(bowl_cache)} bowl cached. {len(failed)} failures.")
+    return bat_cache, bowl_cache
+
+
+def _prepare_bat_cum(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean batting cumulative DataFrame for stint calculation."""
+    df = df.copy()
+    for col in ["Mat", "Inns", "NO", "Runs", "BF"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["Mat"])
+    df = df.sort_values("Mat").reset_index(drop=True)
+    for col in ["Inns", "NO", "Runs", "BF"]:
+        if col in df.columns:
+            df[col] = df[col].ffill().fillna(0)
+    return df
+
+
+def _prepare_bowl_cum(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean bowling cumulative DataFrame for stint calculation."""
+    df = df.copy()
+    if "Overs" in df.columns:
+        df["cum_balls"] = df["Overs"].apply(overs_to_balls)
+    for col in ["Mat", "Inns", "Runs", "Wkts"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["Mat"])
+    df = df.sort_values("Mat").reset_index(drop=True)
+    for col in ["Runs", "Wkts", "Inns"]:
+        if col in df.columns:
+            df[col] = df[col].ffill().fillna(0)
+    if "cum_balls" not in df.columns:
+        df["cum_balls"] = 0
+    df["cum_balls"] = df["cum_balls"].ffill().fillna(0).astype(int)
+    return df
+
+
+LOI_STINT_INNINGS = 20
+
+
+def _innings_boundaries(cum_inns: pd.Series, stint_innings: int = LOI_STINT_INNINGS) -> list[tuple[int, int]]:
+    """Split cumulative innings series into stint boundaries of N innings each.
+    Returns list of (start_idx, end_idx) index pairs."""
+    n = len(cum_inns)
+    if n == 0:
+        return []
+
+    boundaries = []
+    start_idx = 0
+    start_inns = 0.0
+
+    for idx in range(n):
+        current_inns = float(cum_inns.iloc[idx])
+        if current_inns - start_inns >= stint_innings:
+            boundaries.append((start_idx, idx))
+            start_idx = idx + 1
+            start_inns = current_inns
+
+    if start_idx < n:
+        remaining = float(cum_inns.iloc[n - 1]) - start_inns
+        if remaining < stint_innings and boundaries:
+            prev_start, _ = boundaries.pop()
+            boundaries.append((prev_start, n - 1))
+        elif remaining > 0:
+            boundaries.append((start_idx, n - 1))
+
+    return boundaries
+
+
+def compute_stints_loi(
+    bat_df: pd.DataFrame,
+    bowl_df: pd.DataFrame | None,
+) -> tuple[list[dict], list[dict]]:
+    """Compute batting and bowling stints separately, each based on 10-innings blocks.
+    Returns (bat_stints, bowl_stints).
+    """
+    bat = _prepare_bat_cum(bat_df)
+    if len(bat) < 2:
+        return [], []
+
+    total_matches = int(bat.iloc[-1]["Mat"])
+
+    # -- Batting stints (by batting innings) --
+    bat_boundaries = _innings_boundaries(bat["Inns"])
+    bat_stints = []
+    for si, ei in bat_boundaries:
+        c = bat.iloc[ei]
+        if si == 0:
+            s_runs, s_bf, s_inns, s_no = float(c["Runs"]), float(c["BF"]), float(c["Inns"]), float(c["NO"])
+        else:
+            p = bat.iloc[si - 1]
+            s_runs = float(c["Runs"]) - float(p["Runs"])
+            s_bf = float(c["BF"]) - float(p["BF"])
+            s_inns = float(c["Inns"]) - float(p["Inns"])
+            s_no = float(c["NO"]) - float(p["NO"])
+
+        matches = ei - si + 1
+        s_dismissals = s_inns - s_no
+        bat_avg = float(s_runs / s_dismissals) if s_dismissals > 0 else None
+        bat_sr = float(100 * s_runs / s_bf) if s_bf > 0 else None
+        bat_metric = bat_avg * (bat_sr / 100) if bat_avg is not None and bat_sr is not None else None
+
+        bat_stints.append({
+            "label": f"{int(bat.iloc[si]['Mat'])}\u2013{int(c['Mat'])}",
+            "matches": matches,
+            "innings": int(s_inns),
+            "bat_avg": round(bat_avg, 2) if bat_avg is not None else None,
+            "bat_sr": round(bat_sr, 2) if bat_sr is not None else None,
+            "bat_metric": round(bat_metric, 2) if bat_metric is not None else None,
+        })
+
+    # -- Bowling stints (by bowling innings) --
+    bowl_stints = []
+    if bowl_df is not None and len(bowl_df) > 0:
+        bowl = _prepare_bowl_cum(bowl_df)
+        if len(bowl) > 0 and float(bowl.iloc[-1]["Inns"]) >= LOI_STINT_INNINGS:
+            bowl_boundaries = _innings_boundaries(bowl["Inns"])
+            for si, ei in bowl_boundaries:
+                c = bowl.iloc[ei]
+                if si == 0:
+                    s_wkts = float(c["Wkts"])
+                    s_bowl_runs = float(c["Runs"])
+                    s_balls = int(c["cum_balls"])
+                    s_inns = float(c["Inns"])
+                else:
+                    p = bowl.iloc[si - 1]
+                    s_wkts = float(c["Wkts"]) - float(p["Wkts"])
+                    s_bowl_runs = float(c["Runs"]) - float(p["Runs"])
+                    s_balls = int(c["cum_balls"]) - int(p["cum_balls"])
+                    s_inns = float(c["Inns"]) - float(p["Inns"])
+
+                matches = ei - si + 1
+                bowl_avg = float(s_bowl_runs / s_wkts) if s_wkts > 0 else None
+                econ = float(6 * s_bowl_runs / s_balls) if s_balls > 0 else None
+                bowl_metric = (BOWL_K / (bowl_avg * (econ / 6))) if bowl_avg and econ and bowl_avg > 0 and econ > 0 else None
+                wpm = float(s_wkts / matches) if s_wkts > 0 else None
+
+                bowl_stints.append({
+                    "label": f"{int(bowl.iloc[si]['Mat'])}\u2013{int(c['Mat'])}",
+                    "matches": matches,
+                    "innings": int(s_inns),
+                    "bowl_avg": round(bowl_avg, 2) if bowl_avg is not None else None,
+                    "econ": round(econ, 2) if econ is not None else None,
+                    "bowl_metric": round(bowl_metric, 2) if bowl_metric is not None else None,
+                    "wpm": round(wpm, 2) if wpm is not None else None,
+                })
+
+    return bat_stints, bowl_stints
+
+
+def excellence_indices_loi(
+    bat_stints: list[dict], bowl_stints: list[dict],
+    total_matches: int, boei_scale: float = 1.0, baseline_wpm: float = 1.0,
+) -> dict:
+    """BEI/BoEI/AEI for LOI formats with separate batting/bowling stints.
+    AEI uses balance-weighted sum: (BEI+BoEI) × sqrt(min/max) to reward dual-threat allrounders.
+    """
+    denom = total_matches ** LOI_ALPHA if total_matches > 0 else 1.0
+
+    bat_sum = sum(
+        s["bat_metric"] * s["matches"] for s in bat_stints if s["bat_metric"] is not None
+    )
+    bowl_sum = sum(
+        s["bowl_metric"] * np.sqrt(s["wpm"] / baseline_wpm) * s["matches"]
+        for s in bowl_stints if s["bowl_metric"] is not None and s["wpm"] is not None
+    )
+
+    bei = bat_sum / denom
+    boei = bowl_sum * boei_scale / denom
+    aei = bei + boei
+
+    return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2), "matches": total_matches}
+
+
+def compute_loi_baseline_wpm(bat_cache: dict, bowl_cache: dict) -> float:
+    """Mean wpm across ALL LOI players (including non-bowlers as 0)."""
+    wpms = []
+    for pid in bat_cache:
+        bat_df = bat_cache[pid]
+        bat_clean = _prepare_bat_cum(bat_df)
+        if len(bat_clean) < 2:
+            continue
+        total_mat = float(bat_clean.iloc[-1]["Mat"])
+        if total_mat < LOI_MIN_MATCHES:
+            continue
+        bowl_df = bowl_cache.get(pid)
+        if bowl_df is not None:
+            bowl_clean = _prepare_bowl_cum(bowl_df)
+            if len(bowl_clean) > 0:
+                last_wkts = float(bowl_clean.iloc[-1]["Wkts"]) if not pd.isna(bowl_clean.iloc[-1]["Wkts"]) else 0
+            else:
+                last_wkts = 0
+        else:
+            last_wkts = 0
+        wpms.append(last_wkts / total_mat)
+    return float(np.mean(wpms)) if wpms else 1.0
+
+
+def compute_loi_boei_scale(
+    bat_cache: dict, bowl_cache: dict, baseline_wpm: float = 1.0
+) -> float:
+    """Compute BoEI normalization scale for LOI formats."""
+    bat_num = bat_den = bowl_num = bowl_den = 0.0
+    for pid in bat_cache:
+        try:
+            bat_df = bat_cache[pid]
+            bat_clean = _prepare_bat_cum(bat_df)
+            if len(bat_clean) < 2 or float(bat_clean.iloc[-1]["Mat"]) < LOI_MIN_MATCHES:
+                continue
+            bowl_df = bowl_cache.get(pid)
+            bat_stints, bowl_stints = compute_stints_loi(bat_df, bowl_df)
+            for s in bat_stints:
+                if s["bat_metric"] is not None:
+                    bat_num += s["bat_metric"] * s["matches"]
+                    bat_den += s["matches"]
+            for s in bowl_stints:
+                if s["bowl_metric"] is not None and s["wpm"] is not None:
+                    bowl_num += s["bowl_metric"] * np.sqrt(s["wpm"] / baseline_wpm) * s["matches"]
+                    bowl_den += s["matches"]
+        except Exception:
+            continue
+    if bowl_den == 0 or bat_den == 0:
+        return 1.0
+    return (bat_num / bat_den) / (bowl_num / bowl_den)
+
+
+def _scrape_loi_era_aggregate(
+    start_year: int, end_year: int, cricket_class: int = 2
+) -> dict | None:
+    """Scrape overall LOI figures (Runs, Wkts, Ave, RPO) for a date range."""
+    url = (
+        f"https://stats.espncricinfo.com/ci/engine/stats/index.html?"
+        f"class={cricket_class};spanmin1=01+Jan+{start_year};spanmax1=31+Dec+{end_year};"
+        f"spanval1=span;template=results;type=aggregate"
+    )
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        tables = soup.select("table.engineTable")
+        for table in tables:
+            rows = table.select("tr.data1")
+            if not rows:
+                continue
+            cells = rows[0].find_all("td")
+            headers = [th.get_text(strip=True) for th in table.select("tr th")]
+            if "Runs" not in headers or "Wkts" not in headers:
+                continue
+            vals = [c.get_text(strip=True) for c in cells]
+            row_dict = dict(zip(headers, vals))
+            runs = int(row_dict["Runs"].replace(",", ""))
+            wkts = int(row_dict["Wkts"].replace(",", ""))
+            balls = int(row_dict.get("Balls", "0").replace(",", "")) if "Balls" in row_dict else 0
+            ave = float(row_dict["Ave"]) if row_dict.get("Ave", "-") != "-" else (runs / wkts if wkts else 0)
+            rpo = float(row_dict["RPO"]) if row_dict.get("RPO", "-") != "-" else (6 * runs / balls if balls else 0)
+            return {"runs": runs, "wkts": wkts, "ave": round(ave, 2), "rpo": round(rpo, 2)}
+    except Exception as e:
+        print(f"    WARNING: Failed to scrape LOI era {start_year}-{end_year}: {e}")
+    return None
+
+
+def scrape_loi_era_averages(
+    spans: set[tuple[int, int]],
+    cricket_class: int = 2,
+    cache_path: Path = ODI_ERA_CACHE_PATH,
+    delay: float = 0.3,
+) -> dict[tuple[int, int], dict]:
+    """Scrape LOI era averages for all unique career spans, with caching."""
+    cache = _load_loi_cache(cache_path)
+    current_year = datetime.now().year
+    to_scrape = []
+    for span in spans:
+        if span not in cache:
+            to_scrape.append(span)
+        elif span[1] >= current_year:
+            to_scrape.append(span)
+
+    if not to_scrape:
+        print(f"  LOI era cache complete: {len(cache)} spans")
+        return cache
+
+    print(f"  Scraping LOI era averages for {len(to_scrape)} spans...")
+    for i, (sy, ey) in enumerate(sorted(to_scrape)):
+        result = _scrape_loi_era_aggregate(sy, ey, cricket_class)
+        if result:
+            cache[(sy, ey)] = result
+        if i > 0 and i % 50 == 0:
+            _save_loi_cache(cache, cache_path)
+            print(f"    {i}/{len(to_scrape)} done...")
+        time.sleep(delay)
+
+    _save_loi_cache(cache, cache_path)
+    print(f"  LOI era cache: {len(cache)} spans")
+    return cache
+
+
+def compute_loi_all_time(era_cache: dict) -> tuple[float, float]:
+    """Compute all-time LOI average and RPO from the broadest span in cache."""
+    if not era_cache:
+        return 31.0, 4.7
+    broadest = max(era_cache.keys(), key=lambda k: k[1] - k[0])
+    return era_cache[broadest]["ave"], era_cache[broadest]["rpo"]
+
+
+def compute_loi_all_players(
+    bat_cache: dict,
+    bowl_cache: dict,
+    player_info: pd.DataFrame,
+    boei_scale: float,
+    baseline_wpm: float = 1.0,
+    era_cache: dict | None = None,
+    all_time_avg: float = 31.0,
+    all_time_rpo: float = 4.7,
+) -> list[dict]:
+    span_map = {}
+    if "Span" in player_info.columns:
+        for _, row in player_info.iterrows():
+            sp = parse_span(str(row.get("Span", "")))
+            if sp:
+                span_map[int(row["player_id"])] = sp
+
+    records = []
+    for pid in bat_cache:
+        try:
+            bat_df = bat_cache[pid]
+            bowl_df = bowl_cache.get(pid)
+            name = bat_df.attrs.get("player_name", "Unknown")
+
+            bat_stints, bowl_stints = compute_stints_loi(bat_df, bowl_df)
+            bat_clean = _prepare_bat_cum(bat_df)
+            if len(bat_clean) < 2:
+                continue
+            total_matches = int(bat_clean.iloc[-1]["Mat"])
+            if total_matches < LOI_MIN_MATCHES:
+                continue
+
+            idx = excellence_indices_loi(bat_stints, bowl_stints, total_matches, boei_scale, baseline_wpm)
+
+            info_row = player_info[player_info["player_id"] == pid]
+            country = info_row["country"].values[0] if len(info_row) > 0 else ""
+
+            bei = idx["BEI"]
+            boei = idx["BoEI"]
+            era_avg = all_time_avg
+            era_rpo = all_time_rpo
+            bat_era_factor = 1.0
+            bowl_era_factor = 1.0
+
+            span = span_map.get(int(pid))
+            if span and era_cache and span in era_cache:
+                era_data = era_cache[span]
+                era_avg = era_data["ave"]
+                era_rpo = era_data["rpo"]
+                if era_avg > 0 and era_rpo > 0:
+                    bat_avg_factor = all_time_avg / era_avg
+                    bat_sr_factor = all_time_rpo / era_rpo
+                    bat_era_factor = round(bat_avg_factor * bat_sr_factor, 4)
+                    bowl_avg_factor = era_avg / all_time_avg
+                    bowl_rpo_factor = era_rpo / all_time_rpo
+                    bowl_era_factor = round(bowl_avg_factor * bowl_rpo_factor, 4)
+                    bei = round(bei * bat_era_factor, 2)
+                    boei = round(boei * bowl_era_factor, 2)
+
+            aei = round(bei + boei, 2)
+            records.append({
+                "player_id": int(pid),
+                "player_name": name,
+                "country": country,
+                "BEI": bei,
+                "BoEI": boei,
+                "AEI": aei,
+                "matches": total_matches,
+                "bat_stints": bat_stints,
+                "bowl_stints": bowl_stints,
+                "era_avg": era_avg,
+                "era_rpo": era_rpo,
+                "bat_era_factor": bat_era_factor,
+                "bowl_era_factor": bowl_era_factor,
+            })
+        except Exception:
+            continue
+
+    records.sort(key=lambda r: r["AEI"], reverse=True)
+    return records
+
+
+def build_loi_rankings_json(
+    all_players: list[dict],
+    boei_scale: float,
+    baseline_wpm: float = 1.0,
+    all_time_avg: float = 31.0,
+    all_time_rpo: float = 4.7,
+    format_name: str = "ODI",
+) -> dict:
+    """Build rankings JSON for an LOI format. Same structure as Test rankings."""
+    rating_stats = compute_ratings(all_players)
+
+    bei_sorted = sorted(all_players, key=lambda p: p["BEI"], reverse=True)
+    boei_sorted = sorted(all_players, key=lambda p: p["BoEI"], reverse=True)
+
+    allrounders = []
+    for p in all_players:
+        if p["BEI_rating"] >= LOI_MIN_AR_RATING and p["BoEI_rating"] >= LOI_MIN_AR_RATING:
+            geo = np.sqrt(p["BEI_rating"] * p["BoEI_rating"])
+            balance = min(p["BEI"], p["BoEI"]) / p["AEI"] if p["AEI"] > 0 else 0
+            allrounders.append({**p, "balance": round(balance * 100, 1), "geo_rating": round(geo)})
+    allrounders.sort(key=lambda p: p["geo_rating"], reverse=True)
+
+    def player_summary(p, extra_fields=None):
+        d = {
+            "name": p["player_name"],
+            "country": p["country"],
+            "matches": p["matches"],
+            "BEI": p["BEI"],
+            "BoEI": p["BoEI"],
+            "AEI": p["AEI"],
+            "bat_rating": p["BEI_rating"],
+            "bowl_rating": p["BoEI_rating"],
+            "ar_rating": p.get("geo_rating", p["AEI_rating"]),
+        }
+        if extra_fields:
+            for k in extra_fields:
+                d[k] = p[k]
+        return d
+
+    bat_rank_map = {}
+    for rank, p in enumerate(bei_sorted, 1):
+        bat_rank_map[p["player_name"]] = rank if p["BEI"] > 0 else None
+
+    bowl_rank_map = {}
+    for rank, p in enumerate(boei_sorted, 1):
+        bowl_rank_map[p["player_name"]] = rank if p["BoEI"] > 0 else None
+
+    ar_rank_map = {}
+    ar_geo_map = {}
+    for rank, p in enumerate(allrounders, 1):
+        ar_rank_map[p["player_name"]] = rank
+        ar_geo_map[p["player_name"]] = p["geo_rating"]
+
+    all_players_index = [
+        {
+            "name": p["player_name"],
+            "country": p["country"],
+            "matches": p["matches"],
+            "BEI": p["BEI"],
+            "BoEI": p["BoEI"],
+            "AEI": p["AEI"],
+            "bat_rating": p["BEI_rating"],
+            "bowl_rating": p["BoEI_rating"],
+            "ar_rating": ar_geo_map.get(p["player_name"], p["AEI_rating"]),
+            "bat_rank": bat_rank_map.get(p["player_name"]),
+            "bowl_rank": bowl_rank_map.get(p["player_name"]),
+            "ar_rank": ar_rank_map.get(p["player_name"]),
+            "bat_stints": p["bat_stints"],
+            "bowl_stints": p["bowl_stints"],
+            "era_avg": p.get("era_avg"),
+            "era_rpo": p.get("era_rpo"),
+            "bat_era_factor": p.get("bat_era_factor"),
+            "bowl_era_factor": p.get("bowl_era_factor"),
+        }
+        for p in all_players
+    ]
+
+    return {
+        "metadata": {
+            "format": format_name,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "total_players": len(all_players),
+            "boei_scale": round(boei_scale, 4),
+            "alpha": LOI_ALPHA,
+            "bowl_k": BOWL_K,
+            "min_matches": LOI_MIN_MATCHES,
+            "min_ar_rating": LOI_MIN_AR_RATING,
+            "stint_innings": LOI_STINT_INNINGS,
+            "rating_base": RATING_BASE,
+            "rating_k": RATING_K,
+            "all_time_avg": round(all_time_avg, 2),
+            "all_time_rpo": round(all_time_rpo, 2),
+        },
+        "batting_top25": [player_summary(p) for p in bei_sorted[:TOP_N]],
+        "bowling_top25": [player_summary(p) for p in boei_sorted[:TOP_N]],
+        "allrounder_top25": [player_summary(p, ["balance"]) for p in allrounders[:TOP_N]],
+        "all_players": all_players_index,
+    }
+
+
+def run_loi_pipeline(
+    cricket_class: int = 2,
+    format_name: str = "ODI",
+    bat_agg_path: Path = ODI_BAT_AGG_PATH,
+    bowl_agg_path: Path = ODI_BOWL_AGG_PATH,
+    bat_cum_path: Path = ODI_BAT_CUM_CACHE_PATH,
+    bowl_cum_path: Path = ODI_BOWL_CUM_CACHE_PATH,
+    era_cache_path: Path = ODI_ERA_CACHE_PATH,
+    force_scrape: bool = False,
+) -> dict:
+    """Full pipeline for an LOI format. Returns rankings JSON dict."""
+    print(f"\n{'=' * 60}")
+    print(f"GOAT Cricket Rankings — {format_name}")
+    print(f"{'=' * 60}")
+
+    # 1. Aggregate player lists
+    if bat_agg_path.exists() and not force_scrape:
+        bat_agg = pd.read_pickle(bat_agg_path)
+        print(f"Loaded cached {format_name} batting aggregate: {len(bat_agg)} players")
+    else:
+        print(f"Scraping {format_name} batting aggregate...")
+        bat_agg = scrape_statsguru_aggregate("batting", min_matches=LOI_MIN_MATCHES, cricket_class=cricket_class)
+        bat_agg.to_pickle(bat_agg_path)
+        print(f"  Saved {len(bat_agg)} players")
+
+    if bowl_agg_path.exists() and not force_scrape:
+        bowl_agg = pd.read_pickle(bowl_agg_path)
+        print(f"Loaded cached {format_name} bowling aggregate: {len(bowl_agg)} players")
+    else:
+        print(f"Scraping {format_name} bowling aggregate...")
+        bowl_agg = scrape_statsguru_aggregate("bowling", min_matches=LOI_MIN_MATCHES, cricket_class=cricket_class)
+        bowl_agg.to_pickle(bowl_agg_path)
+        print(f"  Saved {len(bowl_agg)} players")
+
+    all_ids = sorted(set(bat_agg["player_id"].tolist()) | set(bowl_agg["player_id"].tolist()))
+    print(f"\nUnique {format_name} players with {LOI_MIN_MATCHES}+ matches: {len(all_ids)}")
+
+    info_cols = ["player_id", "player_name", "country"]
+    if "Span" in bat_agg.columns:
+        info_cols.append("Span")
+    player_info = bat_agg[info_cols].drop_duplicates("player_id")
+    bowl_info_cols = ["player_id", "player_name", "country"]
+    if "Span" in bowl_agg.columns:
+        bowl_info_cols.append("Span")
+    bowl_only = bowl_agg[~bowl_agg["player_id"].isin(player_info["player_id"])][
+        bowl_info_cols
+    ].drop_duplicates("player_id")
+    player_info = pd.concat([player_info, bowl_only], ignore_index=True)
+
+    # 2. Per-player cumulative data
+    if force_scrape or not bat_cum_path.exists():
+        bat_cache, bowl_cache = scrape_loi_all_players(
+            all_ids, cricket_class, bat_cum_path, bowl_cum_path
+        )
+    else:
+        bat_cache = _load_loi_cache(bat_cum_path)
+        bowl_cache = _load_loi_cache(bowl_cum_path)
+        missing = [pid for pid in all_ids if pid not in bat_cache]
+        if missing:
+            print(f"  {len(missing)} new players to scrape...")
+            bat_cache, bowl_cache = scrape_loi_all_players(
+                all_ids, cricket_class, bat_cum_path, bowl_cum_path
+            )
+        else:
+            print(f"  LOI cumulative cache: {len(bat_cache)} bat, {len(bowl_cache)} bowl")
+
+    # 3. Era normalization
+    print(f"\nScraping {format_name} era averages...")
+    unique_spans = set()
+    if "Span" in player_info.columns:
+        for sp_str in player_info["Span"].dropna().unique():
+            sp = parse_span(str(sp_str))
+            if sp:
+                unique_spans.add(sp)
+    if unique_spans:
+        min_y = min(s[0] for s in unique_spans)
+        max_y = max(s[1] for s in unique_spans)
+        unique_spans.add((min_y, max_y))
+
+    if force_scrape or not era_cache_path.exists():
+        era_cache = scrape_loi_era_averages(unique_spans, cricket_class, era_cache_path)
+    else:
+        era_cache = _load_loi_cache(era_cache_path)
+        missing = unique_spans - set(era_cache.keys())
+        if missing:
+            era_cache = scrape_loi_era_averages(unique_spans, cricket_class, era_cache_path)
+        else:
+            print(f"  LOI era cache complete: {len(era_cache)} spans")
+
+    all_time_avg, all_time_rpo = compute_loi_all_time(era_cache)
+    print(f"  All-time {format_name} avg: {all_time_avg}, RPO: {all_time_rpo}")
+
+    # 4. Baseline WPM and BoEI scale
+    print(f"\nComputing {format_name} baseline wpm...")
+    baseline_wpm = compute_loi_baseline_wpm(bat_cache, bowl_cache)
+    print(f"  BASELINE_WPM = {baseline_wpm:.2f}")
+
+    print(f"Computing {format_name} BoEI scale...")
+    boei_scale = compute_loi_boei_scale(bat_cache, bowl_cache, baseline_wpm)
+    print(f"  BOEI_SCALE = {boei_scale:.4f}")
+
+    # 5. Compute all players
+    print(f"Computing {format_name} indices for all players...")
+    all_players = compute_loi_all_players(
+        bat_cache, bowl_cache, player_info, boei_scale,
+        baseline_wpm=baseline_wpm, era_cache=era_cache,
+        all_time_avg=all_time_avg, all_time_rpo=all_time_rpo,
+    )
+    print(f"  Computed indices for {len(all_players)} players")
+
+    # 6. Build JSON
+    print(f"Building {format_name} rankings JSON...")
+    rankings = build_loi_rankings_json(
+        all_players, boei_scale,
+        baseline_wpm=baseline_wpm, all_time_avg=all_time_avg,
+        all_time_rpo=all_time_rpo, format_name=format_name,
+    )
+
+    return rankings
+
+
 # ─── JSON Output ─────────────────────────────────────────────────────────────
 
 
@@ -885,6 +1632,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
 
     return {
         "metadata": {
+            "format": "Tests",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "total_players": len(all_players),
             "boei_scale": round(boei_scale, 4),
@@ -990,7 +1738,7 @@ def main():
     )
     print(f"  Computed indices for {len(all_players)} players")
 
-    print("Building rankings JSON...")
+    print("Building Test rankings JSON...")
     rankings = build_rankings_json(all_players, boei_scale, median_wpm=median_wpm, all_time_avg=all_time_avg)
 
     out_path = SITE_DIR / "rankings.json"
@@ -1002,6 +1750,30 @@ def main():
     print(f"  Batting top 3: {', '.join(p['name'] for p in rankings['batting_top25'][:3])}")
     print(f"  Bowling top 3: {', '.join(p['name'] for p in rankings['bowling_top25'][:3])}")
     print(f"  Allrounder top 3: {', '.join(p['name'] for p in rankings['allrounder_top25'][:3])}")
+
+    # ── ODI Pipeline ──
+    odi_rankings = run_loi_pipeline(
+        cricket_class=2,
+        format_name="ODI",
+        bat_agg_path=ODI_BAT_AGG_PATH,
+        bowl_agg_path=ODI_BOWL_AGG_PATH,
+        bat_cum_path=ODI_BAT_CUM_CACHE_PATH,
+        bowl_cum_path=ODI_BOWL_CUM_CACHE_PATH,
+        era_cache_path=ODI_ERA_CACHE_PATH,
+        force_scrape=do_scrape,
+    )
+
+    odi_out_path = SITE_DIR / "odi_rankings.json"
+    with open(odi_out_path, "w") as f:
+        json.dump(odi_rankings, f, separators=(",", ":"))
+
+    size_mb = odi_out_path.stat().st_size / 1024 / 1024
+    print(f"\nWrote {odi_out_path} ({size_mb:.1f} MB)")
+    print(f"  ODI Batting top 3: {', '.join(p['name'] for p in odi_rankings['batting_top25'][:3])}")
+    print(f"  ODI Bowling top 3: {', '.join(p['name'] for p in odi_rankings['bowling_top25'][:3])}")
+    if odi_rankings["allrounder_top25"]:
+        print(f"  ODI Allrounder top 3: {', '.join(p['name'] for p in odi_rankings['allrounder_top25'][:3])}")
+
     print("\nDone!")
 
 
