@@ -37,8 +37,8 @@ const FLAGS = {
 
 function getFlag(country) {
   if (!country) return '';
-  const primary = country.split('/').pop();
-  return FLAGS[primary] || FLAGS[country.split('/')[0]] || '\u{1F3CF}';
+  const primary = country.split('/')[0];
+  return FLAGS[primary] || FLAGS[country.split('/').pop()] || '\u{1F3CF}';
 }
 
 // Known full name → abbreviated name mappings for search
