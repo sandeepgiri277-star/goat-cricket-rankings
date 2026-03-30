@@ -101,10 +101,28 @@ async function loadData() {
     DATA = await resp.json();
     buildNameIndex();
     renderAll();
+    restoreFromHash();
     document.body.classList.add('loaded');
   } catch (e) {
     document.querySelector('.content').innerHTML =
       '<p style="text-align:center;padding:3rem;color:var(--accent3)">Failed to load rankings data. Make sure rankings.json is available.</p>';
+  }
+}
+
+function restoreFromHash() {
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if (!hash) return;
+
+  if (hash.startsWith('player/')) {
+    const name = hash.slice(7);
+    switchTab('player-lookup', false);
+    document.getElementById('player-search').value = name;
+    showPlayer(name, false);
+  } else {
+    const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'methodology'];
+    if (validTabs.includes(hash)) {
+      switchTab(hash, false);
+    }
   }
 }
 
@@ -415,9 +433,13 @@ function setupSearch() {
   });
 }
 
-function showPlayer(name) {
+function showPlayer(name, updateHash = true) {
   const player = DATA.all_players.find(p => p.name === name);
   if (!player) return;
+
+  if (updateHash) {
+    history.pushState(null, '', `#player/${encodeURIComponent(name)}`);
+  }
 
   const card = document.getElementById('player-card');
   card.classList.remove('hidden');
@@ -614,11 +636,16 @@ function simpleKDE(values, nPoints = 150) {
 
 // ─── Tab Navigation ─────────────────────────────────────────────────────────
 
-function switchTab(tabId) {
+function switchTab(tabId, updateHash = true) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
+
+  if (updateHash) {
+    const hash = tabId === 'allrounders' ? '' : `#${tabId}`;
+    history.pushState(null, '', hash || location.pathname);
+  }
 
   setTimeout(() => {
     const panel = document.getElementById(`panel-${tabId}`);
@@ -672,5 +699,9 @@ document.addEventListener('DOMContentLoaded', () => {
       lastWidth = newWidth;
       if (DATA) renderAll();
     }
+  });
+
+  window.addEventListener('popstate', () => {
+    if (DATA) restoreFromHash();
   });
 });
