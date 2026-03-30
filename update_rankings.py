@@ -543,27 +543,29 @@ def compute_ratings(all_players: list[dict]) -> dict:
             else:
                 p[f"{metric}_rating"] = 0
 
-    # Pass 2: AEI ratings — geometric mean of individual ratings,
-    # normalized so the best allrounder ≈ 1000.
-    # z-scores don't work here because the allrounder population is too
-    # small (~40-50) and heavily right-skewed.
+    # Pass 2: AEI ratings — arithmetic mean of individual ratings,
+    # normalized so the best allrounder = 1000.
+    # Arithmetic mean rewards total contribution across both disciplines.
+    # The MIN_AR_RATING threshold already ensures genuine allrounders;
+    # within that group, a dominant batsman who also bowls well (Sobers)
+    # should rate above a more balanced but lower-ceiling player.
     qualifying = [
         p for p in all_players
         if p["BEI_rating"] >= MIN_AR_RATING
         and p["BoEI_rating"] >= MIN_AR_RATING
     ]
     for p in qualifying:
-        p["_ar_geo"] = np.sqrt(p["BEI_rating"] * p["BoEI_rating"])
+        p["_ar_avg"] = (p["BEI_rating"] + p["BoEI_rating"]) / 2
 
-    max_geo = max((p["_ar_geo"] for p in qualifying), default=1)
+    max_avg = max((p["_ar_avg"] for p in qualifying), default=1)
     for p in all_players:
-        geo = p.pop("_ar_geo", 0)
-        if geo > 0:
-            p["AEI_rating"] = int(round(geo / max_geo * 1000))
+        avg = p.pop("_ar_avg", 0)
+        if avg > 0:
+            p["AEI_rating"] = int(round(avg / max_avg * 1000))
         else:
             p["AEI_rating"] = 0
 
-    stats["AEI"] = (0.0, 0.0)  # not used for z-scores anymore
+    stats["AEI"] = (0.0, 0.0)
     return stats
 
 
@@ -670,18 +672,19 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 else:
                     r[f"{metric}_rating"] = 0
 
-        # AEI ratings via geometric mean of individual ratings
+        # AEI ratings via arithmetic mean of individual ratings
         ar_qual = [
             r for r in recomputed
             if r.get("BEI_rating", 0) >= MIN_AR_RATING
             and r.get("BoEI_rating", 0) >= MIN_AR_RATING
         ]
         for r in ar_qual:
-            r["_ar_geo"] = np.sqrt(r["BEI_rating"] * r["BoEI_rating"])
-        a_max_geo = max((r["_ar_geo"] for r in ar_qual), default=1)
+            r["_ar_avg"] = (r["BEI_rating"] + r["BoEI_rating"]) / 2
+        a_max_avg = max((r["_ar_avg"] for r in ar_qual), default=1)
         for r in recomputed:
-            if "_ar_geo" in r and r["_ar_geo"] > 0:
-                r["AEI_rating"] = int(round(r["_ar_geo"] / a_max_geo * 1000))
+            avg = r.pop("_ar_avg", 0)
+            if avg > 0:
+                r["AEI_rating"] = int(round(avg / a_max_avg * 1000))
             else:
                 r["AEI_rating"] = 0
 
