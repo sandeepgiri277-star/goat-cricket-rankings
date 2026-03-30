@@ -543,25 +543,27 @@ def compute_ratings(all_players: list[dict]) -> dict:
             else:
                 p[f"{metric}_rating"] = 0
 
-    # Pass 2: AEI ratings (population = players meeting MIN_AR_RATING in both)
-    ar_vals = np.array([
-        p["AEI"] for p in all_players
-        if p["AEI"] > 0
-        and p["BEI_rating"] >= MIN_AR_RATING
+    # Pass 2: AEI ratings — geometric mean of individual ratings,
+    # normalized so the best allrounder ≈ 1000.
+    # z-scores don't work here because the allrounder population is too
+    # small (~40-50) and heavily right-skewed.
+    qualifying = [
+        p for p in all_players
+        if p["BEI_rating"] >= MIN_AR_RATING
         and p["BoEI_rating"] >= MIN_AR_RATING
-    ])
-    stats["AEI"] = (float(ar_vals.mean()), float(ar_vals.std())) if len(ar_vals) > 1 else (0.0, 1.0)
+    ]
+    for p in qualifying:
+        p["_ar_geo"] = np.sqrt(p["BEI_rating"] * p["BoEI_rating"])
 
-    mu, sigma = stats["AEI"]
-    if sigma == 0:
-        sigma = 1
+    max_geo = max((p["_ar_geo"] for p in qualifying), default=1)
     for p in all_players:
-        val = p["AEI"]
-        if val > 0:
-            p["AEI_rating"] = _z_to_rating((val - mu) / sigma)
+        geo = p.pop("_ar_geo", 0)
+        if geo > 0:
+            p["AEI_rating"] = int(round(geo / max_geo * 1000))
         else:
             p["AEI_rating"] = 0
 
+    stats["AEI"] = (0.0, 0.0)  # not used for z-scores anymore
     return stats
 
 
@@ -573,13 +575,12 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
 
     allrounders = []
     for p in all_players:
-        if p["AEI"] <= 0:
+        if p["AEI_rating"] <= 0:
             continue
         if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
-            balance = min(p["BEI"], p["BoEI"]) / p["AEI"]
+            balance = min(p["BEI"], p["BoEI"]) / p["AEI"] if p["AEI"] > 0 else 0
             allrounders.append({**p, "balance": round(balance * 100, 1)})
-    allrounders = [p for p in allrounders if p["AEI_rating"] > 0]
-    allrounders.sort(key=lambda p: p["AEI"], reverse=True)
+    allrounders.sort(key=lambda p: p["AEI_rating"], reverse=True)
 
     def player_summary(p, extra_fields=None):
         d = {
@@ -653,8 +654,8 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 "matches": total,
             })
 
-        # Compute ratings for this alpha's distribution
-        for metric in ["BEI", "BoEI", "AEI"]:
+        # Compute BEI/BoEI ratings via z-scores
+        for metric in ["BEI", "BoEI"]:
             vals = [r[metric] for r in recomputed if r[metric] > 0]
             if len(vals) < 2:
                 continue
@@ -665,21 +666,28 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 v = r[metric]
                 if v > 0:
                     z = (v - mu) / sigma
-                    r[f"{metric}_rating"] = max(0, int(round(
-                        RATING_BASE + RATING_K * np.sqrt(z) if z >= 0 else RATING_BASE - RATING_K * np.sqrt(-z)
-                    )))
+                    r[f"{metric}_rating"] = _z_to_rating(z)
                 else:
                     r[f"{metric}_rating"] = 0
 
-        bat_top = sorted(recomputed, key=lambda x: x["BEI"], reverse=True)[:15]
-        bowl_top = sorted(recomputed, key=lambda x: x["BoEI"], reverse=True)[:15]
-        ar_candidates = [
+        # AEI ratings via geometric mean of individual ratings
+        ar_qual = [
             r for r in recomputed
-            if r["AEI"] > 0
-            and r.get("BEI_rating", 0) >= MIN_AR_RATING
+            if r.get("BEI_rating", 0) >= MIN_AR_RATING
             and r.get("BoEI_rating", 0) >= MIN_AR_RATING
         ]
-        ar_top = sorted(ar_candidates, key=lambda x: x["AEI"], reverse=True)[:15]
+        for r in ar_qual:
+            r["_ar_geo"] = np.sqrt(r["BEI_rating"] * r["BoEI_rating"])
+        a_max_geo = max((r["_ar_geo"] for r in ar_qual), default=1)
+        for r in recomputed:
+            if "_ar_geo" in r and r["_ar_geo"] > 0:
+                r["AEI_rating"] = int(round(r["_ar_geo"] / a_max_geo * 1000))
+            else:
+                r["AEI_rating"] = 0
+
+        bat_top = sorted(recomputed, key=lambda x: x["BEI"], reverse=True)[:15]
+        bowl_top = sorted(recomputed, key=lambda x: x["BoEI"], reverse=True)[:15]
+        ar_top = sorted(ar_qual, key=lambda x: x["AEI_rating"], reverse=True)[:15]
 
         alpha_comparison[str(a)] = {
             "batting": bat_top,
