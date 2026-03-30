@@ -543,25 +543,23 @@ def compute_ratings(all_players: list[dict]) -> dict:
             else:
                 p[f"{metric}_rating"] = 0
 
-    # Pass 2: AEI ratings — arithmetic mean of individual ratings,
-    # normalized so the best allrounder = 1000.
-    # Arithmetic mean rewards total contribution across both disciplines.
-    # The MIN_AR_RATING threshold already ensures genuine allrounders;
-    # within that group, a dominant batsman who also bowls well (Sobers)
-    # should rate above a more balanced but lower-ceiling player.
-    qualifying = [
-        p for p in all_players
-        if p["BEI_rating"] >= MIN_AR_RATING
-        and p["BoEI_rating"] >= MIN_AR_RATING
-    ]
-    for p in qualifying:
-        p["_ar_avg"] = (p["BEI_rating"] + p["BoEI_rating"]) / 2
-
-    max_avg = max((p["_ar_avg"] for p in qualifying), default=1)
+    # Pass 2: AEI ratings — use the raw AEI (career-integrated BEI + BoEI)
+    # normalized so the top qualifying allrounder = 1000.
+    # AEI already captures sustained contribution across both disciplines
+    # over the full career. Simple normalization avoids the z-score
+    # instability that plagued the small allrounder population (~50).
+    qual_set = set()
     for p in all_players:
-        avg = p.pop("_ar_avg", 0)
-        if avg > 0:
-            p["AEI_rating"] = int(round(avg / max_avg * 1000))
+        if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
+            qual_set.add(p["player_name"])
+
+    max_aei = max(
+        (p["AEI"] for p in all_players if p["player_name"] in qual_set and p["AEI"] > 0),
+        default=1,
+    )
+    for p in all_players:
+        if p["player_name"] in qual_set and p["AEI"] > 0:
+            p["AEI_rating"] = int(round(p["AEI"] / max_aei * 1000))
         else:
             p["AEI_rating"] = 0
 
@@ -672,19 +670,17 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 else:
                     r[f"{metric}_rating"] = 0
 
-        # AEI ratings via arithmetic mean of individual ratings
+        # AEI ratings via normalized raw AEI
         ar_qual = [
             r for r in recomputed
             if r.get("BEI_rating", 0) >= MIN_AR_RATING
             and r.get("BoEI_rating", 0) >= MIN_AR_RATING
         ]
-        for r in ar_qual:
-            r["_ar_avg"] = (r["BEI_rating"] + r["BoEI_rating"]) / 2
-        a_max_avg = max((r["_ar_avg"] for r in ar_qual), default=1)
+        ar_qual_names = {r["name"] for r in ar_qual}
+        a_max_aei = max((r["AEI"] for r in ar_qual if r["AEI"] > 0), default=1)
         for r in recomputed:
-            avg = r.pop("_ar_avg", 0)
-            if avg > 0:
-                r["AEI_rating"] = int(round(avg / a_max_avg * 1000))
+            if r["name"] in ar_qual_names and r["AEI"] > 0:
+                r["AEI_rating"] = int(round(r["AEI"] / a_max_aei * 1000))
             else:
                 r["AEI_rating"] = 0
 
