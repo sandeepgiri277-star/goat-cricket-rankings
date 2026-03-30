@@ -543,27 +543,25 @@ def compute_ratings(all_players: list[dict]) -> dict:
             else:
                 p[f"{metric}_rating"] = 0
 
-    # Pass 2: AEI ratings — use the raw AEI (career-integrated BEI + BoEI)
-    # normalized so the top qualifying allrounder = 1000.
-    # AEI already captures sustained contribution across both disciplines
-    # over the full career. Simple normalization avoids the z-score
-    # instability that plagued the small allrounder population (~50).
-    qual_set = set()
-    for p in all_players:
-        if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
-            qual_set.add(p["player_name"])
+    # Pass 2: AEI ratings via z-scores against the FULL population.
+    # Using all 870 players (not just ~50 qualifying allrounders) gives
+    # stable stats. The allrounder leaderboard then filters to qualified
+    # players only. This keeps the same sqrt-compressed z-score formula
+    # as batting/bowling, so the scale feels consistent (Kallis > 1000
+    # like Bradman for batting).
+    aei_vals = np.array([p["AEI"] for p in all_players if p["AEI"] > 0])
+    stats["AEI"] = (float(aei_vals.mean()), float(aei_vals.std())) if len(aei_vals) > 1 else (0.0, 1.0)
 
-    max_aei = max(
-        (p["AEI"] for p in all_players if p["player_name"] in qual_set and p["AEI"] > 0),
-        default=1,
-    )
+    mu, sigma = stats["AEI"]
+    if sigma == 0:
+        sigma = 1
     for p in all_players:
-        if p["player_name"] in qual_set and p["AEI"] > 0:
-            p["AEI_rating"] = int(round(p["AEI"] / max_aei * 1000))
+        if p["AEI"] > 0:
+            z = (p["AEI"] - mu) / sigma
+            p["AEI_rating"] = _z_to_rating(z)
         else:
             p["AEI_rating"] = 0
 
-    stats["AEI"] = (0.0, 0.0)
     return stats
 
 
@@ -670,19 +668,23 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 else:
                     r[f"{metric}_rating"] = 0
 
-        # AEI ratings via normalized raw AEI
+        # AEI ratings via z-scores against full population
+        aei_v = [r["AEI"] for r in recomputed if r["AEI"] > 0]
+        if len(aei_v) >= 2:
+            a_mu, a_sigma = float(np.mean(aei_v)), float(np.std(aei_v))
+            if a_sigma == 0:
+                a_sigma = 1.0
+            for r in recomputed:
+                if r["AEI"] > 0:
+                    r["AEI_rating"] = _z_to_rating((r["AEI"] - a_mu) / a_sigma)
+                else:
+                    r["AEI_rating"] = 0
+
         ar_qual = [
             r for r in recomputed
             if r.get("BEI_rating", 0) >= MIN_AR_RATING
             and r.get("BoEI_rating", 0) >= MIN_AR_RATING
         ]
-        ar_qual_names = {r["name"] for r in ar_qual}
-        a_max_aei = max((r["AEI"] for r in ar_qual if r["AEI"] > 0), default=1)
-        for r in recomputed:
-            if r["name"] in ar_qual_names and r["AEI"] > 0:
-                r["AEI_rating"] = int(round(r["AEI"] / a_max_aei * 1000))
-            else:
-                r["AEI_rating"] = 0
 
         bat_top = sorted(recomputed, key=lambda x: x["BEI"], reverse=True)[:15]
         bowl_top = sorted(recomputed, key=lambda x: x["BoEI"], reverse=True)[:15]
