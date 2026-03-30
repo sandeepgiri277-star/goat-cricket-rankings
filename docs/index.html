@@ -93,7 +93,11 @@
         <p>The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.</p>
 
         <h3>Bowling Score Transformation</h3>
-        <p>Bowling averages are "lower is better," so we flip them: <strong>bowl_score = 1000 &divide; bowl_avg</strong>. A bowling average of 20 becomes a score of 50; an average of 25 becomes 40. Now higher is better, just like batting.</p>
+        <p>Bowling averages are "lower is better," so we flip them and factor in <strong>wickets per match</strong>:</p>
+        <div class="formula">
+          bowl_score = (1000 &divide; bowl_avg) &times; &radic;(wpm &divide; baseline_wpm)
+        </div>
+        <p>This captures both <strong>quality</strong> (average) and <strong>volume</strong> (wickets per match). A bowler averaging 22 and taking 5 wickets per match scores far higher than one averaging 22 but taking only 1 per match. The square root dampens the volume factor so quality still dominates.</p>
 
         <h3>Bowling Excellence Index (BoEI)</h3>
         <div class="formula">
@@ -124,14 +128,24 @@
         <div class="formula">
           AEI = BEI + BoEI
         </div>
-        <p>A genuine allrounder must achieve a minimum rating of <strong>250</strong> in both batting and bowling. This filters out specialists &mdash; Tendulkar (no qualifying bowling stints) and Warne (minimal batting contribution) don't qualify despite high total scores.</p>
+        <p>Since BoEI already incorporates wickets per match, the straight sum naturally rewards players who contribute with <strong>both</strong> bat and ball. A part-time bowler who barely takes wickets will have a negligible BoEI regardless of their bowling average. A genuine allrounder must also achieve a minimum rating of <strong>250</strong> in both batting and bowling to qualify.</p>
 
         <h3>Distribution Overview</h3>
         <p>The density curves below show where all qualifying Test players fall across BEI, BoEI, and AEI.</p>
         <div class="chart-container" id="chart-kde"></div>
 
+        <h3>Era Adjustment</h3>
+        <p>Not all eras are created equal. Averaging 50 in the 1950s (when pitches were uncovered and the overall Test average was ~30) is a far greater achievement than averaging 50 in the 2000s (when flat pitches pushed the overall average above 33). We normalize for this.</p>
+        <p>For each player, we look up the <strong>overall Test average</strong> (total runs &divide; total wickets) across all matches played during their career span. We then compare it to the all-time average (<span id="all-time-avg-display"></span>):</p>
+        <div class="formula">
+          Batting factor = All-time avg &divide; Era avg<br>
+          Bowling factor = Era avg &divide; All-time avg
+        </div>
+        <p>A player from a low-scoring era (e.g., era avg = 28) gets a batting boost of ~1.14&times; and a bowling penalty of ~0.88&times;. A player from a high-scoring era (e.g., era avg = 34) gets a batting penalty of ~0.94&times; and a bowling boost of ~1.07&times;.</p>
+        <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of their era</em>.</p>
+
         <h3>Rating Scale (0&ndash;1000)</h3>
-        <p>Raw indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
+        <p>Era-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
         <div class="formula">
           Rating = 350 + 351 &times; &radic;z &nbsp;&nbsp; where z = (value &minus; &mu;) / &sigma;
         </div>

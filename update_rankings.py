@@ -48,6 +48,7 @@ BAT_AGG_PATH = CACHE_DIR / "batting_aggregate.pkl"
 BOWL_AGG_PATH = CACHE_DIR / "bowling_aggregate.pkl"
 ALLROUND_CACHE_PATH = CACHE_DIR / "allround_cache.pkl"
 INNINGS_CACHE_PATH = CACHE_DIR / "innings_cache.pkl"
+ERA_CACHE_PATH = CACHE_DIR / "era_cache.pkl"
 
 # ─── Scraping ────────────────────────────────────────────────────────────────
 
@@ -270,6 +271,100 @@ def save_innings_cache(cache: dict):
         pickle.dump(cache, f)
 
 
+def load_era_cache() -> dict:
+    if ERA_CACHE_PATH.exists():
+        with open(ERA_CACHE_PATH, "rb") as f:
+            return pickle.load(f)
+    return {}
+
+
+def save_era_cache(cache: dict):
+    with open(ERA_CACHE_PATH, "wb") as f:
+        pickle.dump(cache, f)
+
+
+def _scrape_era_aggregate(start_year: int, end_year: int) -> dict | None:
+    """Scrape overall Test figures (Runs, Wkts, Ave) for a date range."""
+    url = (
+        f"https://stats.espncricinfo.com/ci/engine/stats/index.html?"
+        f"class=1;spanmin1=01+Jan+{start_year};spanmax1=31+Dec+{end_year};"
+        f"spanval1=span;template=results;type=aggregate"
+    )
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        tables = soup.select("table.engineTable")
+        for table in tables:
+            rows = table.select("tr.data1")
+            if not rows:
+                continue
+            cells = rows[0].find_all("td")
+            headers = [th.get_text(strip=True) for th in table.select("tr th")]
+            if "Runs" not in headers or "Wkts" not in headers:
+                continue
+            vals = [c.get_text(strip=True) for c in cells]
+            row_dict = dict(zip(headers, vals))
+            runs = int(row_dict["Runs"].replace(",", ""))
+            wkts = int(row_dict["Wkts"].replace(",", ""))
+            ave = float(row_dict["Ave"]) if row_dict.get("Ave", "-") != "-" else (runs / wkts if wkts else 0)
+            return {"runs": runs, "wkts": wkts, "ave": round(ave, 2)}
+    except Exception as e:
+        print(f"    WARNING: Failed to scrape era {start_year}-{end_year}: {e}")
+    return None
+
+
+def scrape_era_averages(
+    spans: set[tuple[int, int]], delay: float = 0.3
+) -> dict[tuple[int, int], dict]:
+    """Scrape era averages for all unique career spans, with caching."""
+    cache = load_era_cache()
+    current_year = datetime.now().year
+    to_scrape = []
+    for span in spans:
+        if span not in cache:
+            to_scrape.append(span)
+        elif span[1] >= current_year:
+            to_scrape.append(span)
+
+    if not to_scrape:
+        print(f"  Era cache complete: {len(cache)} spans")
+        return cache
+
+    print(f"  Scraping era averages for {len(to_scrape)} spans...")
+    for i, (sy, ey) in enumerate(sorted(to_scrape)):
+        result = _scrape_era_aggregate(sy, ey)
+        if result:
+            cache[(sy, ey)] = result
+        if i > 0 and i % 50 == 0:
+            save_era_cache(cache)
+            print(f"    {i}/{len(to_scrape)} done...")
+        time.sleep(delay)
+
+    save_era_cache(cache)
+    print(f"  Era cache: {len(cache)} spans")
+    return cache
+
+
+def parse_span(span_str: str) -> tuple[int, int] | None:
+    """Parse '1989-2013' into (1989, 2013)."""
+    parts = span_str.strip().split("-")
+    if len(parts) == 2:
+        try:
+            return int(parts[0]), int(parts[1])
+        except ValueError:
+            pass
+    return None
+
+
+def compute_all_time_avg(era_cache: dict) -> float:
+    """Compute all-time Test average from the broadest span in cache, or default."""
+    if not era_cache:
+        return 31.91
+    broadest = max(era_cache.keys(), key=lambda k: k[1] - k[0])
+    return era_cache[broadest]["ave"]
+
+
 def load_or_scrape_aggregates(force_scrape: bool = False):
     for p in [BAT_AGG_PATH, BOWL_AGG_PATH]:
         if p.exists():
@@ -423,6 +518,7 @@ def compute_stints(
         bat_avg = float(s_runs / s_dism) if bat_qualifies and s_dism > 0 else None
         bowl_avg = float(s_br / s_wkts) if bowl_qualifies and s_wkts > 0 else None
         bowl_score = (BOWL_K / bowl_avg) if bowl_avg and bowl_avg > 0 else None
+        wpm = float(s_wkts / matches) if bowl_qualifies and s_wkts > 0 else None
 
         stints.append({
             "label": f"{int(df.iloc[i]['Mat'])}\u2013{int(c['Mat'])}",
@@ -430,13 +526,14 @@ def compute_stints(
             "bat_avg": round(bat_avg, 2) if bat_avg is not None else None,
             "bowl_avg": round(bowl_avg, 2) if bowl_avg is not None else None,
             "bowl_score": round(bowl_score, 2) if bowl_score is not None else None,
+            "wpm": round(wpm, 2) if wpm is not None else None,
         })
         i = end_idx + 1
 
     return stints
 
 
-def excellence_indices(stints: list[dict], boei_scale: float = 1.0) -> dict:
+def excellence_indices(stints: list[dict], boei_scale: float = 1.0, median_wpm: float = 2.75) -> dict:
     total_matches = sum(s["matches"] for s in stints)
     denom = total_matches ** ALPHA if total_matches > 0 else 1.0
 
@@ -444,7 +541,8 @@ def excellence_indices(stints: list[dict], boei_scale: float = 1.0) -> dict:
         s["bat_avg"] * s["matches"] for s in stints if s["bat_avg"] is not None
     )
     bowl_sum = sum(
-        s["bowl_score"] * s["matches"] for s in stints if s["bowl_score"] is not None
+        s["bowl_score"] * np.sqrt(s["wpm"] / median_wpm) * s["matches"]
+        for s in stints if s["bowl_score"] is not None and s["wpm"] is not None
     )
 
     bei = bat_sum / denom
@@ -454,7 +552,24 @@ def excellence_indices(stints: list[dict], boei_scale: float = 1.0) -> dict:
     return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2), "matches": total_matches}
 
 
-def compute_boei_scale(cache: dict, innings_cache: dict) -> float:
+def compute_baseline_wpm(cache: dict) -> float:
+    """Mean wickets-per-match across ALL players (including non-bowlers as 0)."""
+    wpms = []
+    for pid, df in cache.items():
+        try:
+            df_clean = df.dropna(subset=["Mat"])
+            if len(df_clean) < 2:
+                continue
+            last = df_clean.iloc[-1]
+            mat = float(last["Mat"])
+            wkts = float(last["Wkts"]) if last["Wkts"] > 0 else 0
+            wpms.append(wkts / mat if mat > 0 else 0)
+        except Exception:
+            continue
+    return float(np.mean(wpms)) if wpms else 1.4
+
+
+def compute_boei_scale(cache: dict, innings_cache: dict, median_wpm: float = 2.75) -> float:
     bat_num = bat_den = bowl_num = bowl_den = 0.0
     for pid, df in cache.items():
         try:
@@ -467,8 +582,8 @@ def compute_boei_scale(cache: dict, innings_cache: dict) -> float:
                 if s["bat_avg"] is not None:
                     bat_num += s["bat_avg"] * s["matches"]
                     bat_den += s["matches"]
-                if s["bowl_score"] is not None:
-                    bowl_num += s["bowl_score"] * s["matches"]
+                if s["bowl_score"] is not None and s["wpm"] is not None:
+                    bowl_num += s["bowl_score"] * np.sqrt(s["wpm"] / median_wpm) * s["matches"]
                     bowl_den += s["matches"]
         except Exception:
             continue
@@ -477,7 +592,22 @@ def compute_boei_scale(cache: dict, innings_cache: dict) -> float:
     return (bat_num / bat_den) / (bowl_num / bowl_den)
 
 
-def compute_all_players(cache: dict, innings_cache: dict, player_info: pd.DataFrame, boei_scale: float):
+def compute_all_players(
+    cache: dict,
+    innings_cache: dict,
+    player_info: pd.DataFrame,
+    boei_scale: float,
+    median_wpm: float = 2.75,
+    era_cache: dict | None = None,
+    all_time_avg: float = 31.91,
+):
+    span_map = {}
+    if "Span" in player_info.columns:
+        for _, row in player_info.iterrows():
+            sp = parse_span(str(row.get("Span", "")))
+            if sp:
+                span_map[int(row["player_id"])] = sp
+
     records = []
     for pid, df in cache.items():
         try:
@@ -487,18 +617,38 @@ def compute_all_players(cache: dict, innings_cache: dict, player_info: pd.DataFr
                 continue
             inn_data = innings_cache.get(pid)
             stints = compute_stints(df_clean, inn_data)
-            idx = excellence_indices(stints, boei_scale)
+            idx = excellence_indices(stints, boei_scale, median_wpm)
             info_row = player_info[player_info["player_id"] == pid]
             country = info_row["country"].values[0] if len(info_row) > 0 else ""
+
+            bei = idx["BEI"]
+            boei = idx["BoEI"]
+            era_avg = all_time_avg
+            bat_era_factor = 1.0
+            bowl_era_factor = 1.0
+
+            span = span_map.get(int(pid))
+            if span and era_cache and span in era_cache:
+                era_avg = era_cache[span]["ave"]
+                if era_avg > 0:
+                    bat_era_factor = round(all_time_avg / era_avg, 4)
+                    bowl_era_factor = round(era_avg / all_time_avg, 4)
+                    bei = round(bei * bat_era_factor, 2)
+                    boei = round(boei * bowl_era_factor, 2)
+
+            aei = round(bei + boei, 2)
             records.append({
                 "player_id": int(pid),
                 "player_name": name,
                 "country": country,
-                "BEI": idx["BEI"],
-                "BoEI": idx["BoEI"],
-                "AEI": idx["AEI"],
+                "BEI": bei,
+                "BoEI": boei,
+                "AEI": aei,
                 "matches": idx["matches"],
                 "stints": stints,
+                "era_avg": era_avg,
+                "bat_era_factor": bat_era_factor,
+                "bowl_era_factor": bowl_era_factor,
             })
         except Exception:
             continue
@@ -565,7 +715,7 @@ def compute_ratings(all_players: list[dict]) -> dict:
     return stats
 
 
-def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
+def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: float = 2.75, all_time_avg: float = 31.91) -> dict:
     rating_stats = compute_ratings(all_players)
 
     bei_sorted = sorted(all_players, key=lambda p: p["BEI"], reverse=True)
@@ -638,11 +788,13 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
                 for s in p["stints"] if s["bat_avg"] is not None
             )
             raw_boei = sum(
-                s["bowl_score"] * s["matches"]
-                for s in p["stints"] if s["bowl_score"] is not None
+                s["bowl_score"] * np.sqrt(s["wpm"] / median_wpm) * s["matches"]
+                for s in p["stints"] if s["bowl_score"] is not None and s["wpm"] is not None
             )
             bei = raw_bei / denom
             boei = raw_boei * boei_scale / denom
+            bei *= p.get("bat_era_factor", 1.0)
+            boei *= p.get("bowl_era_factor", 1.0)
             aei = bei + boei
             recomputed.append({
                 "name": p["player_name"],
@@ -724,6 +876,9 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
             "bowl_rank": bowl_rank_map.get(p["player_name"]),
             "ar_rank": ar_rank_map.get(p["player_name"]),
             "stints": p["stints"],
+            "era_avg": p.get("era_avg"),
+            "bat_era_factor": p.get("bat_era_factor"),
+            "bowl_era_factor": p.get("bowl_era_factor"),
         }
         for p in all_players
     ]
@@ -741,6 +896,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float) -> dict:
             "stint_size": STINT_SIZE,
             "rating_base": RATING_BASE,
             "rating_k": RATING_K,
+            "all_time_avg": round(all_time_avg, 2),
         },
         "batting_top25": [player_summary(p) for p in bei_sorted[:TOP_N]],
         "bowling_top25": [player_summary(p) for p in boei_sorted[:TOP_N]],
@@ -770,9 +926,15 @@ def main():
     all_ids = sorted(set(bat_agg["player_id"].tolist()) | set(bowl_agg["player_id"].tolist()))
     print(f"\nUnique Test players with {MIN_MATCHES}+ matches: {len(all_ids)}")
 
-    player_info = bat_agg[["player_id", "player_name", "country"]].drop_duplicates("player_id")
+    info_cols = ["player_id", "player_name", "country"]
+    if "Span" in bat_agg.columns:
+        info_cols.append("Span")
+    player_info = bat_agg[info_cols].drop_duplicates("player_id")
+    bowl_info_cols = ["player_id", "player_name", "country"]
+    if "Span" in bowl_agg.columns:
+        bowl_info_cols.append("Span")
     bowl_only = bowl_agg[~bowl_agg["player_id"].isin(player_info["player_id"])][
-        ["player_id", "player_name", "country"]
+        bowl_info_cols
     ].drop_duplicates("player_id")
     player_info = pd.concat([player_info, bowl_only], ignore_index=True)
 
@@ -785,16 +947,51 @@ def main():
         innings_cache = load_innings_cache()
         print(f"Loaded innings cache: {len(innings_cache)} players")
 
-    print("\nComputing BoEI normalization scale...")
-    boei_scale = compute_boei_scale(cache, innings_cache)
+    # Era normalization
+    print("\nScraping era averages...")
+    unique_spans = set()
+    if "Span" in player_info.columns:
+        for sp_str in player_info["Span"].dropna().unique():
+            sp = parse_span(str(sp_str))
+            if sp:
+                unique_spans.add(sp)
+    # Always include the broadest range for all-time average
+    if unique_spans:
+        min_y = min(s[0] for s in unique_spans)
+        max_y = max(s[1] for s in unique_spans)
+        unique_spans.add((min_y, max_y))
+
+    if do_scrape or not ERA_CACHE_PATH.exists():
+        era_cache = scrape_era_averages(unique_spans, delay=0.3)
+    else:
+        era_cache = load_era_cache()
+        missing = unique_spans - set(era_cache.keys())
+        if missing:
+            print(f"  {len(missing)} new spans to scrape...")
+            era_cache = scrape_era_averages(unique_spans, delay=0.3)
+        else:
+            print(f"  Era cache complete: {len(era_cache)} spans")
+
+    all_time_avg = compute_all_time_avg(era_cache)
+    print(f"  All-time Test average: {all_time_avg}")
+
+    print("\nComputing baseline wickets per match (all players)...")
+    median_wpm = compute_baseline_wpm(cache)
+    print(f"  BASELINE_WPM = {median_wpm:.2f}")
+
+    print("Computing BoEI normalization scale...")
+    boei_scale = compute_boei_scale(cache, innings_cache, median_wpm)
     print(f"  BOEI_SCALE = {boei_scale:.4f}")
 
-    print("Computing indices for all players...")
-    all_players = compute_all_players(cache, innings_cache, player_info, boei_scale)
+    print("Computing indices for all players (with era adjustment)...")
+    all_players = compute_all_players(
+        cache, innings_cache, player_info, boei_scale,
+        median_wpm=median_wpm, era_cache=era_cache, all_time_avg=all_time_avg,
+    )
     print(f"  Computed indices for {len(all_players)} players")
 
     print("Building rankings JSON...")
-    rankings = build_rankings_json(all_players, boei_scale)
+    rankings = build_rankings_json(all_players, boei_scale, median_wpm=median_wpm, all_time_avg=all_time_avg)
 
     out_path = SITE_DIR / "rankings.json"
     with open(out_path, "w") as f:

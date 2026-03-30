@@ -379,6 +379,12 @@ a:hover { text-decoration: underline; }
 }
 
 .player-header .ph-country { color: var(--text-muted); }
+.player-header .ph-era {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+  opacity: 0.85;
+}
 
 .player-header .ph-stats {
   display: flex;

@@ -139,6 +139,10 @@ function renderAll() {
   renderKDE();
   renderAlphaTable('allrounder');
   document.getElementById('boei-scale-display').textContent = `\u00d7${DATA.metadata.boei_scale}`;
+  const allTimeEl = document.getElementById('all-time-avg-display');
+  if (allTimeEl && DATA.metadata.all_time_avg) {
+    allTimeEl.textContent = DATA.metadata.all_time_avg.toFixed(2);
+  }
 }
 
 function renderMeta() {
@@ -459,10 +463,19 @@ function showPlayer(name, updateHash = true) {
     stats += `<div class="ph-stat"><div class="label">Allrounder</div><div class="value">${player.ar_rating} (#${player.ar_rank})</div></div>`;
   }
 
+  let eraInfo = '';
+  if (player.era_avg && player.bat_era_factor) {
+    const eraAvg = player.era_avg.toFixed(1);
+    const batF = player.bat_era_factor.toFixed(2);
+    const bowlF = player.bowl_era_factor.toFixed(2);
+    eraInfo = `<div class="ph-era">Era avg: ${eraAvg} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
+  }
+
   document.getElementById('player-header').innerHTML = `
     <div>
       <div class="ph-name">${getFlag(player.country)} ${player.name}</div>
       <div class="ph-country">${player.country} · ${player.matches} matches</div>
+      ${eraInfo}
     </div>
     <div class="ph-stats">${stats}</div>
   `;
