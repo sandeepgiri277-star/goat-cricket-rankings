@@ -30,7 +30,7 @@ BOWL_K = 1000
 MIN_STINT_BAT_INN = 10
 MIN_STINT_BOWL_INN = 10
 ALPHA = 0.70
-LOI_ALPHA = 0.75
+LOI_ALPHA = 0.70
 MIN_MATCHES = 20
 LOI_MIN_MATCHES = 50
 STINT_SIZE = 10
@@ -1477,12 +1477,11 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
 
     allrounders = []
     for p in fm_players:
-        if p["AEI_rating"] <= 0:
-            continue
         if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
+            geo = np.sqrt(p["BEI_rating"] * p["BoEI_rating"])
             balance = min(p["BEI"], p["BoEI"]) / p["AEI"] if p["AEI"] > 0 else 0
-            allrounders.append({**p, "balance": round(balance * 100, 1)})
-    allrounders.sort(key=lambda p: p["AEI_rating"], reverse=True)
+            allrounders.append({**p, "balance": round(balance * 100, 1), "geo_rating": round(geo)})
+    allrounders.sort(key=lambda p: p["geo_rating"], reverse=True)
 
     def player_summary(p, extra_fields=None):
         d = {
@@ -1494,7 +1493,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
             "AEI": p["AEI"],
             "bat_rating": p["BEI_rating"],
             "bowl_rating": p["BoEI_rating"],
-            "ar_rating": p["AEI_rating"],
+            "ar_rating": p.get("geo_rating", p["AEI_rating"]),
         }
         if extra_fields:
             for k in extra_fields:
@@ -1586,15 +1585,15 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
                 else:
                     r["AEI_rating"] = 0
 
-        ar_qual = [
-            r for r in recomputed
-            if r.get("BEI_rating", 0) >= MIN_AR_RATING
-            and r.get("BoEI_rating", 0) >= MIN_AR_RATING
-        ]
+        ar_qual = []
+        for r in recomputed:
+            if r.get("BEI_rating", 0) >= MIN_AR_RATING and r.get("BoEI_rating", 0) >= MIN_AR_RATING:
+                r["geo_rating"] = round(np.sqrt(r["BEI_rating"] * r["BoEI_rating"]))
+                ar_qual.append(r)
 
         bat_top = sorted(recomputed, key=lambda x: x["BEI"], reverse=True)[:15]
         bowl_top = sorted(recomputed, key=lambda x: x["BoEI"], reverse=True)[:15]
-        ar_top = sorted(ar_qual, key=lambda x: x["AEI_rating"], reverse=True)[:15]
+        ar_top = sorted(ar_qual, key=lambda x: x["geo_rating"], reverse=True)[:15]
 
         alpha_comparison[str(a)] = {
             "batting": bat_top,
@@ -1612,8 +1611,10 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
         bowl_rank_map[p["player_name"]] = rank if p["BoEI"] > 0 else None
 
     ar_rank_map = {}
+    ar_geo_map = {}
     for rank, p in enumerate(allrounders, 1):
         ar_rank_map[p["player_name"]] = rank
+        ar_geo_map[p["player_name"]] = p["geo_rating"]
 
     all_players_index = [
         {
@@ -1625,7 +1626,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
             "AEI": p["AEI"],
             "bat_rating": p["BEI_rating"],
             "bowl_rating": p["BoEI_rating"],
-            "ar_rating": p["AEI_rating"],
+            "ar_rating": ar_geo_map.get(p["player_name"], p["AEI_rating"]),
             "bat_rank": bat_rank_map.get(p["player_name"]),
             "bowl_rank": bowl_rank_map.get(p["player_name"]),
             "ar_rank": ar_rank_map.get(p["player_name"]),

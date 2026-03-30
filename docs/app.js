@@ -453,13 +453,9 @@ function renderMethodology() {
       </div>
       <p>A player from a low-scoring era (e.g., era avg = 28) gets a batting boost of ~1.14× and a bowling penalty of ~0.88×. A player from a high-scoring era (e.g., era avg = 34) gets a batting penalty of ~0.94× and a bowling boost of ~1.07×.</p>`;
 
-  const arDesc = isODI
-    ? `<p>Since BoEI already incorporates wickets per match and economy, the straight sum captures overall allrounder contribution. However, ODI allrounders are <strong>ranked by the geometric mean</strong> of their batting and bowling ratings — √(bat_rating × bowl_rating) — which naturally rewards <strong>balance</strong> between the two disciplines. A player must achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`
-    : `<p>Since BoEI already incorporates wickets per match, the straight sum naturally rewards players who contribute with <strong>both</strong> bat and ball. A part-time bowler who barely takes wickets will have a negligible BoEI regardless of their bowling average. A genuine allrounder must also achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`;
+  const arDesc = `<p>The AEI captures a player's combined contribution with bat and ball. However, allrounders are <strong>ranked by the geometric mean</strong> of their batting and bowling ratings — √(bat_rating × bowl_rating) — which naturally rewards <strong>balance</strong> between the two disciplines. A player who is elite in one but weak in the other will rank below someone who is very good in both. A player must achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`;
 
-  const arRankFormula = isODI
-    ? `AEI = BEI + BoEI<br>Ranking metric = √(bat_rating × bowl_rating)`
-    : `AEI = BEI + BoEI`;
+  const arRankFormula = `AEI = BEI + BoEI<br>Ranking metric = √(bat_rating × bowl_rating)`;
 
   let html = `
     <h2>${label} Methodology</h2>
