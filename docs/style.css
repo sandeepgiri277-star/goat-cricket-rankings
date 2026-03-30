@@ -125,6 +125,7 @@ a:hover { text-decoration: underline; }
 
 .tabs {
   display: flex;
+  justify-content: center;
   gap: 0;
   max-width: var(--max-w);
   margin: 0 auto;
