@@ -40,6 +40,11 @@ RATING_K = 351  # sqrt-compressed: 900+=elite, 800+=great, 700+=very good
 MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
 LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
 
+FULL_MEMBERS = {"AUS", "BAN", "ENG", "IND", "IRE", "NZ", "PAK", "SA", "SL", "WI", "ZIM", "AFG"}
+
+def is_full_member(country: str) -> bool:
+    return any(c in FULL_MEMBERS for c in country.split("/"))
+
 CACHE_DIR = Path(__file__).parent / "cricket_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 SITE_DIR = Path(__file__).parent / "docs"
@@ -1194,11 +1199,12 @@ def build_loi_rankings_json(
     """Build rankings JSON for an LOI format. Same structure as Test rankings."""
     rating_stats = compute_ratings(all_players)
 
-    bei_sorted = sorted(all_players, key=lambda p: p["BEI"], reverse=True)
-    boei_sorted = sorted(all_players, key=lambda p: p["BoEI"], reverse=True)
+    fm_players = [p for p in all_players if is_full_member(p["country"])]
+    bei_sorted = sorted(fm_players, key=lambda p: p["BEI"], reverse=True)
+    boei_sorted = sorted(fm_players, key=lambda p: p["BoEI"], reverse=True)
 
     allrounders = []
-    for p in all_players:
+    for p in fm_players:
         if p["BEI_rating"] >= LOI_MIN_AR_RATING and p["BoEI_rating"] >= LOI_MIN_AR_RATING:
             geo = np.sqrt(p["BEI_rating"] * p["BoEI_rating"])
             balance = min(p["BEI"], p["BoEI"]) / p["AEI"] if p["AEI"] > 0 else 0
@@ -1465,11 +1471,12 @@ def compute_ratings(all_players: list[dict]) -> dict:
 def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: float = 2.75, all_time_avg: float = 31.91) -> dict:
     rating_stats = compute_ratings(all_players)
 
-    bei_sorted = sorted(all_players, key=lambda p: p["BEI"], reverse=True)
-    boei_sorted = sorted(all_players, key=lambda p: p["BoEI"], reverse=True)
+    fm_players = [p for p in all_players if is_full_member(p["country"])]
+    bei_sorted = sorted(fm_players, key=lambda p: p["BEI"], reverse=True)
+    boei_sorted = sorted(fm_players, key=lambda p: p["BoEI"], reverse=True)
 
     allrounders = []
-    for p in all_players:
+    for p in fm_players:
         if p["AEI_rating"] <= 0:
             continue
         if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
