@@ -892,7 +892,8 @@ function renderPlayerCareer(player) {
     const xName = n === 1 ? 'xaxis' : `xaxis${n}`;
     const yName = n === 1 ? 'yaxis' : `yaxis${n}`;
 
-    layout[xName] = { gridcolor: gc, domain: [0, 1], anchor: n === 1 ? 'y' : `y${n}`, tickfont: { size: mobile ? 9 : 12 } };
+    const xDomain = isLOI ? [0, 0.92] : [0, 1];
+    layout[xName] = { gridcolor: gc, domain: xDomain, anchor: n === 1 ? 'y' : `y${n}`, tickfont: { size: mobile ? 9 : 12 } };
     layout[yName] = { gridcolor: gc, domain: domains[ri], anchor: n === 1 ? 'x' : `x${n}` };
 
     const mutedColor = isDark ? '#8b8fa3' : '#6b7085';
@@ -916,8 +917,8 @@ function renderPlayerCareer(player) {
         layout[srAxisName] = {
           gridcolor: 'rgba(0,0,0,0)', domain: domains[ri],
           anchor: 'free', overlaying: n === 1 ? 'y' : `y${n}`,
-          side: 'right', position: 1,
-          title: { text: 'SR', font: { color: srColor, size: 11 } },
+          side: 'right', position: 0.92,
+          title: '',
           tickfont: { color: srColor, size: 10 },
           range: [0, srMax * 1.3], showgrid: false,
         };
@@ -942,8 +943,8 @@ function renderPlayerCareer(player) {
         layout[econAxisName] = {
           gridcolor: 'rgba(0,0,0,0)', domain: domains[ri],
           anchor: 'free', overlaying: n === 1 ? 'y' : `y${n}`,
-          side: 'right', position: 1,
-          title: { text: 'Econ', font: { color: '#FF6692', size: 11 } },
+          side: 'right', position: 0.92,
+          title: '',
           tickfont: { color: '#FF6692', size: 10 },
           range: [0, econMax * 1.3], showgrid: false,
         };
