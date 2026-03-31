@@ -901,7 +901,9 @@ function renderPlayerCareer(player) {
     if (r === 'bat') {
       layout[yName].title = '';
       layout[yName].range = [0, batMax * 1.3];
-      const sub = mobile ? 'Per 10-match window (min. 10 innings)' : 'Average for each 10-match window (min. 10 batting innings to qualify)';
+      const windowDesc = isLOI ? `${DATA.metadata.stint_innings}-innings window` : `${DATA.metadata.stint_size}-match window`;
+      const minDesc = isLOI ? `${DATA.metadata.stint_innings} innings` : `10 batting innings`;
+      const sub = mobile ? `Per ${windowDesc} (min. ${minDesc})` : `Average for each ${windowDesc} (min. ${minDesc} to qualify)`;
       layout.annotations.push({
         text: `<b>Batting Average per Stint</b><br><span style="color:${mutedColor};font-size:${mobile ? 9 : 11}px">${sub}</span>`,
         xref: 'paper', yref: 'paper', x: 0.5, y: annoY, showarrow: false,
@@ -923,9 +925,11 @@ function renderPlayerCareer(player) {
     } else if (r === 'bowl') {
       layout[yName].title = '';
       layout[yName].range = [0, bowlMax * 1.3];
+      const bWindowDesc = isLOI ? `${DATA.metadata.stint_innings}-innings window` : `${DATA.metadata.stint_size}-match window`;
+      const bMinDesc = isLOI ? `${DATA.metadata.stint_innings} innings` : `10 bowling innings`;
       const sub = mobile
-        ? 'Per 10-match window (min. 10 innings) \u2014 lower is better'
-        : 'Average for each 10-match window (min. 10 bowling innings to qualify) \u2014 lower is better';
+        ? `Per ${bWindowDesc} (min. ${bMinDesc}) \u2014 lower is better`
+        : `Average for each ${bWindowDesc} (min. ${bMinDesc} to qualify) \u2014 lower is better`;
       layout.annotations.push({
         text: `<b>Bowling Average per Stint</b><br><span style="color:${mutedColor};font-size:${mobile ? 9 : 11}px">${sub}</span>`,
         xref: 'paper', yref: 'paper', x: 0.5, y: annoY, showarrow: false,
