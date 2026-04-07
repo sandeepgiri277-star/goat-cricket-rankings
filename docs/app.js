@@ -887,8 +887,8 @@ function renderPlayerCareer(player) {
     ...plotlyLayout(),
     height: totalRows === 1 ? (mobile ? 350 : 420) : (mobile ? 600 : 750),
     showlegend: isLOI,
-    legend: isLOI ? { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: { size: 11 } } : undefined,
-    margin: { l: mobile ? 40 : 60, r: isLOI ? (mobile ? 50 : 70) : (mobile ? 15 : 30), t: mobile ? 10 : 10, b: mobile ? 30 : 40 },
+    legend: isLOI ? { orientation: 'h', y: 1.12, x: 0.5, xanchor: 'center', font: { size: 11 } } : undefined,
+    margin: { l: mobile ? 40 : 60, r: isLOI ? (mobile ? 50 : 70) : (mobile ? 15 : 30), t: isLOI ? (mobile ? 40 : 50) : (mobile ? 10 : 10), b: mobile ? 30 : 40 },
     annotations: [],
   };
 
