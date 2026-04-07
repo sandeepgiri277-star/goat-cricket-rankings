@@ -7,11 +7,15 @@ let CURRENT_FORMAT = 'tests';
 const FORMAT_FILES = {
   tests: 'rankings.json',
   odis: 'odi_rankings.json',
+  t20is: 't20i_rankings.json',
+  ipl: 'ipl_rankings.json',
 };
 
 const FORMAT_LABELS = {
   tests: 'Test',
   odis: 'ODI',
+  t20is: 'T20I',
+  ipl: 'IPL',
 };
 
 const COLORS = {
@@ -133,6 +137,8 @@ async function loadData() {
     restoreFromHash();
     document.body.classList.add('loaded');
     loadFormatData('odis');
+    loadFormatData('t20is');
+    loadFormatData('ipl');
   } catch (e) {
     document.querySelector('.content').innerHTML =
       '<p style="text-align:center;padding:3rem;color:var(--accent3)">Failed to load rankings data. Make sure rankings.json is available.</p>';
@@ -210,8 +216,8 @@ async function restoreFromHash() {
 
 function updateFormatLabels() {
   const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
-  const isODI = CURRENT_FORMAT === 'odis';
-  const stintDesc = isODI ? `${DATA.metadata.stint_innings}-innings stints` : `${DATA.metadata.stint_size}-match stints`;
+  const isLOI = CURRENT_FORMAT !== 'tests';
+  const stintDesc = isLOI ? `${DATA.metadata.stint_innings}-innings stints` : `${DATA.metadata.stint_size}-match stints`;
   document.getElementById('heading-allrounders').textContent = `Top 100 ${label} Allrounders`;
   document.getElementById('heading-batting').textContent = `Top 100 ${label} Batters`;
   document.getElementById('heading-bowling').textContent = `Top 100 ${label} Bowlers`;
@@ -403,44 +409,44 @@ function renderMethodology() {
   const el = document.getElementById('methodology-content');
   if (!el) return;
   const m = DATA.metadata;
-  const isODI = CURRENT_FORMAT === 'odis';
-  const label = isODI ? 'ODI' : 'Test';
+  const isLOI = CURRENT_FORMAT !== 'tests';
+  const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
   const alpha = m.alpha;
 
-  const stintDesc = isODI
+  const stintDesc = isLOI
     ? `We divide every career into <strong>${m.stint_innings}-innings windows</strong> — separately for batting and bowling. Because ODIs can include matches where a player doesn't bat or bowl, we track <em>innings played</em> rather than matches. If the final window is shorter than ${m.stint_innings} innings, it merges into the previous one.`
     : `We divide every career into <strong>${m.stint_size}-match windows</strong> and compute batting and bowling averages independently for each window. If the final leftover is shorter than ${m.stint_size} matches, it merges into the previous window (e.g., 71 matches → stints of 10, 10, 10, 10, 10, 10, 11). This gives us a picture of how a player performed at each stage of their career — not just one blended number.`;
 
-  const minQualDesc = isODI
+  const minQualDesc = isLOI
     ? `Players must have played at least <strong>${m.min_matches} matches</strong> to qualify. Each stint requires ≥ <strong>${m.stint_innings} batting innings</strong> (batting) or ≥ <strong>${m.stint_innings} bowling innings</strong> (bowling) to count. Only ICC Full Member nations are included in the rankings.`
     : `Each stint requires ≥ <strong>${m.min_stint_bat_inn} batting innings</strong> (batting) or ≥ <strong>${m.min_stint_bowl_inn} bowling innings</strong> (bowling) to count. This filters out part-time players and prevents small samples from producing misleading averages.`;
 
-  const batFormula = isODI
+  const batFormula = isLOI
     ? `bat_metric = batting_avg × (strike_rate / 100)`
     : `bat_metric = batting_avg`;
 
-  const batFormulaDesc = isODI
+  const batFormulaDesc = isLOI
     ? `In limited-overs cricket, <strong>how fast</strong> you score matters as much as <strong>how many</strong> you score. A player averaging 40 at a strike rate of 95 is far more valuable than one averaging 40 at 65. The batting metric captures both dimensions.`
     : `The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.`;
 
-  const bowlFormula = isODI
+  const bowlFormula = isLOI
     ? `bowl_score = (${m.bowl_k} / (bowl_avg × economy / 6)) × √(wpm / baseline_wpm)`
     : `bowl_score = (${m.bowl_k} / bowl_avg) × √(wpm / baseline_wpm)`;
 
-  const bowlFormulaDesc = isODI
-    ? `In ODIs, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently.`
+  const bowlFormulaDesc = isLOI
+    ? `In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently.`
     : `This captures both <strong>quality</strong> (average) and <strong>volume</strong> (wickets per match). A bowler averaging 22 and taking 5 wickets per match scores far higher than one averaging 22 but taking only 1 per match. The square root dampens the volume factor so quality still dominates.`;
 
-  const beiFormula = isODI
+  const beiFormula = isLOI
     ? `BEI = (∑ bat_metric × stint_matches) / M<sup>${alpha}</sup>`
     : `BEI = (∑ stint_bat_avg × stint_matches) / M<sup>${alpha}</sup>`;
 
-  const alphaDesc = isODI
-    ? `At α = ${alpha}, sustaining ODI excellence over a long career is rewarded, but slightly less than in Tests (α = 0.70) — reflecting that ODI careers tend to be longer and format-specific peaks matter more.`
+  const alphaDesc = isLOI
+    ? `At α = ${alpha}, sustaining ${label} excellence over a long career is rewarded, but quality per match still matters most.`
     : `At α = ${alpha}, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.`;
 
-  const eraDesc = isODI
-    ? `<p>For each player, we look up the <strong>overall ODI batting average</strong> and <strong>runs per over</strong> across all matches during their career span, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
+  const eraDesc = isLOI
+    ? `<p>For each player, we look up the <strong>overall ${label} batting average</strong> and <strong>runs per over</strong> across all matches during their career span, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
       <div class="formula">
         Batting factor = (All-time avg / Era avg) × (All-time RPO / Era RPO)<br>
         Bowling factor = (Era avg / All-time avg) × (Era RPO / All-time RPO)
@@ -478,7 +484,7 @@ function renderMethodology() {
     <p>${batFormulaDesc}</p>
 
     <h3>Bowling Score Transformation</h3>
-    <p>Bowling averages are "lower is better," so we flip them and factor in <strong>wickets per match</strong>${isODI ? ' and <strong>economy rate</strong>' : ''}:</p>
+    <p>Bowling averages are "lower is better," so we flip them and factor in <strong>wickets per match</strong>${isLOI ? ' and <strong>economy rate</strong>' : ''}:</p>
     <div class="formula">${bowlFormula}</div>
     <p>${bowlFormulaDesc}</p>
 

@@ -137,6 +137,8 @@ a:hover { text-decoration: underline; }
   max-width: 220px;
   background: var(--bg-card);
   border: 2px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-radius: 0;
   color: var(--text-muted);
   font-family: var(--font);
   font-size: 1.05rem;
@@ -150,12 +152,11 @@ a:hover { text-decoration: underline; }
 
 .format-btn:first-child {
   border-radius: var(--radius) 0 0 var(--radius);
-  border-right: 1px solid var(--border);
 }
 
 .format-btn:last-child {
   border-radius: 0 var(--radius) var(--radius) 0;
-  border-left: 1px solid var(--border);
+  border-right: 2px solid var(--border);
 }
 
 .format-btn:hover { color: var(--text); background: var(--bg-hover); }

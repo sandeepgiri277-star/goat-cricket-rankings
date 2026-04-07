@@ -37,7 +37,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/rankings.json docs/odi_rankings.json cricket_cache/
+          git add docs/rankings.json docs/odi_rankings.json docs/t20i_rankings.json docs/ipl_rankings.json cricket_cache/
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
