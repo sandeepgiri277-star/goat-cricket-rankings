@@ -445,19 +445,19 @@ function renderMethodology() {
     ? `At α = ${alpha}, sustaining ${label} excellence over a long career is rewarded, but quality per match still matters most.`
     : `At α = ${alpha}, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.`;
 
-  const eraDesc = isLOI
-    ? `<p>For each player, we look up the <strong>overall ${label} batting average</strong> and <strong>runs per over</strong> across all matches during their career span, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
+  const pitchDesc = isLOI
+    ? `<p>For each player, we compute the <strong>overall batting average</strong> and <strong>runs per over</strong> across all ${label} matches they appeared in, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
       <div class="formula">
-        Batting factor = (All-time avg / Era avg) × (All-time RPO / Era RPO)<br>
-        Bowling factor = (Era avg / All-time avg) × (Era RPO / All-time RPO)
+        Batting factor = (All-time avg / Match avg) × (All-time RPO / Match RPO)<br>
+        Bowling factor = (Match avg / All-time avg) × (Match RPO / All-time RPO)
       </div>
-      <p>This double normalization ensures that a player from a low-scoring, slow-scoring era gets a batting boost, while a player from a high-scoring, fast-scoring era gets a bowling boost. Both dimensions — average and scoring rate — are accounted for.</p>`
-    : `<p>For each player, we look up the <strong>overall Test average</strong> (total runs ÷ total wickets) across all matches played during their career span. We then compare it to the all-time average (${m.all_time_avg}):</p>
+      <p>This captures both era effects <strong>and</strong> the specific venues and conditions a player faced. A batsman who played mostly on difficult, low-scoring pitches gets a boost. A bowler who benefited from seaming conditions gets a corresponding penalty. Home/away splits are indirectly accounted for.</p>`
+    : `<p>For each player, we compute the <strong>overall batting average</strong> (total runs ÷ total wickets) across all Test matches they appeared in, and compare it to the all-time average (${m.all_time_avg}):</p>
       <div class="formula">
-        Batting factor = All-time avg / Era avg<br>
-        Bowling factor = Era avg / All-time avg
+        Batting factor = All-time avg / Match avg<br>
+        Bowling factor = Match avg / All-time avg
       </div>
-      <p>A player from a low-scoring era (e.g., era avg = 28) gets a batting boost of ~1.14× and a bowling penalty of ~0.88×. A player from a high-scoring era (e.g., era avg = 34) gets a batting penalty of ~0.94× and a bowling boost of ~1.07×.</p>`;
+      <p>A player who faced predominantly tough conditions (e.g., match avg = 28) gets a batting boost of ~1.14× and a bowling penalty of ~0.88×. A player whose matches were high-scoring (e.g., match avg = 34) gets a batting penalty of ~0.94× and a bowling boost of ~1.07×. This is strictly more granular than era-based normalization — it accounts for the specific grounds, pitch conditions, and opposition strength each player actually faced.</p>`;
 
   const arDesc = `<p>The AEI captures a player's combined contribution with bat and ball. However, allrounders are <strong>ranked by the geometric mean</strong> of their batting and bowling ratings — √(bat_rating × bowl_rating) — which naturally rewards <strong>balance</strong> between the two disciplines. A player who is elite in one but weak in the other will rank below someone who is very good in both. A player must achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`;
 
@@ -523,13 +523,13 @@ function renderMethodology() {
     <p>The density curves below show where all qualifying ${label} players fall across BEI, BoEI, and AEI.</p>
     <div class="chart-container" id="chart-kde"></div>` : ''}
 
-    <h3>Era Adjustment</h3>
-    <p>Not all eras are created equal. Averaging 50 in a low-scoring era is a far greater achievement than averaging 50 in a high-scoring one. We normalize for this.</p>
-    ${eraDesc}
-    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of their era</em>.</p>
+    <h3>Pitch Difficulty Normalization</h3>
+    <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
+    ${pitchDesc}
+    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
 
     <h3>Rating Scale (0–1000)</h3>
-    <p>Era-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
+    <p>Pitch-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
     <div class="formula">
       Rating = ${m.rating_base} + ${m.rating_k} × √z &nbsp;&nbsp; where z = (value − μ) / σ
     </div>
@@ -709,20 +709,20 @@ function showPlayer(name, updateHash = true) {
     stats += `<div class="ph-stat"><div class="label">Allrounder</div><div class="value">${player.ar_rating} (#${player.ar_rank})</div></div>`;
   }
 
-  let eraInfo = '';
-  if (player.era_avg && player.bat_era_factor) {
-    const eraAvg = player.era_avg.toFixed(1);
-    const batF = player.bat_era_factor.toFixed(2);
-    const bowlF = player.bowl_era_factor.toFixed(2);
-    const rpoLabel = player.era_rpo ? ` · Era RPO: ${player.era_rpo.toFixed(2)}` : '';
-    eraInfo = `<div class="ph-era">Era avg: ${eraAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
+  let pitchInfo = '';
+  if (player.match_avg && player.bat_pitch_factor) {
+    const matchAvg = player.match_avg.toFixed(1);
+    const batF = player.bat_pitch_factor.toFixed(2);
+    const bowlF = player.bowl_pitch_factor.toFixed(2);
+    const rpoLabel = player.match_rpo ? ` · Match RPO: ${player.match_rpo.toFixed(2)}` : '';
+    pitchInfo = `<div class="ph-era">Match avg: ${matchAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
   }
 
   document.getElementById('player-header').innerHTML = `
     <div>
       <div class="ph-name">${getFlag(player.country)} ${player.name}</div>
       <div class="ph-country">${player.country} · ${player.matches} matches</div>
-      ${eraInfo}
+      ${pitchInfo}
     </div>
     <div class="ph-stats">${stats}</div>
   `;

@@ -78,6 +78,12 @@ IPL_BAT_CUM_CACHE_PATH = CACHE_DIR / "ipl_bat_cum_cache.pkl"
 IPL_BOWL_CUM_CACHE_PATH = CACHE_DIR / "ipl_bowl_cum_cache.pkl"
 IPL_ERA_CACHE_PATH = CACHE_DIR / "ipl_era_cache.pkl"
 
+# Pitch difficulty match-aggregate caches (per-player)
+TEST_MATCH_AGG_CACHE_PATH = CACHE_DIR / "test_match_agg.pkl"
+ODI_MATCH_AGG_CACHE_PATH = CACHE_DIR / "odi_match_agg.pkl"
+T20I_MATCH_AGG_CACHE_PATH = CACHE_DIR / "t20i_match_agg.pkl"
+IPL_MATCH_AGG_CACHE_PATH = CACHE_DIR / "ipl_match_agg.pkl"
+
 # ─── Scraping ────────────────────────────────────────────────────────────────
 
 
@@ -394,6 +400,112 @@ def compute_all_time_avg(era_cache: dict) -> float:
     return era_cache[broadest]["ave"]
 
 
+# ─── Pitch Difficulty (match-level aggregate per player) ─────────────────────
+
+
+def _scrape_all_time_aggregate(cricket_class: int = 1, extra_params: str = "") -> dict:
+    """Scrape all-time aggregate stats (Runs, Wkts, Ave, RPO) for a format."""
+    url = (
+        f"https://stats.espncricinfo.com/ci/engine/stats/index.html?"
+        f"class={cricket_class}{extra_params};template=results;type=aggregate"
+    )
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        for table in soup.select("table.engineTable"):
+            rows = table.select("tr.data1")
+            if not rows:
+                continue
+            cells = rows[0].find_all("td")
+            hdrs = [th.get_text(strip=True) for th in table.select("tr th")]
+            if "Runs" not in hdrs or "Wkts" not in hdrs:
+                continue
+            vals = [c.get_text(strip=True) for c in cells]
+            row_dict = dict(zip(hdrs, vals))
+            runs = _parse_agg_int(row_dict["Runs"])
+            wkts = _parse_agg_int(row_dict["Wkts"])
+            balls = _parse_agg_int(row_dict.get("Balls", "0"))
+            ave = float(row_dict["Ave"]) if row_dict.get("Ave", "-") != "-" else (runs / wkts if wkts else 0)
+            rpo = float(row_dict["RPO"]) if row_dict.get("RPO", "-") != "-" else (6 * runs / balls if balls else 0)
+            return {"runs": runs, "wkts": wkts, "ave": round(ave, 2), "rpo": round(rpo, 2)}
+    except Exception as e:
+        print(f"    WARNING: Failed to scrape all-time aggregate: {e}")
+    return {"runs": 0, "wkts": 0, "ave": 31.91, "rpo": 4.7}
+
+
+def _parse_agg_int(val: str) -> int:
+    """Parse an aggregate integer value, returning 0 for '-' or empty."""
+    val = val.strip().replace(",", "")
+    if not val or val == "-":
+        return 0
+    return int(val)
+
+
+def _scrape_player_match_agg(
+    player_id: int, cricket_class: int = 1, extra_params: str = "",
+) -> dict | None:
+    """Scrape aggregate stats across all matches involving a player."""
+    url = (
+        f"https://stats.espncricinfo.com/ci/engine/stats/index.html?"
+        f"class={cricket_class}{extra_params};player_involve={player_id};"
+        f"template=results;type=aggregate"
+    )
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        for table in soup.select("table.engineTable"):
+            rows = table.select("tr.data1")
+            if not rows:
+                continue
+            cells = rows[0].find_all("td")
+            hdrs = [th.get_text(strip=True) for th in table.select("tr th")]
+            if "Runs" not in hdrs or "Wkts" not in hdrs:
+                continue
+            vals = [c.get_text(strip=True) for c in cells]
+            row_dict = dict(zip(hdrs, vals))
+            runs = _parse_agg_int(row_dict["Runs"])
+            wkts = _parse_agg_int(row_dict["Wkts"])
+            balls = _parse_agg_int(row_dict.get("Balls", "0"))
+            ave = float(row_dict["Ave"]) if row_dict.get("Ave", "-") != "-" else (runs / wkts if wkts else 0)
+            rpo = float(row_dict["RPO"]) if row_dict.get("RPO", "-") != "-" else (6 * runs / balls if balls else 0)
+            return {"runs": runs, "wkts": wkts, "ave": round(ave, 2), "rpo": round(rpo, 2)}
+    except Exception as e:
+        print(f"    WARNING: Failed to scrape match agg for player {player_id}: {e}")
+    return None
+
+
+def scrape_match_agg_all(
+    player_ids: list[int],
+    cricket_class: int = 1,
+    cache_path: Path = TEST_MATCH_AGG_CACHE_PATH,
+    extra_params: str = "",
+    delay: float = 0.3,
+) -> dict[int, dict]:
+    """Scrape per-player match aggregates for all players, with caching."""
+    cache: dict[int, dict] = _load_loi_cache(cache_path)
+    to_scrape = [pid for pid in player_ids if pid not in cache]
+
+    if not to_scrape:
+        print(f"  Match-agg cache complete: {len(cache)} players")
+        return cache
+
+    print(f"  Scraping match aggregates for {len(to_scrape)} players...")
+    for i, pid in enumerate(to_scrape, 1):
+        result = _scrape_player_match_agg(pid, cricket_class, extra_params)
+        if result:
+            cache[pid] = result
+        if i % 50 == 0:
+            _save_loi_cache(cache, cache_path)
+            print(f"    {i}/{len(to_scrape)} done...")
+        time.sleep(delay)
+
+    _save_loi_cache(cache, cache_path)
+    print(f"  Match-agg cache: {len(cache)} players")
+    return cache
+
+
 def load_or_scrape_aggregates(force_scrape: bool = False):
     for p in [BAT_AGG_PATH, BOWL_AGG_PATH]:
         if p.exists():
@@ -627,16 +739,9 @@ def compute_all_players(
     player_info: pd.DataFrame,
     boei_scale: float,
     median_wpm: float = 2.75,
-    era_cache: dict | None = None,
+    match_agg_cache: dict | None = None,
     all_time_avg: float = 31.91,
 ):
-    span_map = {}
-    if "Span" in player_info.columns:
-        for _, row in player_info.iterrows():
-            sp = parse_span(str(row.get("Span", "")))
-            if sp:
-                span_map[int(row["player_id"])] = sp
-
     records = []
     for pid, df in cache.items():
         try:
@@ -652,18 +757,17 @@ def compute_all_players(
 
             bei = idx["BEI"]
             boei = idx["BoEI"]
-            era_avg = all_time_avg
-            bat_era_factor = 1.0
-            bowl_era_factor = 1.0
+            match_avg = all_time_avg
+            bat_pitch_factor = 1.0
+            bowl_pitch_factor = 1.0
 
-            span = span_map.get(int(pid))
-            if span and era_cache and span in era_cache:
-                era_avg = era_cache[span]["ave"]
-                if era_avg > 0:
-                    bat_era_factor = round(all_time_avg / era_avg, 4)
-                    bowl_era_factor = round(era_avg / all_time_avg, 4)
-                    bei = round(bei * bat_era_factor, 2)
-                    boei = round(boei * bowl_era_factor, 2)
+            match_data = (match_agg_cache or {}).get(int(pid))
+            if match_data and match_data.get("ave", 0) > 0:
+                match_avg = match_data["ave"]
+                bat_pitch_factor = round(all_time_avg / match_avg, 4)
+                bowl_pitch_factor = round(match_avg / all_time_avg, 4)
+                bei = round(bei * bat_pitch_factor, 2)
+                boei = round(boei * bowl_pitch_factor, 2)
 
             aei = round(bei + boei, 2)
             records.append({
@@ -675,9 +779,9 @@ def compute_all_players(
                 "AEI": aei,
                 "matches": idx["matches"],
                 "stints": stints,
-                "era_avg": era_avg,
-                "bat_era_factor": bat_era_factor,
-                "bowl_era_factor": bowl_era_factor,
+                "match_avg": match_avg,
+                "bat_pitch_factor": bat_pitch_factor,
+                "bowl_pitch_factor": bowl_pitch_factor,
             })
         except Exception:
             continue
@@ -1127,18 +1231,11 @@ def compute_loi_all_players(
     player_info: pd.DataFrame,
     boei_scale: float,
     baseline_wpm: float = 1.0,
-    era_cache: dict | None = None,
+    match_agg_cache: dict | None = None,
     all_time_avg: float = 31.0,
     all_time_rpo: float = 4.7,
     min_matches: int = LOI_MIN_MATCHES,
 ) -> list[dict]:
-    span_map = {}
-    if "Span" in player_info.columns:
-        for _, row in player_info.iterrows():
-            sp = parse_span(str(row.get("Span", "")))
-            if sp:
-                span_map[int(row["player_id"])] = sp
-
     records = []
     for pid in bat_cache:
         try:
@@ -1161,25 +1258,26 @@ def compute_loi_all_players(
 
             bei = idx["BEI"]
             boei = idx["BoEI"]
-            era_avg = all_time_avg
-            era_rpo = all_time_rpo
-            bat_era_factor = 1.0
-            bowl_era_factor = 1.0
+            match_avg = all_time_avg
+            match_rpo = all_time_rpo
+            bat_pitch_factor = 1.0
+            bowl_pitch_factor = 1.0
 
-            span = span_map.get(int(pid))
-            if span and era_cache and span in era_cache:
-                era_data = era_cache[span]
-                era_avg = era_data["ave"]
-                era_rpo = era_data["rpo"]
-                if era_avg > 0 and era_rpo > 0:
-                    bat_avg_factor = all_time_avg / era_avg
-                    bat_sr_factor = all_time_rpo / era_rpo
-                    bat_era_factor = round(bat_avg_factor * bat_sr_factor, 4)
-                    bowl_avg_factor = era_avg / all_time_avg
-                    bowl_rpo_factor = era_rpo / all_time_rpo
-                    bowl_era_factor = round(bowl_avg_factor * bowl_rpo_factor, 4)
-                    bei = round(bei * bat_era_factor, 2)
-                    boei = round(boei * bowl_era_factor, 2)
+            match_data = (match_agg_cache or {}).get(int(pid))
+            if match_data:
+                m_ave = match_data.get("ave", 0)
+                m_rpo = match_data.get("rpo", 0)
+                if m_ave > 0 and m_rpo > 0:
+                    match_avg = m_ave
+                    match_rpo = m_rpo
+                    bat_avg_factor = all_time_avg / match_avg
+                    bat_sr_factor = all_time_rpo / match_rpo
+                    bat_pitch_factor = round(bat_avg_factor * bat_sr_factor, 4)
+                    bowl_avg_factor = match_avg / all_time_avg
+                    bowl_rpo_factor = match_rpo / all_time_rpo
+                    bowl_pitch_factor = round(bowl_avg_factor * bowl_rpo_factor, 4)
+                    bei = round(bei * bat_pitch_factor, 2)
+                    boei = round(boei * bowl_pitch_factor, 2)
 
             aei = round(bei + boei, 2)
             records.append({
@@ -1192,10 +1290,10 @@ def compute_loi_all_players(
                 "matches": total_matches,
                 "bat_stints": bat_stints,
                 "bowl_stints": bowl_stints,
-                "era_avg": era_avg,
-                "era_rpo": era_rpo,
-                "bat_era_factor": bat_era_factor,
-                "bowl_era_factor": bowl_era_factor,
+                "match_avg": match_avg,
+                "match_rpo": match_rpo,
+                "bat_pitch_factor": bat_pitch_factor,
+                "bowl_pitch_factor": bowl_pitch_factor,
             })
         except Exception:
             continue
@@ -1276,10 +1374,10 @@ def build_loi_rankings_json(
             "ar_rank": ar_rank_map.get(p["player_name"]),
             "bat_stints": p["bat_stints"],
             "bowl_stints": p["bowl_stints"],
-            "era_avg": p.get("era_avg"),
-            "era_rpo": p.get("era_rpo"),
-            "bat_era_factor": p.get("bat_era_factor"),
-            "bowl_era_factor": p.get("bowl_era_factor"),
+            "match_avg": p.get("match_avg"),
+            "match_rpo": p.get("match_rpo"),
+            "bat_pitch_factor": p.get("bat_pitch_factor"),
+            "bowl_pitch_factor": p.get("bowl_pitch_factor"),
         }
         for p in all_players
     ]
@@ -1314,7 +1412,7 @@ def run_loi_pipeline(
     bowl_agg_path: Path = ODI_BOWL_AGG_PATH,
     bat_cum_path: Path = ODI_BAT_CUM_CACHE_PATH,
     bowl_cum_path: Path = ODI_BOWL_CUM_CACHE_PATH,
-    era_cache_path: Path = ODI_ERA_CACHE_PATH,
+    match_agg_cache_path: Path = ODI_MATCH_AGG_CACHE_PATH,
     force_scrape: bool = False,
     extra_params: str = "",
     min_matches: int = LOI_MIN_MATCHES,
@@ -1376,31 +1474,28 @@ def run_loi_pipeline(
         else:
             print(f"  LOI cumulative cache: {len(bat_cache)} bat, {len(bowl_cache)} bowl")
 
-    # 3. Era normalization
-    print(f"\nScraping {format_name} era averages...")
-    unique_spans = set()
-    if "Span" in player_info.columns:
-        for sp_str in player_info["Span"].dropna().unique():
-            sp = parse_span(str(sp_str))
-            if sp:
-                unique_spans.add(sp)
-    if unique_spans:
-        min_y = min(s[0] for s in unique_spans)
-        max_y = max(s[1] for s in unique_spans)
-        unique_spans.add((min_y, max_y))
-
-    if force_scrape or not era_cache_path.exists():
-        era_cache = scrape_loi_era_averages(unique_spans, cricket_class, era_cache_path, extra_params=extra_params)
-    else:
-        era_cache = _load_loi_cache(era_cache_path)
-        missing = unique_spans - set(era_cache.keys())
-        if missing:
-            era_cache = scrape_loi_era_averages(unique_spans, cricket_class, era_cache_path, extra_params=extra_params)
-        else:
-            print(f"  LOI era cache complete: {len(era_cache)} spans")
-
-    all_time_avg, all_time_rpo = compute_loi_all_time(era_cache)
+    # 3. Pitch difficulty: all-time aggregate + per-player match aggregates
+    print(f"\nScraping {format_name} all-time aggregate...")
+    all_time_data = _scrape_all_time_aggregate(cricket_class, extra_params)
+    all_time_avg = all_time_data["ave"]
+    all_time_rpo = all_time_data["rpo"]
     print(f"  All-time {format_name} avg: {all_time_avg}, RPO: {all_time_rpo}")
+
+    print(f"Scraping {format_name} per-player match aggregates (pitch difficulty)...")
+    if force_scrape or not match_agg_cache_path.exists():
+        match_agg_cache = scrape_match_agg_all(
+            all_ids, cricket_class, match_agg_cache_path, extra_params=extra_params,
+        )
+    else:
+        match_agg_cache = _load_loi_cache(match_agg_cache_path)
+        missing = [pid for pid in all_ids if pid not in match_agg_cache]
+        if missing:
+            print(f"  {len(missing)} new players to scrape...")
+            match_agg_cache = scrape_match_agg_all(
+                all_ids, cricket_class, match_agg_cache_path, extra_params=extra_params,
+            )
+        else:
+            print(f"  Match-agg cache complete: {len(match_agg_cache)} players")
 
     # 4. Baseline WPM and BoEI scale
     print(f"\nComputing {format_name} baseline wpm...")
@@ -1415,7 +1510,7 @@ def run_loi_pipeline(
     print(f"Computing {format_name} indices for all players...")
     all_players = compute_loi_all_players(
         bat_cache, bowl_cache, player_info, boei_scale,
-        baseline_wpm=baseline_wpm, era_cache=era_cache,
+        baseline_wpm=baseline_wpm, match_agg_cache=match_agg_cache,
         all_time_avg=all_time_avg, all_time_rpo=all_time_rpo,
         min_matches=min_matches,
     )
@@ -1569,8 +1664,8 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
             )
             bei = raw_bei / denom
             boei = raw_boei * boei_scale / denom
-            bei *= p.get("bat_era_factor", 1.0)
-            boei *= p.get("bowl_era_factor", 1.0)
+            bei *= p.get("bat_pitch_factor", 1.0)
+            boei *= p.get("bowl_pitch_factor", 1.0)
             aei = bei + boei
             recomputed.append({
                 "name": p["player_name"],
@@ -1654,9 +1749,9 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
             "bowl_rank": bowl_rank_map.get(p["player_name"]),
             "ar_rank": ar_rank_map.get(p["player_name"]),
             "stints": p["stints"],
-            "era_avg": p.get("era_avg"),
-            "bat_era_factor": p.get("bat_era_factor"),
-            "bowl_era_factor": p.get("bowl_era_factor"),
+            "match_avg": p.get("match_avg"),
+            "bat_pitch_factor": p.get("bat_pitch_factor"),
+            "bowl_pitch_factor": p.get("bowl_pitch_factor"),
         }
         for p in all_players
     ]
@@ -1726,33 +1821,27 @@ def main():
         innings_cache = load_innings_cache()
         print(f"Loaded innings cache: {len(innings_cache)} players")
 
-    # Era normalization
-    print("\nScraping era averages...")
-    unique_spans = set()
-    if "Span" in player_info.columns:
-        for sp_str in player_info["Span"].dropna().unique():
-            sp = parse_span(str(sp_str))
-            if sp:
-                unique_spans.add(sp)
-    # Always include the broadest range for all-time average
-    if unique_spans:
-        min_y = min(s[0] for s in unique_spans)
-        max_y = max(s[1] for s in unique_spans)
-        unique_spans.add((min_y, max_y))
-
-    if do_scrape or not ERA_CACHE_PATH.exists():
-        era_cache = scrape_era_averages(unique_spans, delay=0.3)
-    else:
-        era_cache = load_era_cache()
-        missing = unique_spans - set(era_cache.keys())
-        if missing:
-            print(f"  {len(missing)} new spans to scrape...")
-            era_cache = scrape_era_averages(unique_spans, delay=0.3)
-        else:
-            print(f"  Era cache complete: {len(era_cache)} spans")
-
-    all_time_avg = compute_all_time_avg(era_cache)
+    # Pitch difficulty: all-time aggregate + per-player match aggregates
+    print("\nScraping all-time Test aggregate...")
+    all_time_data = _scrape_all_time_aggregate(cricket_class=1)
+    all_time_avg = all_time_data["ave"]
     print(f"  All-time Test average: {all_time_avg}")
+
+    print("Scraping per-player match aggregates (pitch difficulty)...")
+    if do_scrape or not TEST_MATCH_AGG_CACHE_PATH.exists():
+        match_agg_cache = scrape_match_agg_all(
+            all_ids, cricket_class=1, cache_path=TEST_MATCH_AGG_CACHE_PATH,
+        )
+    else:
+        match_agg_cache = _load_loi_cache(TEST_MATCH_AGG_CACHE_PATH)
+        missing = [pid for pid in all_ids if pid not in match_agg_cache]
+        if missing:
+            print(f"  {len(missing)} new players to scrape...")
+            match_agg_cache = scrape_match_agg_all(
+                all_ids, cricket_class=1, cache_path=TEST_MATCH_AGG_CACHE_PATH,
+            )
+        else:
+            print(f"  Match-agg cache complete: {len(match_agg_cache)} players")
 
     print("\nComputing baseline wickets per match (all players)...")
     median_wpm = compute_baseline_wpm(cache)
@@ -1762,10 +1851,10 @@ def main():
     boei_scale = compute_boei_scale(cache, innings_cache, median_wpm)
     print(f"  BOEI_SCALE = {boei_scale:.4f}")
 
-    print("Computing indices for all players (with era adjustment)...")
+    print("Computing indices for all players (with pitch difficulty)...")
     all_players = compute_all_players(
         cache, innings_cache, player_info, boei_scale,
-        median_wpm=median_wpm, era_cache=era_cache, all_time_avg=all_time_avg,
+        median_wpm=median_wpm, match_agg_cache=match_agg_cache, all_time_avg=all_time_avg,
     )
     print(f"  Computed indices for {len(all_players)} players")
 
@@ -1790,7 +1879,7 @@ def main():
         bowl_agg_path=ODI_BOWL_AGG_PATH,
         bat_cum_path=ODI_BAT_CUM_CACHE_PATH,
         bowl_cum_path=ODI_BOWL_CUM_CACHE_PATH,
-        era_cache_path=ODI_ERA_CACHE_PATH,
+        match_agg_cache_path=ODI_MATCH_AGG_CACHE_PATH,
         force_scrape=do_scrape,
     )
 
@@ -1813,7 +1902,7 @@ def main():
         bowl_agg_path=T20I_BOWL_AGG_PATH,
         bat_cum_path=T20I_BAT_CUM_CACHE_PATH,
         bowl_cum_path=T20I_BOWL_CUM_CACHE_PATH,
-        era_cache_path=T20I_ERA_CACHE_PATH,
+        match_agg_cache_path=T20I_MATCH_AGG_CACHE_PATH,
         force_scrape=do_scrape,
         min_matches=LOI_MIN_MATCHES_T20,
     )
@@ -1837,7 +1926,7 @@ def main():
         bowl_agg_path=IPL_BOWL_AGG_PATH,
         bat_cum_path=IPL_BAT_CUM_CACHE_PATH,
         bowl_cum_path=IPL_BOWL_CUM_CACHE_PATH,
-        era_cache_path=IPL_ERA_CACHE_PATH,
+        match_agg_cache_path=IPL_MATCH_AGG_CACHE_PATH,
         force_scrape=do_scrape,
         extra_params=";trophy=117",
         min_matches=LOI_MIN_MATCHES_T20,
