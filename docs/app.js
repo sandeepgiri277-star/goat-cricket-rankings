@@ -906,7 +906,7 @@ function renderPlayerCareer(player) {
     const annoY = domains[ri][1] + (totalRows === 1 ? 0.06 : 0.05);
 
     if (r === 'bat') {
-      layout[yName].title = '';
+      layout[yName].title = { text: 'Batting Average', font: { size: 11 }, standoff: 5 };
       layout[yName].range = [0, batMax * 1.3];
       const windowDesc = isLOI ? `${DATA.metadata.stint_innings}-innings window` : `${DATA.metadata.stint_size}-match window`;
       const minDesc = isLOI ? `${DATA.metadata.stint_innings} innings` : `10 batting innings`;
@@ -924,13 +924,13 @@ function renderPlayerCareer(player) {
           gridcolor: 'rgba(0,0,0,0)', domain: domains[ri],
           anchor: 'free', overlaying: n === 1 ? 'y' : `y${n}`,
           side: 'right', position: 0.92,
-          title: '',
+          title: { text: 'Strike Rate', font: { size: 11, color: srColor }, standoff: 5 },
           tickfont: { color: srColor, size: 10 },
           range: [0, srMax * 1.3], showgrid: false,
         };
       }
     } else if (r === 'bowl') {
-      layout[yName].title = '';
+      layout[yName].title = { text: 'Bowling Average', font: { size: 11 }, standoff: 5 };
       layout[yName].range = [0, bowlMax * 1.3];
       const bWindowDesc = isLOI ? `${DATA.metadata.stint_innings}-innings window` : `${DATA.metadata.stint_size}-match window`;
       const bMinDesc = isLOI ? `${DATA.metadata.stint_innings} innings` : `10 bowling innings`;
@@ -950,7 +950,7 @@ function renderPlayerCareer(player) {
           gridcolor: 'rgba(0,0,0,0)', domain: domains[ri],
           anchor: 'free', overlaying: n === 1 ? 'y' : `y${n}`,
           side: 'right', position: 0.92,
-          title: '',
+          title: { text: 'Economy', font: { size: 11, color: '#FF6692' }, standoff: 5 },
           tickfont: { color: '#FF6692', size: 10 },
           range: [0, econMax * 1.3], showgrid: false,
         };
