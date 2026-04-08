@@ -789,31 +789,31 @@ def compute_stints(
 
 def compute_test_career_indices(
     bat_inns: int, career_bat_avg: float,
-    bowl_inns: int, career_bowl_avg: float, career_wpm: float,
-    boei_scale: float, baseline_wpm: float = 1.41,
+    bowl_inns: int, career_bowl_avg: float, career_wpi: float,
+    boei_scale: float, baseline_wpi: float = 1.46,
 ) -> dict:
     import math as _math
     bei = career_bat_avg * (bat_inns ** TEST_LONGEVITY_EXP) if bat_inns > 0 and career_bat_avg > 0 else 0.0
     boei = 0.0
-    if bowl_inns >= TEST_MIN_BOWL_INNS and career_bowl_avg > 0 and career_wpm > 0 and baseline_wpm > 0:
-        boei = (BOWL_K / career_bowl_avg) * _math.sqrt(career_wpm / baseline_wpm) * (bowl_inns ** TEST_LONGEVITY_EXP) * boei_scale
+    if bowl_inns >= TEST_MIN_BOWL_INNS and career_bowl_avg > 0 and career_wpi > 0 and baseline_wpi > 0:
+        boei = (BOWL_K / career_bowl_avg) * _math.sqrt(career_wpi / baseline_wpi) * (bowl_inns ** TEST_LONGEVITY_EXP) * boei_scale
     return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(bei + boei, 2)}
 
 
-def compute_test_baseline_wpm(bowl_agg: pd.DataFrame, min_matches: int = MIN_MATCHES) -> float:
-    wpms = []
+def compute_test_baseline_wpi(bowl_agg: pd.DataFrame, min_matches: int = MIN_MATCHES) -> float:
+    wpis = []
     for _, r in bowl_agg.iterrows():
         mat = int(_safe_float(r["Mat"]))
         wkts = int(_safe_float(r["Wkts"], 0))
         inns = int(_safe_float(r["Inns"], 0))
-        if mat >= min_matches and inns >= TEST_MIN_BOWL_INNS and mat > 0:
-            wpms.append(wkts / mat)
-    return float(np.mean(wpms)) if wpms else 1.4
+        if mat >= min_matches and inns >= TEST_MIN_BOWL_INNS and inns > 0:
+            wpis.append(wkts / inns)
+    return float(np.mean(wpis)) if wpis else 1.46
 
 
 def compute_test_boei_scale(
     bat_agg: pd.DataFrame, bowl_agg: pd.DataFrame,
-    baseline_wpm: float, min_matches: int = MIN_MATCHES,
+    baseline_wpi: float, min_matches: int = MIN_MATCHES,
 ) -> float:
     import math as _math
     bat_vals = []
@@ -830,10 +830,10 @@ def compute_test_boei_scale(
         inns = int(_safe_float(r["Inns"], 0))
         mat = int(_safe_float(r["Mat"]))
         wkts = int(_safe_float(r["Wkts"], 0))
-        if avg > 0 and inns >= TEST_MIN_BOWL_INNS and mat >= min_matches and mat > 0:
-            wpm = wkts / mat
-            if wpm > 0 and baseline_wpm > 0:
-                bowl_vals.append((BOWL_K / avg) * _math.sqrt(wpm / baseline_wpm) * (inns ** TEST_LONGEVITY_EXP))
+        if avg > 0 and inns >= TEST_MIN_BOWL_INNS and mat >= min_matches and inns > 0:
+            wpi = wkts / inns
+            if wpi > 0 and baseline_wpi > 0:
+                bowl_vals.append((BOWL_K / avg) * _math.sqrt(wpi / baseline_wpi) * (inns ** TEST_LONGEVITY_EXP))
 
     if not bowl_vals or not bat_vals:
         return 1.0
@@ -847,7 +847,7 @@ def compute_all_players(
     bowl_agg: pd.DataFrame,
     player_info: pd.DataFrame,
     boei_scale: float,
-    baseline_wpm: float = 1.41,
+    baseline_wpi: float = 1.46,
     global_match_stats: dict | None = None,
     all_time_avg: float = 31.91,
 ):
@@ -865,12 +865,13 @@ def compute_all_players(
         pid = int(r["player_id"])
         wkts = int(_safe_float(r.get("Wkts", 0), 0))
         mat = int(_safe_float(r["Mat"]))
+        b_inns = int(_safe_float(r["Inns"], 0))
         bowl_lookup[pid] = {
             "avg": _safe_float(r["Ave"]),
-            "inns": int(_safe_float(r["Inns"], 0)),
+            "inns": b_inns,
             "mat": mat,
             "wkts": wkts,
-            "wpm": wkts / mat if mat > 0 else 0,
+            "wpi": wkts / b_inns if b_inns > 0 else 0,
         }
 
     records = []
@@ -887,15 +888,15 @@ def compute_all_players(
             bat_avg = ba.get("avg", 0)
             bowl_inns = bo.get("inns", 0)
             bowl_avg = bo.get("avg", 0)
-            career_wpm = bo.get("wpm", 0)
+            career_wpi = bo.get("wpi", 0)
             career_mat = ba.get("mat", 0)
 
             if career_mat < MIN_MATCHES:
                 continue
 
             idx = compute_test_career_indices(
-                bat_inns, bat_avg, bowl_inns, bowl_avg, career_wpm,
-                boei_scale, baseline_wpm,
+                bat_inns, bat_avg, bowl_inns, bowl_avg, career_wpi,
+                boei_scale, baseline_wpi,
             )
 
             pf = compute_player_pitch_factors(
@@ -1766,7 +1767,7 @@ def compute_ratings(all_players: list[dict]) -> dict:
     return stats
 
 
-def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpm: float = 1.41, all_time_avg: float = 31.91) -> dict:
+def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi: float = 1.46, all_time_avg: float = 31.91) -> dict:
     rating_stats = compute_ratings(all_players)
 
     fm_players = [p for p in all_players if is_full_member(p["country"])]
@@ -1843,7 +1844,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpm
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "total_players": len(all_players),
             "boei_scale": round(boei_scale, 4),
-            "baseline_wpm": round(baseline_wpm, 2),
+            "baseline_wpi": round(baseline_wpi, 2),
             "bowl_k": BOWL_K,
             "longevity_exp": TEST_LONGEVITY_EXP,
             "min_bowl_inns": TEST_MIN_BOWL_INNS,
@@ -1906,23 +1907,23 @@ def main():
         cricket_class=1, cache_path=TEST_GLOBAL_MATCH_CACHE, force=do_scrape,
     )
 
-    print("\nComputing baseline wickets per match (aggregate)...")
-    baseline_wpm = compute_test_baseline_wpm(bowl_agg)
-    print(f"  BASELINE_WPM = {baseline_wpm:.2f}")
+    print("\nComputing baseline wickets per innings (aggregate)...")
+    baseline_wpi = compute_test_baseline_wpi(bowl_agg)
+    print(f"  BASELINE_WPI = {baseline_wpi:.2f}")
 
     print("Computing BoEI normalization scale (aggregate)...")
-    boei_scale = compute_test_boei_scale(bat_agg, bowl_agg, baseline_wpm)
+    boei_scale = compute_test_boei_scale(bat_agg, bowl_agg, baseline_wpi)
     print(f"  BOEI_SCALE = {boei_scale:.4f}")
 
     print("Computing indices for all players (career formula + pitch difficulty)...")
     all_players = compute_all_players(
         cache, innings_cache, bat_agg, bowl_agg, player_info, boei_scale,
-        baseline_wpm=baseline_wpm, global_match_stats=global_match_stats, all_time_avg=all_time_avg,
+        baseline_wpi=baseline_wpi, global_match_stats=global_match_stats, all_time_avg=all_time_avg,
     )
     print(f"  Computed indices for {len(all_players)} players")
 
     print("Building Test rankings JSON...")
-    rankings = build_rankings_json(all_players, boei_scale, baseline_wpm=baseline_wpm, all_time_avg=all_time_avg)
+    rankings = build_rankings_json(all_players, boei_scale, baseline_wpi=baseline_wpi, all_time_avg=all_time_avg)
 
     out_path = SITE_DIR / "rankings.json"
     with open(out_path, "w") as f:
