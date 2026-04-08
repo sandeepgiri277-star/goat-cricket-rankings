@@ -333,13 +333,11 @@ async function restoreFromHash() {
 function updateFormatLabels() {
   if (CURRENT_FORMAT === 'crossformat') return;
   const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
-  const isLOI = CURRENT_FORMAT !== 'tests';
-  const stintDesc = isLOI ? `${DATA.metadata.stint_innings}-innings stints` : `${DATA.metadata.stint_size}-match stints`;
   document.getElementById('heading-allrounders').textContent = `Top 100 ${label} Allrounders`;
   document.getElementById('heading-batting').textContent = `Top 100 ${label} Batters`;
   document.getElementById('heading-bowling').textContent = `Top 100 ${label} Bowlers`;
-  document.querySelector('#panel-batting .panel-desc').textContent = `The greatest batsmen in ${label} cricket history, ranked by sustained batting excellence across ${stintDesc}. Click any player to explore their career.`;
-  document.querySelector('#panel-bowling .panel-desc').textContent = `The greatest bowlers in ${label} cricket history, ranked by sustained bowling excellence across ${stintDesc}. Click any player to explore their career.`;
+  document.querySelector('#panel-batting .panel-desc').textContent = `The greatest batsmen in ${label} cricket history, ranked by career batting excellence. Click any player to explore their career.`;
+  document.querySelector('#panel-bowling .panel-desc').textContent = `The greatest bowlers in ${label} cricket history, ranked by career bowling excellence. Click any player to explore their career.`;
 }
 
 function renderAll() {
