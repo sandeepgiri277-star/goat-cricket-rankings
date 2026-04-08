@@ -606,8 +606,8 @@ function renderMethodology() {
 
     <h3>Career Formula</h3>
     <p>We use a direct career formula that captures quality and career length in a single expression:</p>
-    <div class="formula">BEI = batting_avg × innings<sup>${longevityExp}</sup></div>
-    <p>In Tests, strike rate is not a meaningful differentiator — patient accumulation is often more valuable than aggressive scoring. So the batting metric is simply the career average, multiplied by a longevity factor. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a meaningful but controlled longevity bonus.</p>
+    <div class="formula">BEI = √(batting_avg × runs_per_innings) × innings<sup>${longevityExp}</sup></div>
+    <p>The batting metric is the <strong>geometric mean</strong> of the career average and runs per innings. Career average (runs ÷ dismissals) rewards not-outs, while runs per innings (runs ÷ innings) measures raw per-innings production. The geometric mean balances both: it still gives partial credit for not-outs (a genuine 150* deserves more than 150), but it prevents players with high not-out rates from having inflated ratings relative to openers who get out nearly every innings. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a meaningful but controlled longevity bonus.</p>
 
     <h3>Why a Higher Longevity Exponent Than LOIs?</h3>
     <p>Limited-overs formats use an exponent of 0.2 because the batting metric (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players of different quality. In Tests, the metric is <strong>avg alone</strong>, so the numerical spread is smaller. A higher exponent (${longevityExp}) compensates by giving more credit to sustained excellence over long careers, ensuring that 200-Test legends are properly rewarded relative to 50-Test players with comparable averages.</p>

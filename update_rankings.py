@@ -807,12 +807,13 @@ def compute_stints(
 
 
 def compute_test_career_indices(
-    bat_inns: int, career_bat_avg: float,
+    bat_inns: int, career_bat_avg: float, career_rpi: float,
     bowl_inns: int, career_bowl_avg: float, career_wpi: float,
     boei_scale: float, baseline_wpi: float = 1.46,
 ) -> dict:
     import math as _math
-    bei = career_bat_avg * (bat_inns ** TEST_LONGEVITY_EXP) if bat_inns > 0 and career_bat_avg > 0 else 0.0
+    bat_metric = _math.sqrt(career_bat_avg * career_rpi) if career_bat_avg > 0 and career_rpi > 0 else 0.0
+    bei = bat_metric * (bat_inns ** TEST_LONGEVITY_EXP) if bat_inns > 0 else 0.0
     boei = 0.0
     if bowl_inns >= TEST_MIN_BOWL_INNS and career_bowl_avg > 0 and career_wpi > 0 and baseline_wpi > 0:
         boei = (BOWL_K / career_bowl_avg) * _math.sqrt(career_wpi / baseline_wpi) * (bowl_inns ** TEST_LONGEVITY_EXP) * boei_scale
@@ -840,8 +841,10 @@ def compute_test_boei_scale(
         avg = _safe_float(r["Ave"])
         inns = int(_safe_float(r["Inns"]))
         mat = int(_safe_float(r["Mat"]))
-        if avg > 0 and inns > 0 and mat >= min_matches:
-            bat_vals.append(avg * (inns ** TEST_LONGEVITY_EXP))
+        runs = int(_safe_float(r.get("Runs", 0), 0))
+        rpi = runs / inns if inns > 0 else 0
+        if avg > 0 and rpi > 0 and inns > 0 and mat >= min_matches:
+            bat_vals.append(_math.sqrt(avg * rpi) * (inns ** TEST_LONGEVITY_EXP))
 
     bowl_vals = []
     for _, r in bowl_agg.iterrows():
@@ -873,10 +876,13 @@ def compute_all_players(
     bat_lookup = {}
     for _, r in bat_agg.iterrows():
         pid = int(r["player_id"])
+        inns = int(_safe_float(r["Inns"]))
+        runs = int(_safe_float(r.get("Runs", 0), 0))
         bat_lookup[pid] = {
             "avg": _safe_float(r["Ave"]),
-            "inns": int(_safe_float(r["Inns"])),
+            "inns": inns,
             "mat": int(_safe_float(r["Mat"])),
+            "rpi": runs / inns if inns > 0 else 0,
         }
 
     bowl_lookup = {}
@@ -905,6 +911,7 @@ def compute_all_players(
             bo = bowl_lookup.get(int(pid), {})
             bat_inns = ba.get("inns", 0)
             bat_avg = ba.get("avg", 0)
+            bat_rpi = ba.get("rpi", 0)
             bowl_inns = bo.get("inns", 0)
             bowl_avg = bo.get("avg", 0)
             career_wpi = bo.get("wpi", 0)
@@ -914,7 +921,7 @@ def compute_all_players(
                 continue
 
             idx = compute_test_career_indices(
-                bat_inns, bat_avg, bowl_inns, bowl_avg, career_wpi,
+                bat_inns, bat_avg, bat_rpi, bowl_inns, bowl_avg, career_wpi,
                 boei_scale, baseline_wpi,
             )
 
