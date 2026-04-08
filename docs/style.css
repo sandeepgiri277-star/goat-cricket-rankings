@@ -130,6 +130,8 @@ a:hover { text-decoration: underline; }
   margin: 0 auto;
   padding: 1.2rem 1rem 0;
   gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .format-btn {
@@ -423,6 +425,11 @@ a:hover { text-decoration: underline; }
 }
 
 .player-header .ph-country { color: var(--text-muted); }
+.player-header .ph-career {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 0.2rem;
+}
 .player-header .ph-era {
   color: var(--text-muted);
   font-size: 0.85rem;
@@ -543,6 +550,34 @@ a:hover { text-decoration: underline; }
 .alpha-table .alpha-rank { color: var(--text-muted); }
 .alpha-table .alpha-current { background: var(--formula-bg); font-weight: 600; }
 
+/* ─── Cross-Format ──────────────────────────────────────────────────────── */
+
+.xf-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid var(--border);
+  color: var(--text);
+}
+
+.xf-section-gap {
+  margin-top: 2.5rem;
+}
+
+.xf-count {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.xf-breakdown {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── Loading State ──────────────────────────────────────────────────────── */
 
 body:not(.loaded) .content { opacity: 0.3; pointer-events: none; }
@@ -609,6 +644,9 @@ footer {
   .alpha-table th, .alpha-table td { padding: 0.25rem 0.3rem; }
 
   .search-wrap { max-width: 100%; }
+
+  .xf-section-title { font-size: 0.95rem; }
+  .xf-breakdown { font-size: 0.7rem; }
 }
 
 @media (max-width: 480px) {

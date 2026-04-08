@@ -40,6 +40,7 @@ RATING_K = 351  # sqrt-compressed: 900+=elite, 800+=great, 700+=very good
 MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
 LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
 LOI_MIN_MATCHES_T20 = 30  # T20I and IPL have shorter careers
+LOI_LONGEVITY_EXP = 0.20  # innings^exp longevity factor; lower = quality-dominated, higher = longevity-rewarding
 
 FULL_MEMBERS = {"AUS", "BAN", "ENG", "IND", "IRE", "NZ", "PAK", "SA", "SL", "WI", "ZIM", "AFG"}
 
@@ -77,6 +78,8 @@ IPL_BOWL_AGG_PATH = CACHE_DIR / "ipl_bowl_agg.pkl"
 IPL_BAT_CUM_CACHE_PATH = CACHE_DIR / "ipl_bat_cum_cache.pkl"
 IPL_BOWL_CUM_CACHE_PATH = CACHE_DIR / "ipl_bowl_cum_cache.pkl"
 IPL_ERA_CACHE_PATH = CACHE_DIR / "ipl_era_cache.pkl"
+
+
 
 # Global match-level stats caches (keyed by start_date)
 TEST_GLOBAL_MATCH_CACHE = CACHE_DIR / "test_global_match_stats.pkl"
@@ -878,6 +881,10 @@ def compute_all_players(
             bei = round(bei * bat_pitch_factor, 2)
             boei = round(boei * bowl_pitch_factor, 2)
 
+            last_row = df_clean.iloc[-1]
+            career_bat_avg = round(float(last_row["Bat Av"]), 2) if pd.notna(last_row.get("Bat Av")) else None
+            career_bowl_avg = round(float(last_row["Bowl Av"]), 2) if pd.notna(last_row.get("Bowl Av")) else None
+
             aei = round(bei + boei, 2)
             records.append({
                 "player_id": int(pid),
@@ -891,6 +898,8 @@ def compute_all_players(
                 "match_avg": match_avg,
                 "bat_pitch_factor": bat_pitch_factor,
                 "bowl_pitch_factor": bowl_pitch_factor,
+                "career_bat_avg": career_bat_avg,
+                "career_bowl_avg": career_bowl_avg,
             })
         except Exception:
             continue
@@ -990,6 +999,8 @@ def _save_loi_cache(cache: dict, path: Path):
         pickle.dump(cache, f)
 
 
+
+
 def scrape_loi_all_players(
     player_ids: list[int],
     cricket_class: int = 2,
@@ -1047,6 +1058,20 @@ def _prepare_bat_cum(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _count_format_innings(cum_df: pd.DataFrame, col: str = "Inns") -> int:
+    """Count format-specific innings from cumulative data by counting increments.
+    Needed because the Inns column may show career-wide totals (e.g. IPL data
+    includes all T20 innings in the running total)."""
+    if col not in cum_df.columns or len(cum_df) == 0:
+        return 0
+    vals = cum_df[col].astype(float).values
+    count = 1  # first match
+    for i in range(1, len(vals)):
+        if vals[i] > vals[i - 1]:
+            count += 1
+    return count
+
+
 def _prepare_bowl_cum(df: pd.DataFrame) -> pd.DataFrame:
     """Clean bowling cumulative DataFrame for stint calculation."""
     df = df.copy()
@@ -1102,14 +1127,12 @@ def compute_stints_loi(
     bat_df: pd.DataFrame,
     bowl_df: pd.DataFrame | None,
 ) -> tuple[list[dict], list[dict]]:
-    """Compute batting and bowling stints separately, each based on 10-innings blocks.
-    Returns (bat_stints, bowl_stints).
+    """Compute batting and bowling stints for chart visualization only.
+    bat_metric = avg * SR / 100 (simple product, no adjustments).
     """
     bat = _prepare_bat_cum(bat_df)
     if len(bat) < 2:
         return [], []
-
-    total_matches = int(bat.iloc[-1]["Mat"])
 
     # -- Batting stints (by batting innings) --
     bat_boundaries = _innings_boundaries(bat["Inns"])
@@ -1129,7 +1152,7 @@ def compute_stints_loi(
         s_dismissals = s_inns - s_no
         bat_avg = float(s_runs / s_dismissals) if s_dismissals > 0 else None
         bat_sr = float(100 * s_runs / s_bf) if s_bf > 0 else None
-        bat_metric = bat_avg * (bat_sr / 100) if bat_avg is not None and bat_sr is not None else None
+        bat_metric = float(bat_avg * bat_sr / 100) if bat_avg is not None and bat_sr is not None else None
 
         bat_stints.append({
             "label": f"{int(bat.iloc[si]['Mat'])}\u2013{int(c['Mat'])}",
@@ -1179,28 +1202,23 @@ def compute_stints_loi(
     return bat_stints, bowl_stints
 
 
-def excellence_indices_loi(
-    bat_stints: list[dict], bowl_stints: list[dict],
-    total_matches: int, boei_scale: float = 1.0, baseline_wpm: float = 1.0,
+def compute_loi_career_indices(
+    bat_inns: int, bat_avg: float, bat_sr: float,
+    bowl_inns: int = 0, bowl_avg: float = 0, bowl_econ: float = 0,
+    boei_scale: float = 1.0,
 ) -> dict:
-    """BEI/BoEI/AEI for LOI formats with separate batting/bowling stints.
-    AEI uses balance-weighted sum: (BEI+BoEI) × sqrt(min/max) to reward dual-threat allrounders.
+    """Career-formula BEI/BoEI/AEI for LOI formats using aggregate stats.
+    BEI  = avg * SR/100 * bat_innings^exp
+    BoEI = BOWL_K/(bowl_avg * econ/6) * bowl_innings^exp * boei_scale
     """
-    denom = total_matches ** LOI_ALPHA if total_matches > 0 else 1.0
+    bei = bat_avg * bat_sr / 100 * (bat_inns ** LOI_LONGEVITY_EXP) if bat_inns > 0 and bat_avg > 0 and bat_sr > 0 else 0
 
-    bat_sum = sum(
-        s["bat_metric"] * s["matches"] for s in bat_stints if s["bat_metric"] is not None
-    )
-    bowl_sum = sum(
-        s["bowl_metric"] * np.sqrt(s["wpm"] / baseline_wpm) * s["matches"]
-        for s in bowl_stints if s["bowl_metric"] is not None and s["wpm"] is not None
-    )
+    boei = 0.0
+    if bowl_inns >= LOI_STINT_INNINGS and bowl_avg > 0 and bowl_econ > 0:
+        boei = BOWL_K / (bowl_avg * bowl_econ / 6) * (bowl_inns ** LOI_LONGEVITY_EXP) * boei_scale
 
-    bei = bat_sum / denom
-    boei = bowl_sum * boei_scale / denom
     aei = bei + boei
-
-    return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2), "matches": total_matches}
+    return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2)}
 
 
 def compute_loi_baseline_wpm(bat_cache: dict, bowl_cache: dict, min_matches: int = LOI_MIN_MATCHES) -> float:
@@ -1211,7 +1229,7 @@ def compute_loi_baseline_wpm(bat_cache: dict, bowl_cache: dict, min_matches: int
         bat_clean = _prepare_bat_cum(bat_df)
         if len(bat_clean) < 2:
             continue
-        total_mat = float(bat_clean.iloc[-1]["Mat"])
+        total_mat = len(bat_clean)
         if total_mat < min_matches:
             continue
         bowl_df = bowl_cache.get(pid)
@@ -1228,31 +1246,36 @@ def compute_loi_baseline_wpm(bat_cache: dict, bowl_cache: dict, min_matches: int
 
 
 def compute_loi_boei_scale(
-    bat_cache: dict, bowl_cache: dict, baseline_wpm: float = 1.0, min_matches: int = LOI_MIN_MATCHES,
+    bat_agg: pd.DataFrame, bowl_agg: pd.DataFrame, min_matches: int = LOI_MIN_MATCHES,
 ) -> float:
-    """Compute BoEI normalization scale for LOI formats."""
-    bat_num = bat_den = bowl_num = bowl_den = 0.0
-    for pid in bat_cache:
+    """Compute BoEI normalization scale so mean(BEI) ≈ mean(BoEI) across qualifying players."""
+    bei_vals = []
+    boei_vals = []
+    for _, row in bat_agg.iterrows():
         try:
-            bat_df = bat_cache[pid]
-            bat_clean = _prepare_bat_cum(bat_df)
-            if len(bat_clean) < 2 or float(bat_clean.iloc[-1]["Mat"]) < min_matches:
+            mat = int(row["Mat"])
+            if mat < min_matches:
                 continue
-            bowl_df = bowl_cache.get(pid)
-            bat_stints, bowl_stints = compute_stints_loi(bat_df, bowl_df)
-            for s in bat_stints:
-                if s["bat_metric"] is not None:
-                    bat_num += s["bat_metric"] * s["matches"]
-                    bat_den += s["matches"]
-            for s in bowl_stints:
-                if s["bowl_metric"] is not None and s["wpm"] is not None:
-                    bowl_num += s["bowl_metric"] * np.sqrt(s["wpm"] / baseline_wpm) * s["matches"]
-                    bowl_den += s["matches"]
+            bat_inns = int(row["Inns"])
+            bat_avg = float(row["Ave"]) if pd.notna(row["Ave"]) and str(row["Ave"]) != "-" else 0
+            bat_sr = float(row["SR"]) if pd.notna(row["SR"]) and str(row["SR"]) != "-" else 0
+
+            pid = row["player_id"]
+            bowl_row = bowl_agg[bowl_agg["player_id"] == pid]
+            bowl_inns = int(bowl_row["Inns"].values[0]) if len(bowl_row) > 0 else 0
+            bowl_avg = float(bowl_row["Ave"].values[0]) if len(bowl_row) > 0 and pd.notna(bowl_row["Ave"].values[0]) and str(bowl_row["Ave"].values[0]) != "-" else 0
+            bowl_econ = float(bowl_row["Econ"].values[0]) if len(bowl_row) > 0 and pd.notna(bowl_row["Econ"].values[0]) and str(bowl_row["Econ"].values[0]) != "-" else 0
+
+            idx = compute_loi_career_indices(bat_inns, bat_avg, bat_sr, bowl_inns, bowl_avg, bowl_econ, boei_scale=1.0)
+            if idx["BEI"] > 0:
+                bei_vals.append(idx["BEI"])
+            if idx["BoEI"] > 0:
+                boei_vals.append(idx["BoEI"])
         except Exception:
             continue
-    if bowl_den == 0 or bat_den == 0:
+    if not boei_vals or not bei_vals:
         return 1.0
-    return (bat_num / bat_den) / (bowl_num / bowl_den)
+    return float(np.mean(bei_vals)) / float(np.mean(boei_vals))
 
 
 def _scrape_loi_era_aggregate(
@@ -1334,17 +1357,34 @@ def compute_loi_all_time(era_cache: dict) -> tuple[float, float]:
     return era_cache[broadest]["ave"], era_cache[broadest]["rpo"]
 
 
+def _safe_float(val, default=0.0) -> float:
+    """Safely convert a value to float, returning default for NaN/'-'/missing."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return default
+    s = str(val).strip()
+    if s in ("-", "", "nan"):
+        return default
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return default
+
+
 def compute_loi_all_players(
     bat_cache: dict,
     bowl_cache: dict,
+    bat_agg: pd.DataFrame,
+    bowl_agg: pd.DataFrame,
     player_info: pd.DataFrame,
     boei_scale: float,
-    baseline_wpm: float = 1.0,
     global_match_stats: dict | None = None,
     all_time_avg: float = 31.0,
     all_time_rpo: float = 4.7,
     min_matches: int = LOI_MIN_MATCHES,
 ) -> list[dict]:
+    bat_agg_idx = bat_agg.set_index("player_id")
+    bowl_agg_idx = bowl_agg.set_index("player_id")
+
     records = []
     for pid in bat_cache:
         try:
@@ -1352,15 +1392,33 @@ def compute_loi_all_players(
             bowl_df = bowl_cache.get(pid)
             name = bat_df.attrs.get("player_name", "Unknown")
 
-            bat_stints, bowl_stints = compute_stints_loi(bat_df, bowl_df)
-            bat_clean = _prepare_bat_cum(bat_df)
-            if len(bat_clean) < 2:
+            if pid not in bat_agg_idx.index:
                 continue
-            total_matches = int(bat_clean.iloc[-1]["Mat"])
+            ba = bat_agg_idx.loc[pid]
+            total_matches = int(ba["Mat"])
             if total_matches < min_matches:
                 continue
 
-            idx = excellence_indices_loi(bat_stints, bowl_stints, total_matches, boei_scale, baseline_wpm)
+            bat_inns = int(ba["Inns"])
+            career_bat_avg = _safe_float(ba["Ave"])
+            career_bat_sr = _safe_float(ba["SR"])
+
+            bowl_inns = 0
+            career_bowl_avg = 0.0
+            career_bowl_econ = 0.0
+            if pid in bowl_agg_idx.index:
+                bo = bowl_agg_idx.loc[pid]
+                bowl_inns = int(bo["Inns"])
+                career_bowl_avg = _safe_float(bo["Ave"])
+                career_bowl_econ = _safe_float(bo["Econ"])
+
+            idx = compute_loi_career_indices(
+                bat_inns, career_bat_avg, career_bat_sr,
+                bowl_inns, career_bowl_avg, career_bowl_econ,
+                boei_scale=boei_scale,
+            )
+
+            bat_stints, bowl_stints = compute_stints_loi(bat_df, bowl_df)
 
             info_row = player_info[player_info["player_id"] == pid]
             country = info_row["country"].values[0] if len(info_row) > 0 else ""
@@ -1368,6 +1426,7 @@ def compute_loi_all_players(
             bei = idx["BEI"]
             boei = idx["BoEI"]
 
+            bat_clean = _prepare_bat_cum(bat_df)
             pf = compute_player_pitch_factors(
                 bat_clean, global_match_stats or {}, all_time_avg, all_time_rpo
             )
@@ -1393,6 +1452,10 @@ def compute_loi_all_players(
                 "match_rpo": match_rpo,
                 "bat_pitch_factor": bat_pitch_factor,
                 "bowl_pitch_factor": bowl_pitch_factor,
+                "career_bat_avg": round(career_bat_avg, 2) if career_bat_avg > 0 else None,
+                "career_bat_sr": round(career_bat_sr, 2) if career_bat_sr > 0 else None,
+                "career_bowl_avg": round(career_bowl_avg, 2) if career_bowl_avg > 0 else None,
+                "career_bowl_econ": round(career_bowl_econ, 2) if career_bowl_econ > 0 else None,
             })
         except Exception:
             continue
@@ -1477,6 +1540,10 @@ def build_loi_rankings_json(
             "match_rpo": p.get("match_rpo"),
             "bat_pitch_factor": p.get("bat_pitch_factor"),
             "bowl_pitch_factor": p.get("bowl_pitch_factor"),
+            "career_bat_avg": p.get("career_bat_avg"),
+            "career_bat_sr": p.get("career_bat_sr"),
+            "career_bowl_avg": p.get("career_bowl_avg"),
+            "career_bowl_econ": p.get("career_bowl_econ"),
         }
         for p in all_players
     ]
@@ -1487,7 +1554,7 @@ def build_loi_rankings_json(
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "total_players": len(all_players),
             "boei_scale": round(boei_scale, 4),
-            "alpha": LOI_ALPHA,
+            "formula": "career",
             "bowl_k": BOWL_K,
             "min_matches": min_matches,
             "min_ar_rating": LOI_MIN_AR_RATING,
@@ -1591,14 +1658,14 @@ def run_loi_pipeline(
     print(f"  BASELINE_WPM = {baseline_wpm:.2f}")
 
     print(f"Computing {format_name} BoEI scale...")
-    boei_scale = compute_loi_boei_scale(bat_cache, bowl_cache, baseline_wpm, min_matches=min_matches)
+    boei_scale = compute_loi_boei_scale(bat_agg, bowl_agg, min_matches=min_matches)
     print(f"  BOEI_SCALE = {boei_scale:.4f}")
 
-    # 5. Compute all players
+    # 5. Compute all players (career formula + stint charts)
     print(f"Computing {format_name} indices for all players...")
     all_players = compute_loi_all_players(
-        bat_cache, bowl_cache, player_info, boei_scale,
-        baseline_wpm=baseline_wpm, global_match_stats=global_match_stats,
+        bat_cache, bowl_cache, bat_agg, bowl_agg, player_info, boei_scale,
+        global_match_stats=global_match_stats,
         all_time_avg=all_time_avg, all_time_rpo=all_time_rpo,
         min_matches=min_matches,
     )
@@ -1840,6 +1907,8 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
             "match_avg": p.get("match_avg"),
             "bat_pitch_factor": p.get("bat_pitch_factor"),
             "bowl_pitch_factor": p.get("bowl_pitch_factor"),
+            "career_bat_avg": p.get("career_bat_avg"),
+            "career_bowl_avg": p.get("career_bowl_avg"),
         }
         for p in all_players
     ]

@@ -3,6 +3,7 @@
 const ALL_DATA = {};
 let DATA = null;
 let CURRENT_FORMAT = 'tests';
+let CROSS_FORMAT_DATA = null;
 
 const FORMAT_FILES = {
   tests: 'rankings.json',
@@ -16,6 +17,7 @@ const FORMAT_LABELS = {
   odis: 'ODI',
   t20is: 'T20I',
   ipl: 'IPL',
+  crossformat: 'Cross-Format',
 };
 
 const COLORS = {
@@ -26,6 +28,9 @@ const COLORS = {
   silver: '#C0C0C0',
   bronze: '#CD7F32',
 };
+
+const XF_COLORS = { tests: '#636EFA', odis: '#00CC96', t20is: '#EF553B' };
+const XF_MIN_AR = 500;
 
 const plotlyConfig = { responsive: true, displayModeBar: false };
 
@@ -59,6 +64,69 @@ function buildNameIndex() {
       FULL_NAMES[surname].push(p.name);
     }
   }
+}
+
+function computeCrossFormat() {
+  const tests = ALL_DATA.tests;
+  const odis = ALL_DATA.odis;
+  const t20is = ALL_DATA.t20is;
+  if (!tests || !odis || !t20is) return null;
+
+  const playerMap = {};
+  for (const [key, data] of [['tests', tests], ['odis', odis], ['t20is', t20is]]) {
+    for (const p of data.all_players) {
+      if (!playerMap[p.name]) playerMap[p.name] = {};
+      playerMap[p.name][key] = p;
+    }
+  }
+
+  const all3 = { batting: [], bowling: [], allrounders: [] };
+  const testOdi = { batting: [], bowling: [], allrounders: [] };
+
+  for (const [name, fmts] of Object.entries(playerMap)) {
+    if (fmts.tests && fmts.odis && fmts.t20is) {
+      const bat = fmts.tests.bat_rating + fmts.odis.bat_rating + fmts.t20is.bat_rating;
+      const bowl = fmts.tests.bowl_rating + fmts.odis.bowl_rating + fmts.t20is.bowl_rating;
+      const entry = {
+        name, country: fmts.tests.country, bat_total: bat, bowl_total: bowl,
+        bat_tests: fmts.tests.bat_rating, bat_odis: fmts.odis.bat_rating, bat_t20is: fmts.t20is.bat_rating,
+        bowl_tests: fmts.tests.bowl_rating, bowl_odis: fmts.odis.bowl_rating, bowl_t20is: fmts.t20is.bowl_rating,
+        matches_tests: fmts.tests.matches, matches_odis: fmts.odis.matches, matches_t20is: fmts.t20is.matches,
+      };
+      if (bat > 0) all3.batting.push(entry);
+      if (bowl > 0) all3.bowling.push(entry);
+      if (bat >= XF_MIN_AR && bowl >= XF_MIN_AR) {
+        entry.ar_total = Math.round(Math.sqrt(bat * bowl));
+        all3.allrounders.push(entry);
+      }
+    }
+
+    if (fmts.tests && fmts.odis) {
+      const bat = fmts.tests.bat_rating + fmts.odis.bat_rating;
+      const bowl = fmts.tests.bowl_rating + fmts.odis.bowl_rating;
+      const entry = {
+        name, country: fmts.tests.country, bat_total: bat, bowl_total: bowl,
+        bat_tests: fmts.tests.bat_rating, bat_odis: fmts.odis.bat_rating,
+        bowl_tests: fmts.tests.bowl_rating, bowl_odis: fmts.odis.bowl_rating,
+        matches_tests: fmts.tests.matches, matches_odis: fmts.odis.matches,
+      };
+      if (bat > 0) testOdi.batting.push(entry);
+      if (bowl > 0) testOdi.bowling.push(entry);
+      if (bat >= XF_MIN_AR && bowl >= XF_MIN_AR) {
+        entry.ar_total = Math.round(Math.sqrt(bat * bowl));
+        testOdi.allrounders.push(entry);
+      }
+    }
+  }
+
+  for (const group of [all3, testOdi]) {
+    group.batting.sort((a, b) => b.bat_total - a.bat_total);
+    group.bowling.sort((a, b) => b.bowl_total - a.bowl_total);
+    group.allrounders.sort((a, b) => b.ar_total - a.ar_total);
+  }
+
+  CROSS_FORMAT_DATA = { all3, testOdi };
+  return CROSS_FORMAT_DATA;
 }
 
 function searchPlayers(query) {
@@ -147,23 +215,46 @@ async function loadData() {
 
 async function switchFormat(format) {
   if (format === CURRENT_FORMAT) return;
-  const data = await loadFormatData(format);
-  if (!data) {
-    alert(`${FORMAT_LABELS[format]} rankings data not yet available.`);
-    return;
+
+  if (format === 'crossformat') {
+    const [tests, odis, t20is] = await Promise.all([
+      loadFormatData('tests'), loadFormatData('odis'), loadFormatData('t20is')
+    ]);
+    if (!tests || !odis || !t20is) {
+      alert('International format data not yet available.');
+      return;
+    }
+    CURRENT_FORMAT = 'crossformat';
+    DATA = null;
+    computeCrossFormat();
+  } else {
+    const data = await loadFormatData(format);
+    if (!data) {
+      alert(`${FORMAT_LABELS[format]} rankings data not yet available.`);
+      return;
+    }
+    CURRENT_FORMAT = format;
+    DATA = data;
+    buildNameIndex();
+    updateFormatLabels();
   }
-  CURRENT_FORMAT = format;
-  DATA = data;
 
   document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.format-btn[data-format="${format}"]`).classList.add('active');
 
-  buildNameIndex();
-  updateFormatLabels();
   renderAll();
 
-  document.getElementById('player-card').classList.add('hidden');
-  document.getElementById('player-search').value = '';
+  const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
+  if (format === 'crossformat') {
+    plTab.style.display = 'none';
+    if (document.querySelector('.tab.active')?.dataset.tab === 'player-lookup') {
+      switchTab('allrounders', false);
+    }
+  } else {
+    plTab.style.display = '';
+    document.getElementById('player-card').classList.add('hidden');
+    document.getElementById('player-search').value = '';
+  }
 
   const activeTab = document.querySelector('.tab.active');
   const tabId = activeTab ? activeTab.dataset.tab : 'allrounders';
@@ -178,7 +269,7 @@ async function restoreFromHash() {
   let format = CURRENT_FORMAT;
   let rest = hash;
 
-  const formatPrefixes = Object.keys(FORMAT_FILES);
+  const formatPrefixes = [...Object.keys(FORMAT_FILES), 'crossformat'];
   for (const f of formatPrefixes) {
     if (hash === f || hash.startsWith(f + '/')) {
       format = f;
@@ -188,33 +279,59 @@ async function restoreFromHash() {
   }
 
   if (format !== CURRENT_FORMAT) {
-    const data = await loadFormatData(format);
-    if (data) {
-      CURRENT_FORMAT = format;
-      DATA = data;
-      document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
-      const btn = document.querySelector(`.format-btn[data-format="${format}"]`);
-      if (btn) btn.classList.add('active');
-      buildNameIndex();
-      updateFormatLabels();
-      renderAll();
+    if (format === 'crossformat') {
+      const [tests, odis, t20is] = await Promise.all([
+        loadFormatData('tests'), loadFormatData('odis'), loadFormatData('t20is')
+      ]);
+      if (tests && odis && t20is) {
+        CURRENT_FORMAT = 'crossformat';
+        DATA = null;
+        computeCrossFormat();
+        document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector('.format-btn[data-format="crossformat"]');
+        if (btn) btn.classList.add('active');
+        const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
+        if (plTab) plTab.style.display = 'none';
+        renderAll();
+      }
+    } else {
+      const data = await loadFormatData(format);
+      if (data) {
+        CURRENT_FORMAT = format;
+        DATA = data;
+        document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector(`.format-btn[data-format="${format}"]`);
+        if (btn) btn.classList.add('active');
+        const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
+        if (plTab) plTab.style.display = '';
+        buildNameIndex();
+        updateFormatLabels();
+        renderAll();
+      }
     }
   }
 
   if (rest.startsWith('player/')) {
-    const name = rest.slice(7);
-    switchTab('player-lookup', false);
-    document.getElementById('player-search').value = name;
-    setTimeout(() => showPlayer(name, false), 120);
+    if (CURRENT_FORMAT !== 'crossformat') {
+      const name = rest.slice(7);
+      switchTab('player-lookup', false);
+      document.getElementById('player-search').value = name;
+      setTimeout(() => showPlayer(name, false), 120);
+    }
   } else {
     const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'methodology'];
     if (validTabs.includes(rest)) {
-      switchTab(rest, false);
+      if (rest === 'player-lookup' && CURRENT_FORMAT === 'crossformat') {
+        switchTab('allrounders', false);
+      } else {
+        switchTab(rest, false);
+      }
     }
   }
 }
 
 function updateFormatLabels() {
+  if (CURRENT_FORMAT === 'crossformat') return;
   const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
   const isLOI = CURRENT_FORMAT !== 'tests';
   const stintDesc = isLOI ? `${DATA.metadata.stint_innings}-innings stints` : `${DATA.metadata.stint_size}-match stints`;
@@ -226,6 +343,10 @@ function updateFormatLabels() {
 }
 
 function renderAll() {
+  if (CURRENT_FORMAT === 'crossformat') {
+    renderCrossFormatAll();
+    return;
+  }
   renderMeta();
   updateFormatLabels();
   renderAllrounderChart();
@@ -406,44 +527,13 @@ function addRowClickHandlers(container) {
 // ─── Methodology ────────────────────────────────────────────────────────────
 
 function renderMethodology() {
+  if (CURRENT_FORMAT === 'crossformat') { renderCrossFormatMethodology(); return; }
   const el = document.getElementById('methodology-content');
   if (!el) return;
   const m = DATA.metadata;
   const isLOI = CURRENT_FORMAT !== 'tests';
   const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
   const alpha = m.alpha;
-
-  const stintDesc = isLOI
-    ? `We divide every career into <strong>${m.stint_innings}-innings windows</strong> — separately for batting and bowling. Because ODIs can include matches where a player doesn't bat or bowl, we track <em>innings played</em> rather than matches. If the final window is shorter than ${m.stint_innings} innings, it merges into the previous one.`
-    : `We divide every career into <strong>${m.stint_size}-match windows</strong> and compute batting and bowling averages independently for each window. If the final leftover is shorter than ${m.stint_size} matches, it merges into the previous window (e.g., 71 matches → stints of 10, 10, 10, 10, 10, 10, 11). This gives us a picture of how a player performed at each stage of their career — not just one blended number.`;
-
-  const minQualDesc = isLOI
-    ? `Players must have played at least <strong>${m.min_matches} matches</strong> to qualify. Each stint requires ≥ <strong>${m.stint_innings} batting innings</strong> (batting) or ≥ <strong>${m.stint_innings} bowling innings</strong> (bowling) to count. Only ICC Full Member nations are included in the rankings.`
-    : `Each stint requires ≥ <strong>${m.min_stint_bat_inn} batting innings</strong> (batting) or ≥ <strong>${m.min_stint_bowl_inn} bowling innings</strong> (bowling) to count. This filters out part-time players and prevents small samples from producing misleading averages.`;
-
-  const batFormula = isLOI
-    ? `bat_metric = batting_avg × (strike_rate / 100)`
-    : `bat_metric = batting_avg`;
-
-  const batFormulaDesc = isLOI
-    ? `In limited-overs cricket, <strong>how fast</strong> you score matters as much as <strong>how many</strong> you score. A player averaging 40 at a strike rate of 95 is far more valuable than one averaging 40 at 65. The batting metric captures both dimensions.`
-    : `The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.`;
-
-  const bowlFormula = isLOI
-    ? `bowl_score = (${m.bowl_k} / (bowl_avg × economy / 6)) × √(wpm / baseline_wpm)`
-    : `bowl_score = (${m.bowl_k} / bowl_avg) × √(wpm / baseline_wpm)`;
-
-  const bowlFormulaDesc = isLOI
-    ? `In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently.`
-    : `This captures both <strong>quality</strong> (average) and <strong>volume</strong> (wickets per match). A bowler averaging 22 and taking 5 wickets per match scores far higher than one averaging 22 but taking only 1 per match. The square root dampens the volume factor so quality still dominates.`;
-
-  const beiFormula = isLOI
-    ? `BEI = (∑ bat_metric × stint_matches) / M<sup>${alpha}</sup>`
-    : `BEI = (∑ stint_bat_avg × stint_matches) / M<sup>${alpha}</sup>`;
-
-  const alphaDesc = isLOI
-    ? `At α = ${alpha}, sustaining ${label} excellence over a long career is rewarded, but quality per match still matters most.`
-    : `At α = ${alpha}, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.`;
 
   const pitchDesc = isLOI
     ? `<p>For each player, we compute the <strong>overall batting average</strong> and <strong>runs per over</strong> across all ${label} matches they appeared in, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
@@ -463,7 +553,60 @@ function renderMethodology() {
 
   const arRankFormula = `AEI = BEI + BoEI<br>Ranking metric = √(bat_rating × bowl_rating)`;
 
-  let html = `
+  let html;
+  if (isLOI) {
+    html = `
+    <h2>${label} Methodology</h2>
+
+    <h3>The Problem with Career Averages</h3>
+    <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label}s is not the same as one who sustains those numbers over 150 ${label}s. Our index rewards both quality and longevity.</p>
+
+    <h3>Why Not Stints?</h3>
+    <p>Our Test rankings use a <strong>stint-based integral</strong> approach — breaking careers into 10-match windows and computing the area under the performance curve. This works well for Tests, where match conditions vary enormously and stint-level analysis captures how a player adapted across different phases of their career.</p>
+    <p>However, in limited-overs cricket, the integral approach has a critical flaw: <strong>a single anomalous stint can disproportionately inflate a player's ranking</strong>. Because batting average in a stint is calculated as runs divided by dismissals, a stretch of not-out innings can produce an astronomical average (e.g., 200+) over just 20 innings. The trapezoidal integration then amplifies this outlier into the career total, potentially pushing a mediocre player's ranking above genuinely elite ones. In Tests, with 10-match windows and longer individual innings, this effect is much less pronounced.</p>
+
+    <h3>Career Formula</h3>
+    <p>For ${label}, we use a direct career formula that captures batting quality, scoring rate, and career length in a single expression:</p>
+    <div class="formula">BEI = batting_avg × (strike_rate / 100) × innings<sup>0.2</sup></div>
+    <p>The <strong>avg × SR/100</strong> term captures a batsman's impact per innings — <em>how many</em> runs they score and <em>how fast</em>. A player averaging 40 at a strike rate of 130 (metric: 52) is far more valuable than one averaging 40 at 70 (metric: 28). The <strong>innings<sup>0.2</sup></strong> factor provides a gentle longevity bonus with heavily diminishing returns — quality per innings dominates, but sustained excellence still gets rewarded. By using career totals, no single hot streak can distort the picture.</p>
+
+    <h3>Bowling Excellence Index (BoEI)</h3>
+    <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>0.2</sup> × scale</div>
+    <p>In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.stint_innings} bowling innings</strong> to qualify.</p>
+
+    <h3>Minimum Qualification</h3>
+    <p>Players must have played at least <strong>${m.min_matches} matches</strong> to qualify.${CURRENT_FORMAT === 'ipl' ? '' : ' Only ICC Full Member nations are included in the rankings.'}</p>
+
+    <h3>Career Charts</h3>
+    <p>The per-player career charts still show ${m.stint_innings}-innings stint breakdowns for visualization — they illustrate how a player's form evolved over time, even though the ranking formula uses career totals rather than stint aggregates.</p>
+
+    <h3>Allrounder Excellence Index (AEI)</h3>
+    <div class="formula">${arRankFormula}</div>
+    ${arDesc}
+
+    ${DATA.distributions ? `
+    <h3>Distribution Overview</h3>
+    <p>The density curves below show where all qualifying ${label} players fall across BEI, BoEI, and AEI.</p>
+    <div class="chart-container" id="chart-kde"></div>` : ''}
+
+    <h3>Pitch Difficulty Normalization</h3>
+    <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
+    ${pitchDesc}
+    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
+
+    <h3>Rating Scale (0–1000)</h3>
+    <p>Pitch-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
+    <div class="formula">
+      Rating = ${m.rating_base} + ${m.rating_k} × √z &nbsp;&nbsp; where z = (value − μ) / σ
+    </div>
+    <p>The square root compresses extreme outliers. Ratings above <strong>900</strong> represent all-time elite players, <strong>800+</strong> is great, and <strong>700+</strong> is very good.</p>
+    `;
+  } else {
+    const stintDesc = `We divide every career into <strong>${m.stint_size}-match windows</strong> and compute batting and bowling averages independently for each window. If the final leftover is shorter than ${m.stint_size} matches, it merges into the previous window (e.g., 71 matches → stints of 10, 10, 10, 10, 10, 10, 11). This gives us a picture of how a player performed at each stage of their career — not just one blended number.`;
+
+    const minQualDesc = `Each stint requires ≥ <strong>${m.min_stint_bat_inn} batting innings</strong> (batting) or ≥ <strong>${m.min_stint_bowl_inn} bowling innings</strong> (bowling) to count. This filters out part-time players and prevents small samples from producing misleading averages.`;
+
+    html = `
     <h2>${label} Methodology</h2>
 
     <h3>The Problem with Career Averages</h3>
@@ -479,14 +622,14 @@ function renderMethodology() {
     <p>Think of it as the <strong>area under the curve</strong> of a player's stint scores plotted over their career. A player who bats well for 15 stints accumulates more area than someone equally skilled over 5 stints. This integral naturally rewards both quality <em>and</em> longevity.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">${beiFormula}</div>
-    <div class="formula">${batFormula}</div>
-    <p>${batFormulaDesc}</p>
+    <div class="formula">BEI = (∑ stint_bat_avg × stint_matches) / M<sup>${alpha}</sup></div>
+    <div class="formula">bat_metric = batting_avg</div>
+    <p>The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.</p>
 
     <h3>Bowling Score Transformation</h3>
-    <p>Bowling averages are "lower is better," so we flip them and factor in <strong>wickets per match</strong>${isLOI ? ' and <strong>economy rate</strong>' : ''}:</p>
-    <div class="formula">${bowlFormula}</div>
-    <p>${bowlFormulaDesc}</p>
+    <p>Bowling averages are "lower is better," so we flip them and factor in <strong>wickets per match</strong>:</p>
+    <div class="formula">bowl_score = (${m.bowl_k} / bowl_avg) × √(wpm / baseline_wpm)</div>
+    <p>This captures both <strong>quality</strong> (average) and <strong>volume</strong> (wickets per match). A bowler averaging 22 and taking 5 wickets per match scores far higher than one averaging 22 but taking only 1 per match. The square root dampens the volume factor so quality still dominates.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
     <div class="formula">
@@ -495,7 +638,7 @@ function renderMethodology() {
     <p>Same integral concept as BEI, but for bowling scores. A data-driven scaling factor (×${m.boei_scale}) ensures that the average bowling stint contributes equally to the average batting stint, so the two indices are comparable.</p>
 
     <h3>Why M<sup>${alpha}</sup>?</h3>
-    <p>The raw integral grows with career length, so we divide by M<sup>α</sup> (where α = ${alpha}) to control <em>how much</em> longevity matters. At α = 1.0, two players with the same per-stint quality would rate equally regardless of career length. At α = 0.5, the longer career would dominate. ${alphaDesc}</p>
+    <p>The raw integral grows with career length, so we divide by M<sup>α</sup> (where α = ${alpha}) to control <em>how much</em> longevity matters. At α = 1.0, two players with the same per-stint quality would rate equally regardless of career length. At α = 0.5, the longer career would dominate. At α = ${alpha}, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.</p>
 
     ${DATA.alpha_comparison ? `
     <div class="alpha-section">
@@ -534,7 +677,8 @@ function renderMethodology() {
       Rating = ${m.rating_base} + ${m.rating_k} × √z &nbsp;&nbsp; where z = (value − μ) / σ
     </div>
     <p>The square root compresses extreme outliers. Ratings above <strong>900</strong> represent all-time elite players, <strong>800+</strong> is great, and <strong>700+</strong> is very good.</p>
-  `;
+    `;
+  }
 
   el.innerHTML = html;
 
@@ -709,6 +853,17 @@ function showPlayer(name, updateHash = true) {
     stats += `<div class="ph-stat"><div class="label">Allrounder</div><div class="value">${player.ar_rating} (#${player.ar_rank})</div></div>`;
   }
 
+  let careerStats = '';
+  const isLOI = CURRENT_FORMAT !== 'tests';
+  const parts = [];
+  if (player.career_bat_avg != null) parts.push(`Avg ${player.career_bat_avg.toFixed(2)}`);
+  if (isLOI && player.career_bat_sr != null) parts.push(`SR ${player.career_bat_sr.toFixed(1)}`);
+  if (player.career_bowl_avg != null) parts.push(`Bowl Avg ${player.career_bowl_avg.toFixed(2)}`);
+  if (isLOI && player.career_bowl_econ != null) parts.push(`Econ ${player.career_bowl_econ.toFixed(2)}`);
+  if (parts.length > 0) {
+    careerStats = `<div class="ph-career">${parts.join(' · ')}</div>`;
+  }
+
   let pitchInfo = '';
   if (player.match_avg && player.bat_pitch_factor) {
     const matchAvg = player.match_avg.toFixed(1);
@@ -722,6 +877,7 @@ function showPlayer(name, updateHash = true) {
     <div>
       <div class="ph-name">${getFlag(player.country)} ${player.name}</div>
       <div class="ph-country">${player.country} · ${player.matches} matches</div>
+      ${careerStats}
       ${pitchInfo}
     </div>
     <div class="ph-stats">${stats}</div>
@@ -986,6 +1142,200 @@ function simpleKDE(values, nPoints = 150) {
     y.push(Math.round(density * 1e6) / 1e6);
   }
   return { x, y };
+}
+
+// ─── Cross-Format Rendering ─────────────────────────────────────────────
+
+function renderCrossFormatAll() {
+  if (!CROSS_FORMAT_DATA) return;
+
+  const dates = ['tests', 'odis', 't20is'].map(f => ALL_DATA[f]?.metadata?.last_updated).filter(Boolean);
+  const latest = dates.sort().pop();
+  if (latest) {
+    const d = new Date(latest);
+    document.getElementById('last-updated').textContent = `Last updated: ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  }
+  document.getElementById('player-count').textContent =
+    `${CROSS_FORMAT_DATA.all3.batting.length} players in all 3 formats \u00b7 ${CROSS_FORMAT_DATA.testOdi.batting.length} in Tests + ODIs`;
+
+  document.getElementById('heading-allrounders').textContent = 'Cross-Format Allrounder GOATs';
+  document.querySelector('#panel-allrounders .panel-desc').textContent =
+    'The greatest allrounders across international formats, ranked by geometric mean of combined batting and bowling ratings. Must have combined batting \u2265 500 and bowling \u2265 500.';
+
+  document.getElementById('heading-batting').textContent = 'Cross-Format Batting GOATs';
+  document.querySelector('#panel-batting .panel-desc').textContent =
+    'The greatest batsmen across international formats, ranked by the sum of format-specific batting ratings.';
+
+  document.getElementById('heading-bowling').textContent = 'Cross-Format Bowling GOATs';
+  document.querySelector('#panel-bowling .panel-desc').textContent =
+    'The greatest bowlers across international formats, ranked by the sum of format-specific bowling ratings.';
+
+  renderXFCategory('allrounders', 'ar_total', CROSS_FORMAT_DATA.all3.allrounders, CROSS_FORMAT_DATA.testOdi.allrounders, true);
+  renderXFCategory('batting', 'bat_total', CROSS_FORMAT_DATA.all3.batting, CROSS_FORMAT_DATA.testOdi.batting, false);
+  renderXFCategory('bowling', 'bowl_total', CROSS_FORMAT_DATA.all3.bowling, CROSS_FORMAT_DATA.testOdi.bowling, false);
+
+  renderCrossFormatMethodology();
+}
+
+function renderXFCategory(category, ratingKey, all3Data, testOdiData, isAR) {
+  const tableContainer = document.getElementById(`table-${category}`);
+  const chartContainer = document.getElementById(`chart-${category}`);
+  const prefix = category === 'batting' ? 'bat' : 'bowl';
+
+  const all3Fmt = [
+    { key: `${prefix}_tests`, label: 'Tests' },
+    { key: `${prefix}_odis`, label: 'ODIs' },
+    { key: `${prefix}_t20is`, label: 'T20Is' },
+  ];
+  const testOdiFmt = [
+    { key: `${prefix}_tests`, label: 'Tests' },
+    { key: `${prefix}_odis`, label: 'ODIs' },
+  ];
+
+  let tableHTML = `<h3 class="xf-section-title">All 3 Formats (Tests + ODIs + T20Is) <span class="xf-count">\u2014 ${all3Data.length} players</span></h3>`;
+  tableHTML += renderXFRows(all3Data.slice(0, 25), ratingKey, isAR ? null : all3Fmt, isAR);
+  tableHTML += `<h3 class="xf-section-title xf-section-gap">Test + ODI <span class="xf-count">\u2014 ${testOdiData.length} players</span></h3>`;
+  tableHTML += renderXFRows(testOdiData.slice(0, 25), ratingKey, isAR ? null : testOdiFmt, isAR);
+  tableContainer.innerHTML = tableHTML;
+
+  const cid1 = `xf-chart-${category}-all3`;
+  const cid2 = `xf-chart-${category}-testodi`;
+  chartContainer.innerHTML = `
+    <h3 class="xf-section-title">All 3 Formats (Tests + ODIs + T20Is)</h3>
+    <div id="${cid1}"></div>
+    <h3 class="xf-section-title xf-section-gap">Test + ODI</h3>
+    <div id="${cid2}"></div>`;
+
+  if (isAR) {
+    renderXFArChart(cid1, all3Data);
+    renderXFArChart(cid2, testOdiData);
+  } else {
+    renderXFStackedChart(cid1, all3Data, prefix, true);
+    renderXFStackedChart(cid2, testOdiData, prefix, false);
+  }
+}
+
+function renderXFRows(players, ratingKey, fmtKeys, isAR) {
+  return players.map((p, i) => {
+    const breakdown = isAR
+      ? `Bat: ${p.bat_total} \u00b7 Bowl: ${p.bowl_total}`
+      : fmtKeys.map(f => `${f.label}: ${p[f.key]}`).join(' \u00b7 ');
+    return `
+      <div class="lb-row ${medalClass(i)}">
+        <div class="lb-rank">${String(i + 1).padStart(2, '0')}</div>
+        <div class="lb-flag">${getFlag(p.country)}</div>
+        <div class="lb-info">
+          <div class="lb-name">${p.name}</div>
+          <div class="lb-country">${p.country}</div>
+          <div class="xf-breakdown">${breakdown}</div>
+        </div>
+        <div class="lb-primary">
+          <div class="lb-primary-val">${p[ratingKey]}</div>
+          <div class="lb-primary-label">Rating</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderXFStackedChart(divId, players, prefix, hasT20) {
+  const mobile = isMobile();
+  const n = mobile ? 15 : 25;
+  const top = players.slice(0, n).reverse();
+  const labels = top.map(p => mobile ? p.name.split(' ').pop() : `${getFlag(p.country)} ${p.name}`);
+
+  const traces = [
+    {
+      y: labels, x: top.map(p => p[prefix + '_tests']),
+      type: 'bar', orientation: 'h', name: 'Tests',
+      marker: { color: XF_COLORS.tests },
+      text: top.map(p => p[prefix + '_tests'] > 0 ? p[prefix + '_tests'] : ''),
+      textposition: 'inside', textfont: { color: '#fff', size: mobile ? 9 : 11 },
+      hovertemplate: '%{y}<br>Tests: %{x}<extra></extra>',
+    },
+    {
+      y: labels, x: top.map(p => p[prefix + '_odis']),
+      type: 'bar', orientation: 'h', name: 'ODIs',
+      marker: { color: XF_COLORS.odis },
+      text: top.map(p => p[prefix + '_odis'] > 0 ? p[prefix + '_odis'] : ''),
+      textposition: 'inside', textfont: { color: '#fff', size: mobile ? 9 : 11 },
+      hovertemplate: '%{y}<br>ODIs: %{x}<extra></extra>',
+    },
+  ];
+
+  if (hasT20) {
+    traces.push({
+      y: labels, x: top.map(p => p[prefix + '_t20is']),
+      type: 'bar', orientation: 'h', name: 'T20Is',
+      marker: { color: XF_COLORS.t20is },
+      text: top.map(p => p[prefix + '_t20is'] > 0 ? p[prefix + '_t20is'] : ''),
+      textposition: 'inside', textfont: { color: '#fff', size: mobile ? 9 : 11 },
+      hovertemplate: '%{y}<br>T20Is: %{x}<extra></extra>',
+    });
+  }
+
+  Plotly.newPlot(divId, traces, plotlyLayout({
+    barmode: 'stack',
+    height: Math.max(mobile ? 400 : 550, top.length * (mobile ? 26 : 30) + 80),
+    margin: { l: mobile ? 100 : 220, r: mobile ? 10 : 60, t: 10, b: 30 },
+    xaxis: { title: 'Combined Rating' },
+    yaxis: { tickfont: { size: mobile ? 10 : 12 } },
+    legend: { orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center' },
+  }), plotlyConfig);
+}
+
+function renderXFArChart(divId, players) {
+  const mobile = isMobile();
+  const n = mobile ? 15 : 25;
+  const top = players.slice(0, n).reverse();
+  const labels = top.map(p => mobile ? p.name.split(' ').pop() : `${getFlag(p.country)} ${p.name}`);
+
+  Plotly.newPlot(divId, [{
+    y: labels, x: top.map(p => p.ar_total), type: 'bar', orientation: 'h',
+    marker: { color: top.map(p => p.ar_total >= 2000 ? COLORS.aei : COLORS.bat) },
+    text: top.map(p => p.ar_total), textposition: 'inside',
+    textfont: { color: '#fff', size: mobile ? 10 : 12, weight: 700 },
+    hovertemplate: '%{y}<br>AR Rating: %{x}<br>Bat: %{customdata[0]} \u00b7 Bowl: %{customdata[1]}<extra></extra>',
+    customdata: top.map(p => [p.bat_total, p.bowl_total]),
+  }], plotlyLayout({
+    height: Math.max(mobile ? 400 : 550, top.length * (mobile ? 26 : 30) + 80),
+    margin: { l: mobile ? 100 : 220, r: mobile ? 10 : 60, t: 10, b: 30 },
+    xaxis: { title: 'Rating' },
+    yaxis: { tickfont: { size: mobile ? 10 : 12 } },
+    showlegend: false,
+  }), plotlyConfig);
+}
+
+function renderCrossFormatMethodology() {
+  const el = document.getElementById('methodology-content');
+  if (!el) return;
+  el.innerHTML = `
+    <h2>Cross-Format Methodology</h2>
+
+    <h3>Concept</h3>
+    <p>The Cross-Format GOAT rankings identify the greatest cricketers across multiple international formats. Instead of looking at one format in isolation, we combine a player's per-format ratings to find those who excelled across the board.</p>
+
+    <h3>Qualification</h3>
+    <p>For <strong>"All 3 Formats"</strong>, a player must appear in the individual rankings for Tests, ODIs, <em>and</em> T20Is \u2014 meaning they met the minimum match and innings thresholds in each format independently. Players like Bradman, who only played Tests, are excluded.</p>
+    <p>For <strong>"Test + ODI"</strong>, a player must appear in both Test and ODI rankings. This captures the great players from the pre-T20 era.</p>
+
+    <h3>Batting GOAT</h3>
+    <div class="formula">Combined Batting Rating = Test bat rating + ODI bat rating + T20I bat rating</div>
+    <p>Each format's batting rating is computed independently using its own methodology \u2014 stint-based integral for Tests, career formula (avg \u00d7 SR/100 \u00d7 innings<sup>0.2</sup>) for LOIs \u2014 with pitch difficulty normalization. The sum rewards players who were elite batsmen across all formats they played. A higher total means consistent excellence across more formats.</p>
+
+    <h3>Bowling GOAT</h3>
+    <div class="formula">Combined Bowling Rating = Test bowl rating + ODI bowl rating + T20I bowl rating</div>
+    <p>Same principle as batting. Bowlers who adapted their skills to the different demands of each format \u2014 the patience of Tests, the containment of ODIs, and the death bowling of T20s \u2014 accumulate a higher combined rating.</p>
+
+    <h3>Allrounder GOAT</h3>
+    <div class="formula">Combined AR Rating = \u221a(Combined Bat Rating \u00d7 Combined Bowl Rating)</div>
+    <p>The geometric mean of combined batting and bowling ratings rewards players who contributed significantly with <strong>both</strong> bat and ball across formats. A player must have a combined batting rating of at least <strong>${XF_MIN_AR}</strong> and a combined bowling rating of at least <strong>${XF_MIN_AR}</strong> to qualify. This filters out pure batsmen and pure bowlers.</p>
+
+    <h3>Why Sum?</h3>
+    <p>We use a simple sum rather than an average because it naturally rewards versatility across more formats. A player who excels in 3 formats has demonstrated the ability to adapt across very different game situations \u2014 the urgency of T20s, the tactical depth of ODIs, and the mental and physical challenge of Tests. Being great in more formats means a higher combined rating.</p>
+
+    <h3>Why Not Average?</h3>
+    <p>An average would rank a player with 950 in Tests + 950 in ODIs + 200 in T20Is (avg: 700) below one with 750 across all three (avg: 750). But the first player achieved far more sustained excellence in two formats than the second. The sum captures this: total greatness across formats, not average greatness.</p>
+  `;
 }
 
 // ─── Tab Navigation ─────────────────────────────────────────────────────────
