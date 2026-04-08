@@ -22,15 +22,12 @@ import numpy as np
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from scipy.stats import gaussian_kde
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 
 BOWL_K = 1000
 MIN_STINT_BAT_INN = 10
 MIN_STINT_BOWL_INN = 10
-ALPHA = 0.70
-LOI_ALPHA = 0.70
 MIN_MATCHES = 20
 LOI_MIN_MATCHES = 50
 STINT_SIZE = 10
@@ -40,7 +37,9 @@ RATING_K = 351  # sqrt-compressed: 900+=elite, 800+=great, 700+=very good
 MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
 LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
 LOI_MIN_MATCHES_T20 = 30  # T20I and IPL have shorter careers
-LOI_LONGEVITY_EXP = 0.20  # innings^exp longevity factor; lower = quality-dominated, higher = longevity-rewarding
+LOI_LONGEVITY_EXP = 0.20  # innings^exp longevity factor for LOIs; lower = quality-dominated, higher = longevity-rewarding
+TEST_LONGEVITY_EXP = 0.35  # higher for Tests: formula uses avg only (no SR), so longevity needs more weight
+TEST_MIN_BOWL_INNS = 20  # min bowling innings to qualify for Test bowling ranking
 
 FULL_MEMBERS = {"AUS", "BAN", "ENG", "IND", "IRE", "NZ", "PAK", "SA", "SL", "WI", "ZIM", "AFG"}
 
@@ -788,74 +787,92 @@ def compute_stints(
     return stints
 
 
-def excellence_indices(stints: list[dict], boei_scale: float = 1.0, median_wpm: float = 2.75) -> dict:
-    total_matches = sum(s["matches"] for s in stints)
-    denom = total_matches ** ALPHA if total_matches > 0 else 1.0
-
-    bat_sum = sum(
-        s["bat_avg"] * s["matches"] for s in stints if s["bat_avg"] is not None
-    )
-    bowl_sum = sum(
-        s["bowl_score"] * np.sqrt(s["wpm"] / median_wpm) * s["matches"]
-        for s in stints if s["bowl_score"] is not None and s["wpm"] is not None
-    )
-
-    bei = bat_sum / denom
-    boei = bowl_sum * boei_scale / denom
-    aei = bei + boei
-
-    return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2), "matches": total_matches}
+def compute_test_career_indices(
+    bat_inns: int, career_bat_avg: float,
+    bowl_inns: int, career_bowl_avg: float, career_wpm: float,
+    boei_scale: float, baseline_wpm: float = 1.41,
+) -> dict:
+    import math as _math
+    bei = career_bat_avg * (bat_inns ** TEST_LONGEVITY_EXP) if bat_inns > 0 and career_bat_avg > 0 else 0.0
+    boei = 0.0
+    if bowl_inns >= TEST_MIN_BOWL_INNS and career_bowl_avg > 0 and career_wpm > 0 and baseline_wpm > 0:
+        boei = (BOWL_K / career_bowl_avg) * _math.sqrt(career_wpm / baseline_wpm) * (bowl_inns ** TEST_LONGEVITY_EXP) * boei_scale
+    return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(bei + boei, 2)}
 
 
-def compute_baseline_wpm(cache: dict) -> float:
-    """Mean wickets-per-match across ALL players (including non-bowlers as 0)."""
+def compute_test_baseline_wpm(bowl_agg: pd.DataFrame, min_matches: int = MIN_MATCHES) -> float:
     wpms = []
-    for pid, df in cache.items():
-        try:
-            df_clean = df.dropna(subset=["Mat"])
-            if len(df_clean) < 2:
-                continue
-            last = df_clean.iloc[-1]
-            mat = float(last["Mat"])
-            wkts = float(last["Wkts"]) if last["Wkts"] > 0 else 0
-            wpms.append(wkts / mat if mat > 0 else 0)
-        except Exception:
-            continue
+    for _, r in bowl_agg.iterrows():
+        mat = int(_safe_float(r["Mat"]))
+        wkts = int(_safe_float(r["Wkts"], 0))
+        inns = int(_safe_float(r["Inns"], 0))
+        if mat >= min_matches and inns >= TEST_MIN_BOWL_INNS and mat > 0:
+            wpms.append(wkts / mat)
     return float(np.mean(wpms)) if wpms else 1.4
 
 
-def compute_boei_scale(cache: dict, innings_cache: dict, median_wpm: float = 2.75) -> float:
-    bat_num = bat_den = bowl_num = bowl_den = 0.0
-    for pid, df in cache.items():
-        try:
-            df_clean = df.dropna(subset=["Mat"])
-            if len(df_clean) < 2:
-                continue
-            inn_data = innings_cache.get(pid)
-            stints = compute_stints(df_clean, inn_data)
-            for s in stints:
-                if s["bat_avg"] is not None:
-                    bat_num += s["bat_avg"] * s["matches"]
-                    bat_den += s["matches"]
-                if s["bowl_score"] is not None and s["wpm"] is not None:
-                    bowl_num += s["bowl_score"] * np.sqrt(s["wpm"] / median_wpm) * s["matches"]
-                    bowl_den += s["matches"]
-        except Exception:
-            continue
-    if bowl_den == 0 or bat_den == 0:
+def compute_test_boei_scale(
+    bat_agg: pd.DataFrame, bowl_agg: pd.DataFrame,
+    baseline_wpm: float, min_matches: int = MIN_MATCHES,
+) -> float:
+    import math as _math
+    bat_vals = []
+    for _, r in bat_agg.iterrows():
+        avg = _safe_float(r["Ave"])
+        inns = int(_safe_float(r["Inns"]))
+        mat = int(_safe_float(r["Mat"]))
+        if avg > 0 and inns > 0 and mat >= min_matches:
+            bat_vals.append(avg * (inns ** TEST_LONGEVITY_EXP))
+
+    bowl_vals = []
+    for _, r in bowl_agg.iterrows():
+        avg = _safe_float(r["Ave"])
+        inns = int(_safe_float(r["Inns"], 0))
+        mat = int(_safe_float(r["Mat"]))
+        wkts = int(_safe_float(r["Wkts"], 0))
+        if avg > 0 and inns >= TEST_MIN_BOWL_INNS and mat >= min_matches and mat > 0:
+            wpm = wkts / mat
+            if wpm > 0 and baseline_wpm > 0:
+                bowl_vals.append((BOWL_K / avg) * _math.sqrt(wpm / baseline_wpm) * (inns ** TEST_LONGEVITY_EXP))
+
+    if not bowl_vals or not bat_vals:
         return 1.0
-    return (bat_num / bat_den) / (bowl_num / bowl_den)
+    return float(np.mean(bat_vals)) / float(np.mean(bowl_vals))
 
 
 def compute_all_players(
     cache: dict,
     innings_cache: dict,
+    bat_agg: pd.DataFrame,
+    bowl_agg: pd.DataFrame,
     player_info: pd.DataFrame,
     boei_scale: float,
-    median_wpm: float = 2.75,
+    baseline_wpm: float = 1.41,
     global_match_stats: dict | None = None,
     all_time_avg: float = 31.91,
 ):
+    bat_lookup = {}
+    for _, r in bat_agg.iterrows():
+        pid = int(r["player_id"])
+        bat_lookup[pid] = {
+            "avg": _safe_float(r["Ave"]),
+            "inns": int(_safe_float(r["Inns"])),
+            "mat": int(_safe_float(r["Mat"])),
+        }
+
+    bowl_lookup = {}
+    for _, r in bowl_agg.iterrows():
+        pid = int(r["player_id"])
+        wkts = int(_safe_float(r.get("Wkts", 0), 0))
+        mat = int(_safe_float(r["Mat"]))
+        bowl_lookup[pid] = {
+            "avg": _safe_float(r["Ave"]),
+            "inns": int(_safe_float(r["Inns"], 0)),
+            "mat": mat,
+            "wkts": wkts,
+            "wpm": wkts / mat if mat > 0 else 0,
+        }
+
     records = []
     for pid, df in cache.items():
         try:
@@ -863,29 +880,37 @@ def compute_all_players(
             df_clean = df.dropna(subset=["Mat"])
             if len(df_clean) < 2:
                 continue
-            inn_data = innings_cache.get(pid)
-            stints = compute_stints(df_clean, inn_data)
-            idx = excellence_indices(stints, boei_scale, median_wpm)
-            info_row = player_info[player_info["player_id"] == pid]
-            country = info_row["country"].values[0] if len(info_row) > 0 else ""
 
-            bei = idx["BEI"]
-            boei = idx["BoEI"]
+            ba = bat_lookup.get(int(pid), {})
+            bo = bowl_lookup.get(int(pid), {})
+            bat_inns = ba.get("inns", 0)
+            bat_avg = ba.get("avg", 0)
+            bowl_inns = bo.get("inns", 0)
+            bowl_avg = bo.get("avg", 0)
+            career_wpm = bo.get("wpm", 0)
+            career_mat = ba.get("mat", 0)
+
+            if career_mat < MIN_MATCHES:
+                continue
+
+            idx = compute_test_career_indices(
+                bat_inns, bat_avg, bowl_inns, bowl_avg, career_wpm,
+                boei_scale, baseline_wpm,
+            )
 
             pf = compute_player_pitch_factors(
                 df_clean, global_match_stats or {}, all_time_avg
             )
-            match_avg = pf["match_avg"]
-            bat_pitch_factor = pf["bat_pitch_factor"]
-            bowl_pitch_factor = pf["bowl_pitch_factor"]
-            bei = round(bei * bat_pitch_factor, 2)
-            boei = round(boei * bowl_pitch_factor, 2)
-
-            last_row = df_clean.iloc[-1]
-            career_bat_avg = round(float(last_row["Bat Av"]), 2) if pd.notna(last_row.get("Bat Av")) else None
-            career_bowl_avg = round(float(last_row["Bowl Av"]), 2) if pd.notna(last_row.get("Bowl Av")) else None
-
+            bei = round(idx["BEI"] * pf["bat_pitch_factor"], 2)
+            boei = round(idx["BoEI"] * pf["bowl_pitch_factor"], 2)
             aei = round(bei + boei, 2)
+
+            info_row = player_info[player_info["player_id"] == int(pid)]
+            country = info_row["country"].values[0] if len(info_row) > 0 else ""
+
+            inn_data = innings_cache.get(pid)
+            stints = compute_stints(df_clean, inn_data)
+
             records.append({
                 "player_id": int(pid),
                 "player_name": name,
@@ -893,13 +918,13 @@ def compute_all_players(
                 "BEI": bei,
                 "BoEI": boei,
                 "AEI": aei,
-                "matches": idx["matches"],
+                "matches": career_mat,
                 "stints": stints,
-                "match_avg": match_avg,
-                "bat_pitch_factor": bat_pitch_factor,
-                "bowl_pitch_factor": bowl_pitch_factor,
-                "career_bat_avg": career_bat_avg,
-                "career_bowl_avg": career_bowl_avg,
+                "match_avg": pf["match_avg"],
+                "bat_pitch_factor": pf["bat_pitch_factor"],
+                "bowl_pitch_factor": pf["bowl_pitch_factor"],
+                "career_bat_avg": round(bat_avg, 2) if bat_avg > 0 else None,
+                "career_bowl_avg": round(bowl_avg, 2) if bowl_avg > 0 else None,
             })
         except Exception:
             continue
@@ -1741,7 +1766,7 @@ def compute_ratings(all_players: list[dict]) -> dict:
     return stats
 
 
-def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: float = 2.75, all_time_avg: float = 31.91) -> dict:
+def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpm: float = 1.41, all_time_avg: float = 31.91) -> dict:
     rating_stats = compute_ratings(all_players)
 
     fm_players = [p for p in all_players if is_full_member(p["country"])]
@@ -1773,108 +1798,6 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
                 d[k] = p[k]
         return d
 
-    bei_vals = [p["BEI"] for p in all_players if p["BEI"] > 0]
-    boei_vals = [p["BoEI"] for p in all_players if p["BoEI"] > 0]
-    aei_vals = [p["AEI"] for p in all_players if p["AEI"] > 0]
-
-    def percentiles(vals):
-        if len(vals) < 5:
-            return {}
-        arr = np.array(vals)
-        return {
-            "p50": round(float(np.percentile(arr, 50)), 1),
-            "p75": round(float(np.percentile(arr, 75)), 1),
-            "p90": round(float(np.percentile(arr, 90)), 1),
-            "p95": round(float(np.percentile(arr, 95)), 1),
-            "p99": round(float(np.percentile(arr, 99)), 1),
-            "max": round(float(arr.max()), 1),
-        }
-
-    def kde_points(vals, n_points=200):
-        if len(vals) < 5:
-            return {"x": [], "y": []}
-        arr = np.array(vals)
-        kde = gaussian_kde(arr, bw_method=0.3)
-        x = np.linspace(0, np.percentile(arr, 99.5) * 1.1, n_points)
-        y = kde(x)
-        return {
-            "x": [round(float(v), 2) for v in x],
-            "y": [round(float(v), 6) for v in y],
-        }
-
-    # Alpha sensitivity: top 15 for each alpha
-    alpha_comparison = {}
-    for a in [0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1.0]:
-        recomputed = []
-        for p in all_players:
-            total = p["matches"]
-            denom = total ** a if total > 0 else 1.0
-            raw_bei = sum(
-                s["bat_avg"] * s["matches"]
-                for s in p["stints"] if s["bat_avg"] is not None
-            )
-            raw_boei = sum(
-                s["bowl_score"] * np.sqrt(s["wpm"] / median_wpm) * s["matches"]
-                for s in p["stints"] if s["bowl_score"] is not None and s["wpm"] is not None
-            )
-            bei = raw_bei / denom
-            boei = raw_boei * boei_scale / denom
-            bei *= p.get("bat_pitch_factor", 1.0)
-            boei *= p.get("bowl_pitch_factor", 1.0)
-            aei = bei + boei
-            recomputed.append({
-                "name": p["player_name"],
-                "BEI": round(bei, 1),
-                "BoEI": round(boei, 1),
-                "AEI": round(aei, 1),
-                "matches": total,
-            })
-
-        # Compute BEI/BoEI ratings via z-scores
-        for metric in ["BEI", "BoEI"]:
-            vals = [r[metric] for r in recomputed if r[metric] > 0]
-            if len(vals) < 2:
-                continue
-            mu, sigma = float(np.mean(vals)), float(np.std(vals))
-            if sigma == 0:
-                sigma = 1.0
-            for r in recomputed:
-                v = r[metric]
-                if v > 0:
-                    z = (v - mu) / sigma
-                    r[f"{metric}_rating"] = _z_to_rating(z)
-                else:
-                    r[f"{metric}_rating"] = 0
-
-        # AEI ratings via z-scores against full population
-        aei_v = [r["AEI"] for r in recomputed if r["AEI"] > 0]
-        if len(aei_v) >= 2:
-            a_mu, a_sigma = float(np.mean(aei_v)), float(np.std(aei_v))
-            if a_sigma == 0:
-                a_sigma = 1.0
-            for r in recomputed:
-                if r["AEI"] > 0:
-                    r["AEI_rating"] = _z_to_rating((r["AEI"] - a_mu) / a_sigma)
-                else:
-                    r["AEI_rating"] = 0
-
-        ar_qual = []
-        for r in recomputed:
-            if r.get("BEI_rating", 0) >= MIN_AR_RATING and r.get("BoEI_rating", 0) >= MIN_AR_RATING:
-                r["geo_rating"] = round(np.sqrt(r["BEI_rating"] * r["BoEI_rating"]))
-                ar_qual.append(r)
-
-        bat_top = sorted(recomputed, key=lambda x: x["BEI"], reverse=True)[:15]
-        bowl_top = sorted(recomputed, key=lambda x: x["BoEI"], reverse=True)[:15]
-        ar_top = sorted(ar_qual, key=lambda x: x["geo_rating"], reverse=True)[:15]
-
-        alpha_comparison[str(a)] = {
-            "batting": bat_top,
-            "bowling": bowl_top,
-            "allrounder": ar_top,
-        }
-
-    # Compute global ranks for every player
     bat_rank_map = {}
     for rank, p in enumerate(bei_sorted, 1):
         bat_rank_map[p["player_name"]] = rank if p["BEI"] > 0 else None
@@ -1916,15 +1839,15 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
     return {
         "metadata": {
             "format": "Tests",
+            "formula": "career",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "total_players": len(all_players),
             "boei_scale": round(boei_scale, 4),
-            "alpha": ALPHA,
+            "baseline_wpm": round(baseline_wpm, 2),
             "bowl_k": BOWL_K,
-            "min_stint_bat_inn": MIN_STINT_BAT_INN,
-            "min_stint_bowl_inn": MIN_STINT_BOWL_INN,
+            "longevity_exp": TEST_LONGEVITY_EXP,
+            "min_bowl_inns": TEST_MIN_BOWL_INNS,
             "min_ar_rating": MIN_AR_RATING,
-            "stint_size": STINT_SIZE,
             "rating_base": RATING_BASE,
             "rating_k": RATING_K,
             "all_time_avg": round(all_time_avg, 2),
@@ -1932,12 +1855,6 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, median_wpm: 
         "batting_top25": [player_summary(p) for p in bei_sorted[:TOP_N]],
         "bowling_top25": [player_summary(p) for p in boei_sorted[:TOP_N]],
         "allrounder_top25": [player_summary(p, ["balance"]) for p in allrounders[:TOP_N]],
-        "distributions": {
-            "BEI": {"percentiles": percentiles(bei_vals), "kde": kde_points(bei_vals)},
-            "BoEI": {"percentiles": percentiles(boei_vals), "kde": kde_points(boei_vals)},
-            "AEI": {"percentiles": percentiles(aei_vals), "kde": kde_points(aei_vals)},
-        },
-        "alpha_comparison": alpha_comparison,
         "all_players": all_players_index,
     }
 
@@ -1989,23 +1906,23 @@ def main():
         cricket_class=1, cache_path=TEST_GLOBAL_MATCH_CACHE, force=do_scrape,
     )
 
-    print("\nComputing baseline wickets per match (all players)...")
-    median_wpm = compute_baseline_wpm(cache)
-    print(f"  BASELINE_WPM = {median_wpm:.2f}")
+    print("\nComputing baseline wickets per match (aggregate)...")
+    baseline_wpm = compute_test_baseline_wpm(bowl_agg)
+    print(f"  BASELINE_WPM = {baseline_wpm:.2f}")
 
-    print("Computing BoEI normalization scale...")
-    boei_scale = compute_boei_scale(cache, innings_cache, median_wpm)
+    print("Computing BoEI normalization scale (aggregate)...")
+    boei_scale = compute_test_boei_scale(bat_agg, bowl_agg, baseline_wpm)
     print(f"  BOEI_SCALE = {boei_scale:.4f}")
 
-    print("Computing indices for all players (with pitch difficulty)...")
+    print("Computing indices for all players (career formula + pitch difficulty)...")
     all_players = compute_all_players(
-        cache, innings_cache, player_info, boei_scale,
-        median_wpm=median_wpm, global_match_stats=global_match_stats, all_time_avg=all_time_avg,
+        cache, innings_cache, bat_agg, bowl_agg, player_info, boei_scale,
+        baseline_wpm=baseline_wpm, global_match_stats=global_match_stats, all_time_avg=all_time_avg,
     )
     print(f"  Computed indices for {len(all_players)} players")
 
     print("Building Test rankings JSON...")
-    rankings = build_rankings_json(all_players, boei_scale, median_wpm=median_wpm, all_time_avg=all_time_avg)
+    rankings = build_rankings_json(all_players, boei_scale, baseline_wpm=baseline_wpm, all_time_avg=all_time_avg)
 
     out_path = SITE_DIR / "rankings.json"
     with open(out_path, "w") as f:

@@ -533,7 +533,6 @@ function renderMethodology() {
   const m = DATA.metadata;
   const isLOI = CURRENT_FORMAT !== 'tests';
   const label = FORMAT_LABELS[CURRENT_FORMAT] || 'Test';
-  const alpha = m.alpha;
 
   const pitchDesc = isLOI
     ? `<p>For each player, we compute the <strong>overall batting average</strong> and <strong>runs per over</strong> across all ${label} matches they appeared in, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
@@ -584,11 +583,6 @@ function renderMethodology() {
     <div class="formula">${arRankFormula}</div>
     ${arDesc}
 
-    ${DATA.distributions ? `
-    <h3>Distribution Overview</h3>
-    <p>The density curves below show where all qualifying ${label} players fall across BEI, BoEI, and AEI.</p>
-    <div class="chart-container" id="chart-kde"></div>` : ''}
-
     <h3>Pitch Difficulty Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
     ${pitchDesc}
@@ -602,9 +596,7 @@ function renderMethodology() {
     <p>The square root compresses extreme outliers. Ratings above <strong>900</strong> represent all-time elite players, <strong>800+</strong> is great, and <strong>700+</strong> is very good.</p>
     `;
   } else {
-    const stintDesc = `We divide every career into <strong>${m.stint_size}-match windows</strong> and compute batting and bowling averages independently for each window. If the final leftover is shorter than ${m.stint_size} matches, it merges into the previous window (e.g., 71 matches → stints of 10, 10, 10, 10, 10, 10, 11). This gives us a picture of how a player performed at each stage of their career — not just one blended number.`;
-
-    const minQualDesc = `Each stint requires ≥ <strong>${m.min_stint_bat_inn} batting innings</strong> (batting) or ≥ <strong>${m.min_stint_bowl_inn} bowling innings</strong> (bowling) to count. This filters out part-time players and prevents small samples from producing misleading averages.`;
+    const longevityExp = m.longevity_exp || 0.35;
 
     html = `
     <h2>${label} Methodology</h2>
@@ -612,59 +604,27 @@ function renderMethodology() {
     <h3>The Problem with Career Averages</h3>
     <p>A player who averages 50 over 20 ${label}s is <strong>not</strong> the same as someone who averages 50 over 180 ${label}s. The second player sustained that level for nine times longer — through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
 
-    <h3>Stint-Based Approach</h3>
-    <p>${stintDesc}</p>
+    <h3>Career Formula</h3>
+    <p>We use a direct career formula that captures quality and career length in a single expression:</p>
+    <div class="formula">BEI = batting_avg × innings<sup>${longevityExp}</sup></div>
+    <p>In Tests, strike rate is not a meaningful differentiator — patient accumulation is often more valuable than aggressive scoring. So the batting metric is simply the career average, multiplied by a longevity factor. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a meaningful but controlled longevity bonus.</p>
 
-    <h3>Minimum Qualification</h3>
-    <p>${minQualDesc}</p>
-
-    <h3>How the Index Works</h3>
-    <p>Think of it as the <strong>area under the curve</strong> of a player's stint scores plotted over their career. A player who bats well for 15 stints accumulates more area than someone equally skilled over 5 stints. This integral naturally rewards both quality <em>and</em> longevity.</p>
-
-    <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">BEI = (∑ stint_bat_avg × stint_matches) / M<sup>${alpha}</sup></div>
-    <div class="formula">bat_metric = batting_avg</div>
-    <p>The sum of each stint's batting average weighted by matches, divided by a career-length adjustment. Averaging 55 across fifteen 10-match stints produces a far higher BEI than averaging 55 across three stints.</p>
-
-    <h3>Bowling Score Transformation</h3>
-    <p>Bowling averages are "lower is better," so we flip them and factor in <strong>wickets per match</strong>:</p>
-    <div class="formula">bowl_score = (${m.bowl_k} / bowl_avg) × √(wpm / baseline_wpm)</div>
-    <p>This captures both <strong>quality</strong> (average) and <strong>volume</strong> (wickets per match). A bowler averaging 22 and taking 5 wickets per match scores far higher than one averaging 22 but taking only 1 per match. The square root dampens the volume factor so quality still dominates.</p>
+    <h3>Why a Higher Longevity Exponent Than LOIs?</h3>
+    <p>Limited-overs formats use an exponent of 0.2 because the batting metric (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players of different quality. In Tests, the metric is <strong>avg alone</strong>, so the numerical spread is smaller. A higher exponent (${longevityExp}) compensates by giving more credit to sustained excellence over long careers, ensuring that 200-Test legends are properly rewarded relative to 50-Test players with comparable averages.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">
-      BoEI = (∑ bowl_score × stint_matches) × scale / M<sup>${alpha}</sup>
-    </div>
-    <p>Same integral concept as BEI, but for bowling scores. A data-driven scaling factor (×${m.boei_scale}) ensures that the average bowling stint contributes equally to the average batting stint, so the two indices are comparable.</p>
+    <div class="formula">BoEI = (${m.bowl_k} / bowl_avg) × √(wpm / baseline_wpm) × innings<sup>${longevityExp}</sup> × scale</div>
+    <p>Bowling averages are "lower is better," so we flip them. The <strong>wickets per match (wpm)</strong> factor captures volume — a strike bowler averaging 22 and taking 5 wickets per match scores far higher than a part-timer averaging 22 but taking 1 per match. The square root dampens the volume factor so quality still dominates. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.min_bowl_inns} bowling innings</strong> to qualify.</p>
 
-    <h3>Why M<sup>${alpha}</sup>?</h3>
-    <p>The raw integral grows with career length, so we divide by M<sup>α</sup> (where α = ${alpha}) to control <em>how much</em> longevity matters. At α = 1.0, two players with the same per-stint quality would rate equally regardless of career length. At α = 0.5, the longer career would dominate. At α = ${alpha}, sustaining excellence over a long career is clearly rewarded, but quality per match still matters most.</p>
+    <h3>Minimum Qualification</h3>
+    <p>Players must have played at least <strong>${m.total_players > 0 ? '20' : '20'} matches</strong> to qualify. Only ICC Full Member nations are included in the rankings.</p>
 
-    ${DATA.alpha_comparison ? `
-    <div class="alpha-section">
-      <h4>Alpha Sensitivity</h4>
-      <p>How do the top 15 rankings change as α varies from 0.5 to 1.0?</p>
-      <div class="alpha-tabs" id="alpha-tabs">
-        <button class="alpha-tab active" data-category="allrounder">Allrounders</button>
-        <button class="alpha-tab" data-category="batting">Batting</button>
-        <button class="alpha-tab" data-category="bowling">Bowling</button>
-      </div>
-      <div class="table-wrap">
-        <table class="alpha-table" id="alpha-table">
-          <thead id="alpha-thead"></thead>
-          <tbody id="alpha-tbody"></tbody>
-        </table>
-      </div>
-    </div>` : ''}
+    <h3>Career Charts</h3>
+    <p>The per-player career charts show 10-match stint breakdowns for visualization — they illustrate how a player's form evolved over time, even though the ranking formula uses career totals rather than stint aggregates.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
     ${arDesc}
-
-    ${DATA.distributions ? `
-    <h3>Distribution Overview</h3>
-    <p>The density curves below show where all qualifying ${label} players fall across BEI, BoEI, and AEI.</p>
-    <div class="chart-container" id="chart-kde"></div>` : ''}
 
     <h3>Pitch Difficulty Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
@@ -681,98 +641,6 @@ function renderMethodology() {
   }
 
   el.innerHTML = html;
-
-  if (DATA.distributions) renderKDE();
-  if (DATA.alpha_comparison) {
-    renderAlphaTable('allrounder');
-    setupAlphaTabs();
-  }
-}
-
-function setupAlphaTabs() {
-  document.querySelectorAll('.alpha-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.alpha-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      renderAlphaTable(tab.dataset.category);
-    });
-  });
-}
-
-function renderKDE() {
-  const traces = [];
-  const items = [
-    { key: 'BEI', color: COLORS.bat, label: 'Batting (BEI)' },
-    { key: 'BoEI', color: COLORS.bowl, label: 'Bowling (BoEI)' },
-    { key: 'AEI', color: COLORS.aei, label: 'Combined (AEI)' },
-  ];
-
-  for (const item of items) {
-    const kde = DATA.distributions[item.key].kde;
-    traces.push({
-      x: kde.x, y: kde.y, type: 'scatter', mode: 'lines',
-      name: item.label, line: { color: item.color, width: 2.5 },
-      fill: 'tozeroy', opacity: 0.3,
-    });
-
-    const p90 = DATA.distributions[item.key].percentiles.p90;
-    traces.push({
-      x: [p90, p90], y: [0, Math.max(...kde.y) * 0.7],
-      type: 'scatter', mode: 'lines',
-      line: { color: item.color, width: 1, dash: 'dot' },
-      showlegend: false,
-      hovertemplate: `${item.key} 90th percentile: ${p90}<extra></extra>`,
-    });
-  }
-
-  const mobile = isMobile();
-  const layout = plotlyLayout({
-    height: mobile ? 280 : 350,
-    xaxis: { title: 'Index Value', tickfont: { size: mobile ? 9 : 12 } },
-    yaxis: { title: 'Density', showticklabels: false },
-    legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center', font: { size: mobile ? 10 : 12 } },
-    margin: { l: mobile ? 30 : 50, r: mobile ? 10 : 30, t: 20, b: mobile ? 40 : 50 },
-  });
-
-  Plotly.newPlot('chart-kde', traces, layout, plotlyConfig);
-}
-
-// ─── Alpha Sensitivity Table ────────────────────────────────────────────────
-
-function renderAlphaTable(category) {
-  const alphas = Object.keys(DATA.alpha_comparison);
-  const thead = document.getElementById('alpha-thead');
-  const tbody = document.getElementById('alpha-tbody');
-  if (!thead || !tbody) return;
-
-  const currentAlpha = String(DATA.metadata.alpha);
-  const metricKey = category === 'batting' ? 'BEI' : category === 'bowling' ? 'BoEI' : 'AEI';
-  const dataSets = {};
-  for (const a of alphas) {
-    dataSets[a] = DATA.alpha_comparison[a][category];
-  }
-
-  thead.innerHTML = `<tr><th></th>${alphas.map(a =>
-    `<th class="${a === currentAlpha ? 'alpha-current' : ''}">\u03b1=${a}</th>`
-  ).join('')}</tr>`;
-
-  let rows = '';
-  for (let rank = 0; rank < 15; rank++) {
-    rows += `<tr><td class="alpha-rank">${rank + 1}</td>`;
-    for (const a of alphas) {
-      const list = dataSets[a];
-      if (rank < list.length) {
-        const p = list[rank];
-        const name = p.name.length > 16 ? p.name.slice(0, 15) + '\u2026' : p.name;
-        const rating = p[metricKey + '_rating'] || Math.round(p[metricKey]);
-        rows += `<td class="${a === currentAlpha ? 'alpha-current' : ''}">${name} <span style="color:var(--text-muted)">${rating}</span></td>`;
-      } else {
-        rows += '<td></td>';
-      }
-    }
-    rows += '</tr>';
-  }
-  tbody.innerHTML = rows;
 }
 
 // ─── Player Search ──────────────────────────────────────────────────────────
