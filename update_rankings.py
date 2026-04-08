@@ -1408,7 +1408,7 @@ def compute_loi_all_players(
             career_bowl_econ = 0.0
             if pid in bowl_agg_idx.index:
                 bo = bowl_agg_idx.loc[pid]
-                bowl_inns = int(bo["Inns"])
+                bowl_inns = int(_safe_float(bo["Inns"], 0))
                 career_bowl_avg = _safe_float(bo["Ave"])
                 career_bowl_econ = _safe_float(bo["Econ"])
 
