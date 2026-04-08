@@ -562,17 +562,33 @@ def compute_player_pitch_factors(
 ) -> dict:
     """Compute pitch difficulty factors for a player from their match history.
 
+    The player's own runs and wickets are subtracted from each match total
+    so a dominant individual performance doesn't inflate the match average
+    and then penalize the same player.
+
     Returns {match_avg, match_rpo, bat_pitch_factor, bowl_pitch_factor}.
     """
     if "Opposition" not in df.columns or "Start Date" not in df.columns:
         return {"match_avg": all_time_avg, "match_rpo": all_time_rpo or 0,
                 "bat_pitch_factor": 1.0, "bowl_pitch_factor": 1.0}
 
+    df_work = df.copy()
+    if "Runs" in df_work.columns:
+        df_work["_Runs"] = df_work["Runs"].apply(lambda v: _safe_float(v, 0))
+        player_runs = df_work["_Runs"].diff().fillna(df_work["_Runs"])
+    else:
+        player_runs = pd.Series(0.0, index=df_work.index)
+    if "Wkts" in df_work.columns:
+        df_work["_Wkts"] = df_work["Wkts"].apply(lambda v: _safe_float(v, 0))
+        player_wkts = df_work["_Wkts"].diff().fillna(df_work["_Wkts"])
+    else:
+        player_wkts = pd.Series(0.0, index=df_work.index)
+
     total_runs = 0
     total_wkts = 0
     matched = 0
 
-    for _, row in df.iterrows():
+    for i, (_, row) in enumerate(df_work.iterrows()):
         opp = str(row.get("Opposition", ""))
         date = str(row.get("Start Date", ""))
         if not opp or not date:
@@ -580,9 +596,12 @@ def compute_player_pitch_factors(
 
         m = _lookup_match_stats(global_match_stats, date, opp)
         if m and m["wkts"] > 0:
-            total_runs += m["runs"]
-            total_wkts += m["wkts"]
-            matched += 1
+            mr = m["runs"] - player_runs.iloc[i]
+            mw = m["wkts"] - player_wkts.iloc[i]
+            if mw > 0:
+                total_runs += mr
+                total_wkts += mw
+                matched += 1
 
     if total_wkts == 0 or matched < 3:
         return {"match_avg": all_time_avg, "match_rpo": all_time_rpo or 0,
@@ -596,7 +615,7 @@ def compute_player_pitch_factors(
     if all_time_rpo:
         rpo_runs = 0
         rpo_count = 0
-        for _, row in df.iterrows():
+        for _, row in df_work.iterrows():
             opp = str(row.get("Opposition", ""))
             date = str(row.get("Start Date", ""))
             m = _lookup_match_stats(global_match_stats, date, opp)
