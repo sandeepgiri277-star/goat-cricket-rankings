@@ -569,13 +569,13 @@ function renderMethodology() {
 
     <h3>Bowling Excellence Index (BoEI)</h3>
     <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>0.2</sup> × scale</div>
-    <p>In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.stint_innings} bowling innings</strong> to qualify.</p>
+    <p>In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
 
     <h3>Minimum Qualification</h3>
     <p>Players must have played at least <strong>${m.min_matches} matches</strong> to qualify.${CURRENT_FORMAT === 'ipl' ? '' : ' Only ICC Full Member nations are included in the rankings.'}</p>
 
     <h3>Career Charts</h3>
-    <p>The per-player career charts still show ${m.stint_innings}-innings stint breakdowns for visualization — they illustrate how a player's form evolved over time, even though the ranking formula uses career totals rather than stint aggregates.</p>
+    <p>The per-player career charts show stint breakdowns for visualization — they illustrate how a player's form evolved over time, even though the ranking formula uses career totals rather than stint aggregates.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
@@ -933,8 +933,10 @@ function renderPlayerCareer(player) {
     if (r === 'bat') {
       layout[yName].title = { text: 'Batting Average', font: { size: 11 }, standoff: 5 };
       layout[yName].range = [0, batMax * 1.3];
-      const windowDesc = isLOI ? `${DATA.metadata.stint_innings}-innings window` : `${DATA.metadata.stint_size}-match window`;
-      const minDesc = isLOI ? `${DATA.metadata.stint_innings} innings` : `10 batting innings`;
+      const stintInns = DATA.metadata.stint_innings || 20;
+      const stintSize = DATA.metadata.stint_size || 10;
+      const windowDesc = isLOI ? `${stintInns}-innings window` : `${stintSize}-match window`;
+      const minDesc = isLOI ? `${stintInns} innings` : `10 batting innings`;
       const sub = mobile ? `Per ${windowDesc} (min. ${minDesc})` : `Average for each ${windowDesc} (min. ${minDesc} to qualify)`;
       layout.annotations.push({
         text: `<b>Batting Average per Stint</b><br><span style="color:${mutedColor};font-size:${mobile ? 9 : 11}px">${sub}</span>`,
@@ -957,8 +959,8 @@ function renderPlayerCareer(player) {
     } else if (r === 'bowl') {
       layout[yName].title = { text: 'Bowling Average', font: { size: 11 }, standoff: 5 };
       layout[yName].range = [0, bowlMax * 1.3];
-      const bWindowDesc = isLOI ? `${DATA.metadata.stint_innings}-innings window` : `${DATA.metadata.stint_size}-match window`;
-      const bMinDesc = isLOI ? `${DATA.metadata.stint_innings} innings` : `10 bowling innings`;
+      const bWindowDesc = isLOI ? `${stintInns}-innings window` : `${stintSize}-match window`;
+      const bMinDesc = isLOI ? `${stintInns} innings` : `10 bowling innings`;
       const sub = mobile
         ? `Per ${bWindowDesc} (min. ${bMinDesc}) \u2014 lower is better`
         : `Average for each ${bWindowDesc} (min. ${bMinDesc} to qualify) \u2014 lower is better`;

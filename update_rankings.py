@@ -36,7 +36,8 @@ RATING_BASE = 350
 RATING_K = 351  # sqrt-compressed: 900+=elite, 800+=great, 700+=very good
 MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
 LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
-LOI_MIN_MATCHES_T20 = 30  # T20I and IPL have shorter careers
+LOI_MIN_MATCHES_T20 = 30  # T20I has shorter careers
+IPL_MIN_MATCHES = 50  # IPL has more games per season; 50 ≈ 3+ seasons
 LOI_LONGEVITY_EXP = 0.20  # innings^exp longevity factor for LOIs; lower = quality-dominated, higher = longevity-rewarding
 TEST_LONGEVITY_EXP = 0.35  # higher for Tests: formula uses avg only (no SR), so longevity needs more weight
 TEST_MIN_BOWL_INNS = 20  # min bowling innings to qualify for Test bowling ranking
@@ -1656,6 +1657,7 @@ def run_loi_pipeline(
     extra_params: str = "",
     min_matches: int = LOI_MIN_MATCHES,
     full_member_only: bool = True,
+    country_map: dict | None = None,
 ) -> dict:
     """Full pipeline for an LOI format. Returns rankings JSON dict."""
     print(f"\n{'=' * 60}")
@@ -1695,6 +1697,14 @@ def run_loi_pipeline(
         bowl_info_cols
     ].drop_duplicates("player_id")
     player_info = pd.concat([player_info, bowl_only], ignore_index=True)
+
+    if country_map:
+        def _fill_country(row):
+            if row["country"] and str(row["country"]).strip():
+                return row["country"]
+            return country_map.get(int(row["player_id"]), "IND")
+        player_info["country"] = player_info.apply(_fill_country, axis=1)
+        print(f"  Filled {sum(player_info['country'] != '')} player nationalities from cross-format data")
 
     # 2. Per-player cumulative data
     if force_scrape or not bat_cum_path.exists():
@@ -2041,6 +2051,19 @@ def main():
         print(f"  T20I Allrounder top 3: {', '.join(p['name'] for p in t20i_rankings['allrounder_top25'][:3])}")
 
     # ── IPL Pipeline ──
+    # Build nationality map from international aggregates for IPL players
+    ipl_country_map = {}
+    for src_path in [BAT_AGG_PATH, BOWL_AGG_PATH, ODI_BAT_AGG_PATH, ODI_BOWL_AGG_PATH,
+                     T20I_BAT_AGG_PATH, T20I_BOWL_AGG_PATH]:
+        if src_path.exists():
+            df = pd.read_pickle(src_path)
+            for _, r in df.iterrows():
+                pid = int(r["player_id"])
+                c = str(r.get("country", "")).strip()
+                if c and pid not in ipl_country_map:
+                    ipl_country_map[pid] = c
+    print(f"\nBuilt IPL nationality map: {len(ipl_country_map)} players from international data")
+
     ipl_rankings = run_loi_pipeline(
         cricket_class=6,
         format_name="IPL",
@@ -2051,8 +2074,9 @@ def main():
         global_match_cache_path=IPL_GLOBAL_MATCH_CACHE,
         force_scrape=do_scrape,
         extra_params=";trophy=117",
-        min_matches=LOI_MIN_MATCHES_T20,
+        min_matches=IPL_MIN_MATCHES,
         full_member_only=False,
+        country_map=ipl_country_map,
     )
 
     ipl_out_path = SITE_DIR / "ipl_rankings.json"
