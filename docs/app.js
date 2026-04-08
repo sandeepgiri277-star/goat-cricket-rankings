@@ -917,6 +917,9 @@ function renderPlayerCareer(player) {
     annotations: [],
   };
 
+  const stintInns = DATA.metadata.stint_innings || 20;
+  const stintSize = DATA.metadata.stint_size || 10;
+
   for (let ri = 0; ri < rows.length; ri++) {
     const r = rows[ri];
     const n = ri + 1;
@@ -933,8 +936,6 @@ function renderPlayerCareer(player) {
     if (r === 'bat') {
       layout[yName].title = { text: 'Batting Average', font: { size: 11 }, standoff: 5 };
       layout[yName].range = [0, batMax * 1.3];
-      const stintInns = DATA.metadata.stint_innings || 20;
-      const stintSize = DATA.metadata.stint_size || 10;
       const windowDesc = isLOI ? `${stintInns}-innings window` : `${stintSize}-match window`;
       const minDesc = isLOI ? `${stintInns} innings` : `10 batting innings`;
       const sub = mobile ? `Per ${windowDesc} (min. ${minDesc})` : `Average for each ${windowDesc} (min. ${minDesc} to qualify)`;
