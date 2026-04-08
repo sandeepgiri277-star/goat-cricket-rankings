@@ -613,8 +613,10 @@ function renderMethodology() {
     <p>Limited-overs formats use an exponent of 0.2 because the batting metric (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players of different quality. In Tests, the metric is <strong>avg alone</strong>, so the numerical spread is smaller. A higher exponent (${longevityExp}) compensates by giving more credit to sustained excellence over long careers, ensuring that 200-Test legends are properly rewarded relative to 50-Test players with comparable averages.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">BoEI = (${m.bowl_k} / bowl_avg) × √(wpi / baseline_wpi) × innings<sup>${longevityExp}</sup> × scale</div>
-    <p>Bowling averages are "lower is better," so we flip them. The <strong>wickets per innings (wpi)</strong> factor captures volume — a strike bowler averaging 22 and taking 2.5 wickets per innings scores far higher than a part-timer averaging 22 but taking 1 per innings. We use wickets per <em>innings</em> rather than per match because it normalizes for matches where a bowler didn't get to bowl both innings (rain, declarations, one-sided games). The square root dampens the volume factor so quality still dominates. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.min_bowl_inns} bowling innings</strong> to qualify.</p>
+    <div class="formula">BoEI = (${m.bowl_k} / bowl_avg) × √(wpi / baseline_wpi) × (baseline_sr / sr)<sup>${m.sr_exp}</sup> × innings<sup>${longevityExp}</sup> × scale</div>
+    <p>Bowling averages are "lower is better," so we flip them. The <strong>wickets per innings (wpi)</strong> factor captures volume — a strike bowler averaging 22 and taking 2.5 wickets per innings scores far higher than a part-timer averaging 22 but taking 1 per innings. We use wickets per <em>innings</em> rather than per match because it normalizes for matches where a bowler didn't get to bowl both innings (rain, declarations, one-sided games). The square root dampens the volume factor so quality still dominates.</p>
+    <p>The <strong>strike rate factor</strong> (baseline_sr / sr)<sup>${m.sr_exp}</sup> gives a mild boost to bowlers who take wickets frequently. The baseline SR is ${m.baseline_sr} (mean across all qualifying bowlers). A bowler with SR 50 gets a ~${Math.round(((m.baseline_sr/50)**m.sr_exp - 1)*100)}% boost, while one at SR 80 is roughly neutral. The low exponent (${m.sr_exp}) keeps this gentle — bowling average remains the dominant quality signal, but strike bowlers like Ambrose and Waqar get appropriate recognition over accumulation-style bowlers.</p>
+    <p>A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.min_bowl_inns} bowling innings</strong> to qualify.</p>
 
     <h3>Minimum Qualification</h3>
     <p>Players must have played at least <strong>${m.total_players > 0 ? '20' : '20'} matches</strong> to qualify. Only ICC Full Member nations are included in the rankings.</p>
@@ -724,10 +726,11 @@ function showPlayer(name, updateHash = true) {
   let careerStats = '';
   const isLOI = CURRENT_FORMAT !== 'tests';
   const parts = [];
-  if (player.career_bat_avg != null) parts.push(`Avg ${player.career_bat_avg.toFixed(2)}`);
+  if (player.career_bat_avg != null) parts.push(`Bat Avg ${player.career_bat_avg.toFixed(2)}`);
   if (isLOI && player.career_bat_sr != null) parts.push(`SR ${player.career_bat_sr.toFixed(1)}`);
   if (player.career_bowl_avg != null) parts.push(`Bowl Avg ${player.career_bowl_avg.toFixed(2)}`);
   if (isLOI && player.career_bowl_econ != null) parts.push(`Econ ${player.career_bowl_econ.toFixed(2)}`);
+  if (!isLOI && player.career_bowl_sr != null) parts.push(`Bowl SR ${player.career_bowl_sr.toFixed(1)}`);
   if (parts.length > 0) {
     careerStats = `<div class="ph-career">${parts.join(' · ')}</div>`;
   }
