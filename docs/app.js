@@ -995,7 +995,6 @@ function showPlayer(name, updateHash = true) {
   `;
 
   renderScoreBreakdown(player);
-  document.getElementById('chart-player-career').innerHTML = '';
 }
 
 function renderPlayerCareer(player) {
