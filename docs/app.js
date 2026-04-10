@@ -843,10 +843,10 @@ function renderScoreBreakdown(player) {
       const allEcon = bowlers.filter(p => p.career_bowl_econ > 0).map(p => p.career_bowl_econ);
       const econPct = _percentile(allEcon.map(v => -v), -econ);
       const [econTier, econTierClass] = _tier(econPct);
-      bars += _barHTML('Wicket-taking', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
+      bars += _barHTML('Average', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
       bars += _barHTML('Economy', `Econ ${econ.toFixed(2)}`, econPct, econTier, econTierClass, null);
     } else {
-      bars += _barHTML('Wicket-taking', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
+      bars += _barHTML('Average', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
       if (player.career_wpi != null) {
         const allWpi = bowlers.filter(p => p.career_wpi > 0).map(p => p.career_wpi);
         const wpiPct = _percentile(allWpi, player.career_wpi);
