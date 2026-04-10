@@ -1296,12 +1296,12 @@ def compute_stints_loi(
 def compute_loi_career_indices(
     bat_inns: int, bat_avg: float, bat_sr: float,
     bat_runs: int = 0,
-    bowl_inns: int = 0, bowl_avg: float = 0, bowl_econ: float = 0,
+    bowl_inns: int = 0, bowl_sr: float = 0, bowl_econ: float = 0,
     boei_scale: float = 1.0,
 ) -> dict:
     """Career-formula BEI/BoEI/AEI for LOI formats using aggregate stats.
     BEI  = avg^(1-α) * RPI^α * SR/100 * bat_innings^exp
-    BoEI = BOWL_K/(bowl_avg * econ/6) * bowl_innings^exp * boei_scale
+    BoEI = BOWL_K/(bowl_SR * econ/6) * bowl_innings^exp * boei_scale
     """
     import math as _math
     bei = 0.0
@@ -1310,8 +1310,8 @@ def compute_loi_career_indices(
         bei = (bat_avg ** (1 - RPI_ALPHA)) * (rpi ** RPI_ALPHA) * bat_sr / 100 * (bat_inns ** LONGEVITY_EXP)
 
     boei = 0.0
-    if bowl_inns >= LOI_STINT_INNINGS and bowl_avg > 0 and bowl_econ > 0:
-        boei = BOWL_K / (bowl_avg * bowl_econ / 6) * (bowl_inns ** LONGEVITY_EXP) * boei_scale
+    if bowl_inns >= LOI_STINT_INNINGS and bowl_sr > 0 and bowl_econ > 0:
+        boei = BOWL_K / (bowl_sr * bowl_econ / 6) * (bowl_inns ** LONGEVITY_EXP) * boei_scale
 
     aei = bei + boei
     return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2)}
@@ -1360,10 +1360,10 @@ def compute_loi_boei_scale(
             pid = row["player_id"]
             bowl_row = bowl_agg[bowl_agg["player_id"] == pid]
             bowl_inns = int(bowl_row["Inns"].values[0]) if len(bowl_row) > 0 else 0
-            bowl_avg = float(bowl_row["Ave"].values[0]) if len(bowl_row) > 0 and pd.notna(bowl_row["Ave"].values[0]) and str(bowl_row["Ave"].values[0]) != "-" else 0
+            bowl_sr = float(bowl_row["SR"].values[0]) if len(bowl_row) > 0 and pd.notna(bowl_row["SR"].values[0]) and str(bowl_row["SR"].values[0]) != "-" else 0
             bowl_econ = float(bowl_row["Econ"].values[0]) if len(bowl_row) > 0 and pd.notna(bowl_row["Econ"].values[0]) and str(bowl_row["Econ"].values[0]) != "-" else 0
 
-            idx = compute_loi_career_indices(bat_inns, bat_avg, bat_sr, bat_runs=bat_runs, bowl_inns=bowl_inns, bowl_avg=bowl_avg, bowl_econ=bowl_econ, boei_scale=1.0)
+            idx = compute_loi_career_indices(bat_inns, bat_avg, bat_sr, bat_runs=bat_runs, bowl_inns=bowl_inns, bowl_sr=bowl_sr, bowl_econ=bowl_econ, boei_scale=1.0)
             if idx["BEI"] > 0:
                 bei_vals.append(idx["BEI"])
             if idx["BoEI"] > 0:
@@ -1504,17 +1504,19 @@ def compute_loi_all_players(
 
             bowl_inns = 0
             career_bowl_avg = 0.0
+            career_bowl_sr = 0.0
             career_bowl_econ = 0.0
             if pid in bowl_agg_idx.index:
                 bo = bowl_agg_idx.loc[pid]
                 bowl_inns = int(_safe_float(bo["Inns"], 0))
                 career_bowl_avg = _safe_float(bo["Ave"])
+                career_bowl_sr = _safe_float(bo.get("SR", 0))
                 career_bowl_econ = _safe_float(bo["Econ"])
 
             idx = compute_loi_career_indices(
                 bat_inns, career_bat_avg, career_bat_sr,
                 bat_runs=bat_runs,
-                bowl_inns=bowl_inns, bowl_avg=career_bowl_avg, bowl_econ=career_bowl_econ,
+                bowl_inns=bowl_inns, bowl_sr=career_bowl_sr, bowl_econ=career_bowl_econ,
                 boei_scale=boei_scale,
             )
 
@@ -1558,6 +1560,7 @@ def compute_loi_all_players(
                 "career_bat_avg": round(career_bat_avg, 2) if career_bat_avg > 0 else None,
                 "career_bat_sr": round(career_bat_sr, 2) if career_bat_sr > 0 else None,
                 "career_bowl_avg": round(career_bowl_avg, 2) if career_bowl_avg > 0 else None,
+                "career_bowl_sr": round(career_bowl_sr, 1) if career_bowl_sr > 0 else None,
                 "career_bowl_econ": round(career_bowl_econ, 2) if career_bowl_econ > 0 else None,
                 "bat_inns": bat_inns,
                 "bowl_inns": bowl_inns,
@@ -1658,6 +1661,7 @@ def build_loi_rankings_json(
             "career_bat_avg": p.get("career_bat_avg"),
             "career_bat_sr": p.get("career_bat_sr"),
             "career_bowl_avg": p.get("career_bowl_avg"),
+            "career_bowl_sr": p.get("career_bowl_sr"),
             "career_bowl_econ": p.get("career_bowl_econ"),
             "bat_inns": p.get("bat_inns"),
             "bowl_inns": p.get("bowl_inns"),

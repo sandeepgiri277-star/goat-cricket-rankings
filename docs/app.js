@@ -597,8 +597,8 @@ function renderMethodology() {
     <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>0.7</sup> × RPI<sup>0.3</sup>) applies a moderate not-out correction — a genuine match-winning 80* still gets substantial credit, but a finisher with a high average inflated by many low-scoring not-outs is tempered. This exponent (0.3) is uniform across all formats. The result is multiplied by <strong>SR/100</strong> to capture scoring speed — a player averaging 40 at a strike rate of 130 is far more valuable than one averaging 40 at 70. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a controlled longevity bonus.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>${longevityExp}</sup> × scale</div>
-    <p>In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
+    <div class="formula">BoEI = (${m.bowl_k} / (bowl_SR × economy / 6)) × innings<sup>${longevityExp}</sup> × scale</div>
+    <p>In limited-overs cricket, a bowler's value comes from two independent factors: <strong>strike rate</strong> (balls per wicket — how quickly they take wickets) and <strong>economy rate</strong> (runs per over — how well they contain). Both are weighted equally. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
 
     <h3>Pitch &amp; Era Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
@@ -770,28 +770,28 @@ function renderScoreBreakdown(player) {
     const avgPct = _percentile(allAvg, avg);
     const [avgTier, avgTierClass] = _tier(avgPct);
     const rpiPct = _percentile(allRpi, rpi);
+    const [rpiTier, rpiTierClass] = _tier(rpiPct);
     const innsPct = _percentile(allInns, inns);
     const [innsTier, innsTierClass] = _tier(innsPct);
-    const qualPct = _percentile(allQuality, qualityMetric);
-    const [qualTier, qualTierClass] = _tier(qualPct);
 
     let bars = '';
-    bars += _barHTML('Quality', `Avg ${avg.toFixed(1)}, RPI ${rpi.toFixed(1)}`, qualPct, qualTier, qualTierClass, null);
+    bars += _barHTML('Average', `${avg.toFixed(1)}`, avgPct, avgTier, avgTierClass);
+    bars += _barHTML('Runs/Innings', `${rpi.toFixed(1)}`, rpiPct, rpiTier, rpiTierClass);
 
     if (isLOI && sr) {
       const allSr = batters.filter(p => p.career_bat_sr > 0).map(p => p.career_bat_sr);
       const srPct = _percentile(allSr, sr);
       const [srTier, srTierClass] = _tier(srPct);
-      bars += _barHTML('Strike Rate', `SR ${sr.toFixed(1)}`, srPct, srTier, srTierClass, null);
+      bars += _barHTML('Strike Rate', `SR ${sr.toFixed(1)}`, srPct, srTier, srTierClass);
     }
 
-    bars += _barHTML('Longevity', `${inns} innings`, innsPct, innsTier, innsTierClass, null);
+    bars += _barHTML('Longevity', `${inns} innings`, innsPct, innsTier, innsTierClass);
 
     if (pitchAdj !== 1) {
       const pitchPct = pitchAdj > 1 ? Math.round(50 + (pitchAdj - 1) * 200) : Math.round(50 - (1 - pitchAdj) * 200);
       const clampedPct = Math.max(5, Math.min(95, pitchPct));
       const [pitchTier, pitchTierClass] = _tier(clampedPct);
-      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass, null);
+      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass);
     }
 
     const beiMedian = m.bei_median;
@@ -839,35 +839,41 @@ function renderScoreBreakdown(player) {
     let bars = '';
 
     if (isLOI) {
+      const bowlSr = player.career_bowl_sr;
       const econ = player.career_bowl_econ || 6;
+      if (bowlSr) {
+        const allBowlSr = bowlers.filter(p => p.career_bowl_sr > 0).map(p => p.career_bowl_sr);
+        const srPct = _percentile(allBowlSr.map(v => -v), -bowlSr);
+        const [srTier, srTierClass] = _tier(srPct);
+        bars += _barHTML('Strike Rate', `SR ${bowlSr.toFixed(1)}`, srPct, srTier, srTierClass);
+      }
       const allEcon = bowlers.filter(p => p.career_bowl_econ > 0).map(p => p.career_bowl_econ);
       const econPct = _percentile(allEcon.map(v => -v), -econ);
       const [econTier, econTierClass] = _tier(econPct);
-      bars += _barHTML('Average', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
-      bars += _barHTML('Economy', `Econ ${econ.toFixed(2)}`, econPct, econTier, econTierClass, null);
+      bars += _barHTML('Economy', `${econ.toFixed(2)}`, econPct, econTier, econTierClass);
     } else {
-      bars += _barHTML('Average', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
+      bars += _barHTML('Average', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass);
       if (player.career_wpi != null) {
         const allWpi = bowlers.filter(p => p.career_wpi > 0).map(p => p.career_wpi);
         const wpiPct = _percentile(allWpi, player.career_wpi);
         const [wpiTier, wpiTierClass] = _tier(wpiPct);
-        bars += _barHTML('Wkts/Innings', `${player.career_wpi.toFixed(2)} wkts/inn`, wpiPct, wpiTier, wpiTierClass, null);
+        bars += _barHTML('Wkts/Innings', `${player.career_wpi.toFixed(2)} wkts/inn`, wpiPct, wpiTier, wpiTierClass);
       }
       if (player.career_bowl_sr) {
         const allBowlSr = bowlers.filter(p => p.career_bowl_sr > 0).map(p => p.career_bowl_sr);
         const srPct = _percentile(allBowlSr.map(v => -v), -player.career_bowl_sr);
         const [srTier, srTierClass] = _tier(srPct);
-        bars += _barHTML('Strike rate', `SR ${player.career_bowl_sr.toFixed(1)}`, srPct, srTier, srTierClass, null);
+        bars += _barHTML('Strike rate', `SR ${player.career_bowl_sr.toFixed(1)}`, srPct, srTier, srTierClass);
       }
     }
 
-    bars += _barHTML('Longevity', `${bowlInns} innings`, bowlInnsPct, bowlInnsTier, bowlInnsTierClass, null);
+    bars += _barHTML('Longevity', `${bowlInns} innings`, bowlInnsPct, bowlInnsTier, bowlInnsTierClass);
 
     if (pitchAdj !== 1) {
       const pitchPct = pitchAdj > 1 ? Math.round(50 + (pitchAdj - 1) * 200) : Math.round(50 - (1 - pitchAdj) * 200);
       const clampedPct = Math.max(5, Math.min(95, pitchPct));
       const [pitchTier, pitchTierClass] = _tier(clampedPct);
-      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass, null);
+      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass);
     }
 
     const boeiMedian = m.boei_median;
@@ -877,8 +883,9 @@ function renderScoreBreakdown(player) {
 
     let formulaParts = [];
     if (isLOI) {
+      const bowlSr = player.career_bowl_sr || (bowlAvg * 6 / (player.career_bowl_econ || 6));
       const econ = player.career_bowl_econ || 6;
-      formulaParts.push(`${bowlK} / (avg × econ/6) = ${bowlK} / (${bowlAvg.toFixed(1)} × ${(econ/6).toFixed(2)}) = ${(bowlK / (bowlAvg * econ / 6)).toFixed(2)}`);
+      formulaParts.push(`${bowlK} / (SR × econ/6) = ${bowlK} / (${bowlSr.toFixed(1)} × ${(econ/6).toFixed(2)}) = ${(bowlK / (bowlSr * econ / 6)).toFixed(2)}`);
     } else {
       formulaParts.push(`${bowlK} / avg = ${bowlK} / ${bowlAvg.toFixed(1)} = ${(bowlK / bowlAvg).toFixed(2)}`);
       if (player.career_wpi != null) {
