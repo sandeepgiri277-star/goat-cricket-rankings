@@ -787,11 +787,14 @@ function renderScoreBreakdown(player) {
 
     bars += _barHTML('Longevity', `${inns} innings`, innsPct, innsTier, innsTierClass);
 
-    if (pitchAdj !== 1) {
-      const pitchPct = pitchAdj > 1 ? Math.round(50 + (pitchAdj - 1) * 200) : Math.round(50 - (1 - pitchAdj) * 200);
-      const clampedPct = Math.max(5, Math.min(95, pitchPct));
-      const [pitchTier, pitchTierClass] = _tier(clampedPct);
-      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass);
+    if (player.match_avg) {
+      const allMatchAvg = all.filter(p => p.match_avg > 0).map(p => p.match_avg);
+      const condPct = _percentile(allMatchAvg.map(v => -v), -player.match_avg);
+      let condLabel, condClass;
+      if (condPct >= 60)      { condLabel = 'Tough'; condClass = 'bd-tier-elite'; }
+      else if (condPct >= 35) { condLabel = 'Medium'; condClass = 'bd-tier-good'; }
+      else                    { condLabel = 'Easy'; condClass = 'bd-tier-avg'; }
+      bars += _barHTML('Conditions', `Match avg ${player.match_avg.toFixed(1)}`, condPct, condLabel, condClass);
     }
 
     const beiMedian = m.bei_median;
@@ -869,11 +872,14 @@ function renderScoreBreakdown(player) {
 
     bars += _barHTML('Longevity', `${bowlInns} innings`, bowlInnsPct, bowlInnsTier, bowlInnsTierClass);
 
-    if (pitchAdj !== 1) {
-      const pitchPct = pitchAdj > 1 ? Math.round(50 + (pitchAdj - 1) * 200) : Math.round(50 - (1 - pitchAdj) * 200);
-      const clampedPct = Math.max(5, Math.min(95, pitchPct));
-      const [pitchTier, pitchTierClass] = _tier(clampedPct);
-      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass);
+    if (player.match_avg) {
+      const allMatchAvg = all.filter(p => p.match_avg > 0).map(p => p.match_avg);
+      const condPct = _percentile(allMatchAvg.map(v => -v), -player.match_avg);
+      let condLabel, condClass;
+      if (condPct >= 60)      { condLabel = 'Tough'; condClass = 'bd-tier-elite'; }
+      else if (condPct >= 35) { condLabel = 'Medium'; condClass = 'bd-tier-good'; }
+      else                    { condLabel = 'Easy'; condClass = 'bd-tier-avg'; }
+      bars += _barHTML('Conditions', `Match avg ${player.match_avg.toFixed(1)}`, condPct, condLabel, condClass);
     }
 
     const boeiMedian = m.boei_median;
