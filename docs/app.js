@@ -851,7 +851,7 @@ function renderScoreBreakdown(player) {
         const allWpi = bowlers.filter(p => p.career_wpi > 0).map(p => p.career_wpi);
         const wpiPct = _percentile(allWpi, player.career_wpi);
         const [wpiTier, wpiTierClass] = _tier(wpiPct);
-        bars += _barHTML('Strike power', `${player.career_wpi.toFixed(2)} wkts/inn`, wpiPct, wpiTier, wpiTierClass, null);
+        bars += _barHTML('Wkts/Innings', `${player.career_wpi.toFixed(2)} wkts/inn`, wpiPct, wpiTier, wpiTierClass, null);
       }
       if (player.career_bowl_sr) {
         const allBowlSr = bowlers.filter(p => p.career_bowl_sr > 0).map(p => p.career_bowl_sr);
