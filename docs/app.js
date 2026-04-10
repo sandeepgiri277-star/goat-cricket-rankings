@@ -784,7 +784,7 @@ function renderScoreBreakdown(player) {
       const allSr = batters.filter(p => p.career_bat_sr > 0).map(p => p.career_bat_sr);
       const srPct = _percentile(allSr, sr);
       const [srTier, srTierClass] = _tier(srPct);
-      bars += _barHTML('Speed', `SR ${sr.toFixed(1)}`, srPct, srTier, srTierClass, null);
+      bars += _barHTML('Strike Rate', `SR ${sr.toFixed(1)}`, srPct, srTier, srTierClass, null);
     }
 
     bars += _barHTML('Longevity', `${inns} innings`, innsPct, innsTier, innsTierClass, null);
