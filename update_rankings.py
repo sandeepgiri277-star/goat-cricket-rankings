@@ -35,6 +35,7 @@ TOP_N = 100
 RATING_BASE = 500   # median player = 500
 RATING_K = 250      # sqrt-compressed: 1000+=GOAT, 900+=elite, 800+=great
 LONGEVITY_EXP = 0.30  # unified innings^exp across all formats
+RPI_ALPHA = 0.30      # avg^(1-α) × RPI^α  — lower α = less not-out correction
 MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
 LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
 LOI_MIN_MATCHES_T20 = 30  # T20I has shorter careers
@@ -827,7 +828,7 @@ def compute_test_career_indices(
     boei_scale: float, baseline_wpi: float = 1.46, baseline_sr: float = 79.9,
 ) -> dict:
     import math as _math
-    bat_metric = _math.sqrt(career_bat_avg * career_rpi) if career_bat_avg > 0 and career_rpi > 0 else 0.0
+    bat_metric = (career_bat_avg ** (1 - RPI_ALPHA)) * (career_rpi ** RPI_ALPHA) if career_bat_avg > 0 and career_rpi > 0 else 0.0
     bei = bat_metric * (bat_inns ** LONGEVITY_EXP) if bat_inns > 0 else 0.0
     boei = 0.0
     if bowl_inns >= TEST_MIN_BOWL_INNS and career_bowl_avg > 0 and career_wpi > 0 and baseline_wpi > 0:
@@ -871,7 +872,7 @@ def compute_test_boei_scale(
         runs = int(_safe_float(r.get("Runs", 0), 0))
         rpi = runs / inns if inns > 0 else 0
         if avg > 0 and rpi > 0 and inns > 0 and mat >= min_matches:
-            bat_vals.append(_math.sqrt(avg * rpi) * (inns ** LONGEVITY_EXP))
+            bat_vals.append((avg ** (1 - RPI_ALPHA)) * (rpi ** RPI_ALPHA) * (inns ** LONGEVITY_EXP))
 
     bowl_vals = []
     for _, r in bowl_agg.iterrows():
@@ -1295,14 +1296,14 @@ def compute_loi_career_indices(
     boei_scale: float = 1.0,
 ) -> dict:
     """Career-formula BEI/BoEI/AEI for LOI formats using aggregate stats.
-    BEI  = sqrt(avg * RPI) * SR/100 * bat_innings^exp
+    BEI  = avg^(1-α) * RPI^α * SR/100 * bat_innings^exp
     BoEI = BOWL_K/(bowl_avg * econ/6) * bowl_innings^exp * boei_scale
     """
     import math as _math
     bei = 0.0
     if bat_inns > 0 and bat_avg > 0 and bat_sr > 0:
         rpi = bat_runs / bat_inns if bat_runs > 0 else bat_avg
-        bei = _math.sqrt(bat_avg * rpi) * bat_sr / 100 * (bat_inns ** LONGEVITY_EXP)
+        bei = (bat_avg ** (1 - RPI_ALPHA)) * (rpi ** RPI_ALPHA) * bat_sr / 100 * (bat_inns ** LONGEVITY_EXP)
 
     boei = 0.0
     if bowl_inns >= LOI_STINT_INNINGS and bowl_avg > 0 and bowl_econ > 0:
@@ -1663,6 +1664,7 @@ def build_loi_rankings_json(
             "formula": "career",
             "bowl_k": BOWL_K,
             "longevity_exp": LONGEVITY_EXP,
+            "rpi_alpha": RPI_ALPHA,
             "min_matches": min_matches,
             "min_ar_rating": LOI_MIN_AR_RATING,
             "stint_innings": LOI_STINT_INNINGS,
@@ -1953,6 +1955,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi
             "sr_exp": TEST_SR_EXP,
             "bowl_k": BOWL_K,
             "longevity_exp": LONGEVITY_EXP,
+            "rpi_alpha": RPI_ALPHA,
             "min_bowl_inns": TEST_MIN_BOWL_INNS,
             "min_matches": MIN_MATCHES,
             "min_ar_rating": MIN_AR_RATING,
