@@ -719,9 +719,9 @@ function _tier(pct) {
   if (pct >= 99) return ['GOAT', 'bd-tier-goat'];
   if (pct >= 95) return ['Elite', 'bd-tier-elite'];
   if (pct >= 85) return ['Excellent', 'bd-tier-excellent'];
-  if (pct >= 70) return ['Great', 'bd-tier-great'];
-  if (pct >= 50) return ['Good', 'bd-tier-good'];
-  if (pct >= 30) return ['Average', 'bd-tier-avg'];
+  if (pct >= 80) return ['Great', 'bd-tier-great'];
+  if (pct >= 60) return ['Good', 'bd-tier-good'];
+  if (pct >= 40) return ['Average', 'bd-tier-avg'];
   return ['Below avg', 'bd-tier-below'];
 }
 
