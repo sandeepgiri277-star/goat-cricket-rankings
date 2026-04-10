@@ -725,7 +725,7 @@ function _tier(pct) {
   return ['Below avg', 'bd-tier-below'];
 }
 
-function _barHTML(label, displayVal, pct, tierLabel, tierClass, footnote) {
+function _barHTML(label, displayVal, pct, tierLabel, tierClass) {
   return `<div class="bd-row">
     <div class="bd-row-label">${label}</div>
     <div class="bd-row-body">
@@ -735,7 +735,6 @@ function _barHTML(label, displayVal, pct, tierLabel, tierClass, footnote) {
         <span class="bd-row-tier ${tierClass}">${tierLabel}</span>
         <span class="bd-row-pct">top ${100 - pct}%</span>
       </div>
-      ${footnote ? `<div class="bd-row-foot">${footnote}</div>` : ''}
     </div>
   </div>`;
 }
@@ -777,8 +776,7 @@ function renderScoreBreakdown(player) {
     const [qualTier, qualTierClass] = _tier(qualPct);
 
     let bars = '';
-    bars += _barHTML('Quality', `Avg ${avg.toFixed(1)}, RPI ${rpi.toFixed(1)}`, qualPct, qualTier, qualTierClass,
-      avg.toFixed(1) !== rpi.toFixed(1) ? `Average rewards not-outs; RPI (${rpi.toFixed(1)}) = raw runs ÷ innings` : null);
+    bars += _barHTML('Quality', `Avg ${avg.toFixed(1)}, RPI ${rpi.toFixed(1)}`, qualPct, qualTier, qualTierClass, null);
 
     if (isLOI && sr) {
       const allSr = batters.filter(p => p.career_bat_sr > 0).map(p => p.career_bat_sr);
@@ -792,9 +790,8 @@ function renderScoreBreakdown(player) {
     if (pitchAdj !== 1) {
       const pitchPct = pitchAdj > 1 ? Math.round(50 + (pitchAdj - 1) * 200) : Math.round(50 - (1 - pitchAdj) * 200);
       const clampedPct = Math.max(5, Math.min(95, pitchPct));
-      const pitchNote = pitchAdj > 1 ? 'Played on tougher pitches than average — score boosted' : 'Played on easier pitches than average — score reduced';
       const [pitchTier, pitchTierClass] = _tier(clampedPct);
-      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass, pitchNote);
+      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass, null);
     }
 
     const beiMedian = m.bei_median;
@@ -846,21 +843,21 @@ function renderScoreBreakdown(player) {
       const allEcon = bowlers.filter(p => p.career_bowl_econ > 0).map(p => p.career_bowl_econ);
       const econPct = _percentile(allEcon.map(v => -v), -econ);
       const [econTier, econTierClass] = _tier(econPct);
-      bars += _barHTML('Wicket-taking', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, 'Lower bowling average = more effective');
-      bars += _barHTML('Economy', `Econ ${econ.toFixed(2)}`, econPct, econTier, econTierClass, 'Runs conceded per over');
+      bars += _barHTML('Wicket-taking', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
+      bars += _barHTML('Economy', `Econ ${econ.toFixed(2)}`, econPct, econTier, econTierClass, null);
     } else {
-      bars += _barHTML('Wicket-taking', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, 'Lower bowling average = more effective');
+      bars += _barHTML('Wicket-taking', `Avg ${bowlAvg.toFixed(1)}`, bowlAvgPct, bowlAvgTier, bowlAvgTierClass, null);
       if (player.career_wpi != null) {
         const allWpi = bowlers.filter(p => p.career_wpi > 0).map(p => p.career_wpi);
         const wpiPct = _percentile(allWpi, player.career_wpi);
         const [wpiTier, wpiTierClass] = _tier(wpiPct);
-        bars += _barHTML('Strike power', `${player.career_wpi.toFixed(2)} wkts/inn`, wpiPct, wpiTier, wpiTierClass, 'Wickets per innings — how frequently they break through');
+        bars += _barHTML('Strike power', `${player.career_wpi.toFixed(2)} wkts/inn`, wpiPct, wpiTier, wpiTierClass, null);
       }
       if (player.career_bowl_sr) {
         const allBowlSr = bowlers.filter(p => p.career_bowl_sr > 0).map(p => p.career_bowl_sr);
         const srPct = _percentile(allBowlSr.map(v => -v), -player.career_bowl_sr);
         const [srTier, srTierClass] = _tier(srPct);
-        bars += _barHTML('Strike rate', `SR ${player.career_bowl_sr.toFixed(1)}`, srPct, srTier, srTierClass, 'Balls per wicket — lower is better');
+        bars += _barHTML('Strike rate', `SR ${player.career_bowl_sr.toFixed(1)}`, srPct, srTier, srTierClass, null);
       }
     }
 
@@ -869,9 +866,8 @@ function renderScoreBreakdown(player) {
     if (pitchAdj !== 1) {
       const pitchPct = pitchAdj > 1 ? Math.round(50 + (pitchAdj - 1) * 200) : Math.round(50 - (1 - pitchAdj) * 200);
       const clampedPct = Math.max(5, Math.min(95, pitchPct));
-      const pitchNote = pitchAdj > 1 ? 'Bowled on flatter pitches than average — score boosted' : 'Bowled on bowler-friendly pitches — score reduced';
       const [pitchTier, pitchTierClass] = _tier(clampedPct);
-      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass, pitchNote);
+      bars += _barHTML('Conditions', `${pitchAdj.toFixed(2)}×`, clampedPct, pitchAdj >= 1 ? 'Tough' : 'Easy', pitchTierClass, null);
     }
 
     const boeiMedian = m.boei_median;
