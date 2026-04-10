@@ -573,6 +573,17 @@ function renderMethodology() {
 
   const arRankFormula = `AEI = BEI + BoEI<br>Ranking metric = √(bat_rating × bowl_rating)`;
 
+  const longevityExp = m.longevity_exp || 0.3;
+
+  const ratingDesc = `
+    <h3>Rating Scale</h3>
+    <p>Pitch-adjusted indices are converted to ratings anchored at the <strong>median</strong> qualifying player = ${m.rating_base}. We compute how many standard deviations above (or below) the median a player sits, then apply square-root compression:</p>
+    <div class="formula">
+      Rating = ${m.rating_base} + ${m.rating_k} × √z &nbsp;&nbsp; where z = (value − median) / σ
+    </div>
+    <p>The square root compresses extreme outliers — going from 3σ to 4σ above the median adds far fewer points than going from 1σ to 2σ. Ratings above <strong>1000</strong> are all-time GOATs, <strong>900+</strong> is elite, <strong>800+</strong> is great, and <strong>700+</strong> is very good. Below the median, ratings scale linearly.</p>
+  `;
+
   let html;
   if (isLOI) {
     html = `
@@ -582,14 +593,11 @@ function renderMethodology() {
     <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label}s is not the same as one who sustains those numbers over 150 ${label}s. Our index rewards both quality and longevity.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">BEI = batting_avg × (strike_rate / 100) × innings<sup>${m.longevity_exp}</sup></div>
-    <p>The <strong>avg × SR/100</strong> term captures a batsman's impact per innings — <em>how many</em> runs they score and <em>how fast</em>. A player averaging 40 at a strike rate of 130 (metric: 52) is far more valuable than one averaging 40 at 70 (metric: 28). The <strong>innings<sup>${m.longevity_exp}</sup></strong> factor provides a gentle longevity bonus with heavily diminishing returns — quality per innings dominates, but sustained excellence still gets rewarded.</p>
-
-    <h3>Why a Lower Longevity Exponent Than Tests?</h3>
-    <p>Limited-overs formats use an exponent of <strong>${m.longevity_exp}</strong> compared to Tests' higher exponent. The batting metric here (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players of different quality. In Tests, the metric uses <strong>√(avg × runs_per_innings)</strong> which has a narrower spread, so a higher longevity exponent is needed there to properly reward sustained excellence over long careers.</p>
+    <div class="formula">BEI = batting_avg × (strike_rate / 100) × innings<sup>${longevityExp}</sup></div>
+    <p>The <strong>avg × SR/100</strong> term captures a batsman's impact per innings — <em>how many</em> runs they score and <em>how fast</em>. A player averaging 40 at a strike rate of 130 (metric: 52) is far more valuable than one averaging 40 at 70 (metric: 28). The <strong>innings<sup>${longevityExp}</sup></strong> factor provides a controlled longevity bonus — quality per innings dominates, but sustained excellence gets rewarded. This exponent (${longevityExp}) is used uniformly across all formats.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>${m.longevity_exp}</sup> × scale</div>
+    <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>${longevityExp}</sup> × scale</div>
     <p>In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
 
     <h3>Pitch &amp; Era Normalization</h3>
@@ -607,16 +615,9 @@ function renderMethodology() {
     <h3>Career Charts</h3>
     <p>The per-player career charts show how a player's form evolved over time in match-window stints. These are for visualization only — the ranking formula uses career totals.</p>
 
-    <h3>Rating Scale (0–1000)</h3>
-    <p>Pitch-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
-    <div class="formula">
-      Rating = ${m.rating_base} + ${m.rating_k} × √z &nbsp;&nbsp; where z = (value − μ) / σ
-    </div>
-    <p>The square root compresses extreme outliers. Ratings above <strong>900</strong> represent all-time elite players, <strong>800+</strong> is great, and <strong>700+</strong> is very good.</p>
+    ${ratingDesc}
     `;
   } else {
-    const longevityExp = m.longevity_exp || 0.35;
-
     html = `
     <h2>${label} Methodology</h2>
 
@@ -625,10 +626,7 @@ function renderMethodology() {
 
     <h3>Batting Excellence Index (BEI)</h3>
     <div class="formula">BEI = √(batting_avg × runs_per_innings) × innings<sup>${longevityExp}</sup></div>
-    <p>The batting metric is the <strong>geometric mean</strong> of the career average and runs per innings. Career average (runs ÷ dismissals) rewards not-outs, while runs per innings (runs ÷ innings) measures raw per-innings production. The geometric mean balances both: it still gives partial credit for not-outs (a genuine 150* deserves more than 150), but it prevents players with high not-out rates from having inflated ratings relative to openers who get out nearly every innings. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a meaningful but controlled longevity bonus.</p>
-
-    <h3>Why a Higher Longevity Exponent Than LOIs?</h3>
-    <p>Tests use a longevity exponent of <strong>${longevityExp}</strong> versus <strong>0.2</strong> for limited-overs formats. This is deliberate. In LOIs, the batting metric (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players. In Tests, the metric is <strong>√(avg × runs_per_innings)</strong> which produces a narrower spread. The higher exponent ensures that 200-Test legends who sustained elite performance across 15+ years, through multiple eras and conditions, are properly rewarded relative to players who shone brightly over 50 Tests.</p>
+    <p>The batting metric is the <strong>geometric mean</strong> of the career average and runs per innings. Career average (runs ÷ dismissals) rewards not-outs, while runs per innings (runs ÷ innings) measures raw per-innings production. The geometric mean balances both: it still gives partial credit for not-outs (a genuine 150* deserves more than 150), but it prevents players with high not-out rates from having inflated ratings relative to openers who get out nearly every innings. The <strong>innings<sup>${longevityExp}</sup></strong> exponent (uniform across all formats) provides a meaningful but controlled longevity bonus.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
     <div class="formula">BoEI = (${m.bowl_k} / bowl_avg) × √(wpi / baseline_wpi) × (baseline_sr / sr)<sup>${m.sr_exp}</sup> × innings<sup>${longevityExp}</sup> × scale</div>
@@ -651,12 +649,7 @@ function renderMethodology() {
     <h3>Career Charts</h3>
     <p>The per-player career charts show 10-match stint breakdowns for visualization — they illustrate how a player's form evolved over time. These are for visualization only — the ranking formula uses career totals.</p>
 
-    <h3>Rating Scale (0–1000)</h3>
-    <p>Pitch-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
-    <div class="formula">
-      Rating = ${m.rating_base} + ${m.rating_k} × √z &nbsp;&nbsp; where z = (value − μ) / σ
-    </div>
-    <p>The square root compresses extreme outliers. Ratings above <strong>900</strong> represent all-time elite players, <strong>800+</strong> is great, and <strong>700+</strong> is very good.</p>
+    ${ratingDesc}
     `;
   }
 

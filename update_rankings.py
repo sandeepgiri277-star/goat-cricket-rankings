@@ -32,14 +32,13 @@ MIN_MATCHES = 20
 LOI_MIN_MATCHES = 50
 STINT_SIZE = 10
 TOP_N = 100
-RATING_BASE = 350
-RATING_K = 351  # sqrt-compressed: 900+=elite, 800+=great, 700+=very good
+RATING_BASE = 500   # median player = 500
+RATING_K = 250      # sqrt-compressed: 1000+=GOAT, 900+=elite, 800+=great
+LONGEVITY_EXP = 0.30  # unified innings^exp across all formats
 MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
 LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
 LOI_MIN_MATCHES_T20 = 30  # T20I has shorter careers
 IPL_MIN_MATCHES = 50  # IPL has more games per season; 50 ≈ 3+ seasons
-LOI_LONGEVITY_EXP = 0.20  # innings^exp longevity factor for LOIs; lower = quality-dominated, higher = longevity-rewarding
-TEST_LONGEVITY_EXP = 0.40  # higher for Tests: formula uses avg only (no SR), so longevity needs more weight
 TEST_MIN_BOWL_INNS = 20  # min bowling innings to qualify for Test bowling ranking
 TEST_SR_EXP = 0.20  # mild strike-rate factor: (baseline_sr / sr) ^ 0.2
 
@@ -829,11 +828,11 @@ def compute_test_career_indices(
 ) -> dict:
     import math as _math
     bat_metric = _math.sqrt(career_bat_avg * career_rpi) if career_bat_avg > 0 and career_rpi > 0 else 0.0
-    bei = bat_metric * (bat_inns ** TEST_LONGEVITY_EXP) if bat_inns > 0 else 0.0
+    bei = bat_metric * (bat_inns ** LONGEVITY_EXP) if bat_inns > 0 else 0.0
     boei = 0.0
     if bowl_inns >= TEST_MIN_BOWL_INNS and career_bowl_avg > 0 and career_wpi > 0 and baseline_wpi > 0:
         sr_factor = (baseline_sr / career_bowl_sr) ** TEST_SR_EXP if career_bowl_sr > 0 and baseline_sr > 0 else 1.0
-        boei = (BOWL_K / career_bowl_avg) * _math.sqrt(career_wpi / baseline_wpi) * sr_factor * (bowl_inns ** TEST_LONGEVITY_EXP) * boei_scale
+        boei = (BOWL_K / career_bowl_avg) * _math.sqrt(career_wpi / baseline_wpi) * sr_factor * (bowl_inns ** LONGEVITY_EXP) * boei_scale
     return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(bei + boei, 2)}
 
 
@@ -872,7 +871,7 @@ def compute_test_boei_scale(
         runs = int(_safe_float(r.get("Runs", 0), 0))
         rpi = runs / inns if inns > 0 else 0
         if avg > 0 and rpi > 0 and inns > 0 and mat >= min_matches:
-            bat_vals.append(_math.sqrt(avg * rpi) * (inns ** TEST_LONGEVITY_EXP))
+            bat_vals.append(_math.sqrt(avg * rpi) * (inns ** LONGEVITY_EXP))
 
     bowl_vals = []
     for _, r in bowl_agg.iterrows():
@@ -885,7 +884,7 @@ def compute_test_boei_scale(
             wpi = wkts / inns
             sr_factor = (baseline_sr / sr) ** TEST_SR_EXP if sr > 0 and baseline_sr > 0 else 1.0
             if wpi > 0 and baseline_wpi > 0:
-                bowl_vals.append((BOWL_K / avg) * _math.sqrt(wpi / baseline_wpi) * sr_factor * (inns ** TEST_LONGEVITY_EXP))
+                bowl_vals.append((BOWL_K / avg) * _math.sqrt(wpi / baseline_wpi) * sr_factor * (inns ** LONGEVITY_EXP))
 
     if not bowl_vals or not bat_vals:
         return 1.0
@@ -1298,11 +1297,11 @@ def compute_loi_career_indices(
     BEI  = avg * SR/100 * bat_innings^exp
     BoEI = BOWL_K/(bowl_avg * econ/6) * bowl_innings^exp * boei_scale
     """
-    bei = bat_avg * bat_sr / 100 * (bat_inns ** LOI_LONGEVITY_EXP) if bat_inns > 0 and bat_avg > 0 and bat_sr > 0 else 0
+    bei = bat_avg * bat_sr / 100 * (bat_inns ** LONGEVITY_EXP) if bat_inns > 0 and bat_avg > 0 and bat_sr > 0 else 0
 
     boei = 0.0
     if bowl_inns >= LOI_STINT_INNINGS and bowl_avg > 0 and bowl_econ > 0:
-        boei = BOWL_K / (bowl_avg * bowl_econ / 6) * (bowl_inns ** LOI_LONGEVITY_EXP) * boei_scale
+        boei = BOWL_K / (bowl_avg * bowl_econ / 6) * (bowl_inns ** LONGEVITY_EXP) * boei_scale
 
     aei = bei + boei
     return {"BEI": round(bei, 2), "BoEI": round(boei, 2), "AEI": round(aei, 2)}
@@ -1648,7 +1647,7 @@ def build_loi_rankings_json(
             "boei_scale": round(boei_scale, 4),
             "formula": "career",
             "bowl_k": BOWL_K,
-            "longevity_exp": LOI_LONGEVITY_EXP,
+            "longevity_exp": LONGEVITY_EXP,
             "min_matches": min_matches,
             "min_ar_rating": LOI_MIN_AR_RATING,
             "stint_innings": LOI_STINT_INNINGS,
@@ -1794,7 +1793,7 @@ def run_loi_pipeline(
 def _z_to_rating(z: float) -> int:
     if z >= 0:
         return max(0, int(round(RATING_BASE + RATING_K * np.sqrt(z))))
-    return max(0, int(round(RATING_BASE - RATING_K * np.sqrt(-z))))
+    return max(0, int(round(RATING_BASE + RATING_K * z)))
 
 
 def compute_ratings(all_players: list[dict]) -> dict:
@@ -1808,8 +1807,8 @@ def compute_ratings(all_players: list[dict]) -> dict:
     boei_vals = np.array([p["BoEI"] for p in all_players if p["BoEI"] > 0])
 
     stats = {
-        "BEI": (float(bei_vals.mean()), float(bei_vals.std())),
-        "BoEI": (float(boei_vals.mean()), float(boei_vals.std())),
+        "BEI": (float(np.median(bei_vals)), float(bei_vals.std())),
+        "BoEI": (float(np.median(boei_vals)), float(boei_vals.std())),
     }
 
     # Pass 1: BEI and BoEI ratings
@@ -1831,7 +1830,7 @@ def compute_ratings(all_players: list[dict]) -> dict:
     # as batting/bowling, so the scale feels consistent (Kallis > 1000
     # like Bradman for batting).
     aei_vals = np.array([p["AEI"] for p in all_players if p["AEI"] > 0])
-    stats["AEI"] = (float(aei_vals.mean()), float(aei_vals.std())) if len(aei_vals) > 1 else (0.0, 1.0)
+    stats["AEI"] = (float(np.median(aei_vals)), float(aei_vals.std())) if len(aei_vals) > 1 else (0.0, 1.0)
 
     mu, sigma = stats["AEI"]
     if sigma == 0:
@@ -1931,7 +1930,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi
             "baseline_sr": round(baseline_sr, 1),
             "sr_exp": TEST_SR_EXP,
             "bowl_k": BOWL_K,
-            "longevity_exp": TEST_LONGEVITY_EXP,
+            "longevity_exp": LONGEVITY_EXP,
             "min_bowl_inns": TEST_MIN_BOWL_INNS,
             "min_matches": MIN_MATCHES,
             "min_ar_rating": MIN_AR_RATING,
