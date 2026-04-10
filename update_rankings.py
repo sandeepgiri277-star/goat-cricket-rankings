@@ -1575,7 +1575,14 @@ def build_loi_rankings_json(
         if p["BEI_rating"] >= LOI_MIN_AR_RATING and p["BoEI_rating"] >= LOI_MIN_AR_RATING:
             geo = np.sqrt(p["BEI_rating"] * p["BoEI_rating"])
             balance = min(p["BEI"], p["BoEI"]) / p["AEI"] if p["AEI"] > 0 else 0
-            allrounders.append({**p, "balance": round(balance * 100, 1), "geo_rating": round(geo)})
+            allrounders.append({**p, "balance": round(balance * 100, 1), "geo_raw": geo})
+    if allrounders:
+        geo_vals = np.array([p["geo_raw"] for p in allrounders])
+        geo_med, geo_std = float(np.median(geo_vals)), float(geo_vals.std())
+        if geo_std == 0:
+            geo_std = 1
+        for p in allrounders:
+            p["geo_rating"] = _z_to_rating((p["geo_raw"] - geo_med) / geo_std)
     allrounders.sort(key=lambda p: p["geo_rating"], reverse=True)
 
     def player_summary(p, extra_fields=None):
@@ -1857,7 +1864,14 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi
         if p["BEI_rating"] >= MIN_AR_RATING and p["BoEI_rating"] >= MIN_AR_RATING:
             geo = np.sqrt(p["BEI_rating"] * p["BoEI_rating"])
             balance = min(p["BEI"], p["BoEI"]) / p["AEI"] if p["AEI"] > 0 else 0
-            allrounders.append({**p, "balance": round(balance * 100, 1), "geo_rating": round(geo)})
+            allrounders.append({**p, "balance": round(balance * 100, 1), "geo_raw": geo})
+    if allrounders:
+        geo_vals = np.array([p["geo_raw"] for p in allrounders])
+        geo_med, geo_std = float(np.median(geo_vals)), float(geo_vals.std())
+        if geo_std == 0:
+            geo_std = 1
+        for p in allrounders:
+            p["geo_rating"] = _z_to_rating((p["geo_raw"] - geo_med) / geo_std)
     allrounders.sort(key=lambda p: p["geo_rating"], reverse=True)
 
     def player_summary(p, extra_fields=None):
