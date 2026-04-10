@@ -1290,14 +1290,19 @@ def compute_stints_loi(
 
 def compute_loi_career_indices(
     bat_inns: int, bat_avg: float, bat_sr: float,
+    bat_runs: int = 0,
     bowl_inns: int = 0, bowl_avg: float = 0, bowl_econ: float = 0,
     boei_scale: float = 1.0,
 ) -> dict:
     """Career-formula BEI/BoEI/AEI for LOI formats using aggregate stats.
-    BEI  = avg * SR/100 * bat_innings^exp
+    BEI  = sqrt(avg * RPI) * SR/100 * bat_innings^exp
     BoEI = BOWL_K/(bowl_avg * econ/6) * bowl_innings^exp * boei_scale
     """
-    bei = bat_avg * bat_sr / 100 * (bat_inns ** LONGEVITY_EXP) if bat_inns > 0 and bat_avg > 0 and bat_sr > 0 else 0
+    import math as _math
+    bei = 0.0
+    if bat_inns > 0 and bat_avg > 0 and bat_sr > 0:
+        rpi = bat_runs / bat_inns if bat_runs > 0 else bat_avg
+        bei = _math.sqrt(bat_avg * rpi) * bat_sr / 100 * (bat_inns ** LONGEVITY_EXP)
 
     boei = 0.0
     if bowl_inns >= LOI_STINT_INNINGS and bowl_avg > 0 and bowl_econ > 0:
@@ -1345,6 +1350,7 @@ def compute_loi_boei_scale(
             bat_inns = int(row["Inns"])
             bat_avg = float(row["Ave"]) if pd.notna(row["Ave"]) and str(row["Ave"]) != "-" else 0
             bat_sr = float(row["SR"]) if pd.notna(row["SR"]) and str(row["SR"]) != "-" else 0
+            bat_runs = int(float(row.get("Runs", 0))) if pd.notna(row.get("Runs", 0)) and str(row.get("Runs", 0)) != "-" else 0
 
             pid = row["player_id"]
             bowl_row = bowl_agg[bowl_agg["player_id"] == pid]
@@ -1352,7 +1358,7 @@ def compute_loi_boei_scale(
             bowl_avg = float(bowl_row["Ave"].values[0]) if len(bowl_row) > 0 and pd.notna(bowl_row["Ave"].values[0]) and str(bowl_row["Ave"].values[0]) != "-" else 0
             bowl_econ = float(bowl_row["Econ"].values[0]) if len(bowl_row) > 0 and pd.notna(bowl_row["Econ"].values[0]) and str(bowl_row["Econ"].values[0]) != "-" else 0
 
-            idx = compute_loi_career_indices(bat_inns, bat_avg, bat_sr, bowl_inns, bowl_avg, bowl_econ, boei_scale=1.0)
+            idx = compute_loi_career_indices(bat_inns, bat_avg, bat_sr, bat_runs=bat_runs, bowl_inns=bowl_inns, bowl_avg=bowl_avg, bowl_econ=bowl_econ, boei_scale=1.0)
             if idx["BEI"] > 0:
                 bei_vals.append(idx["BEI"])
             if idx["BoEI"] > 0:
@@ -1489,6 +1495,7 @@ def compute_loi_all_players(
             bat_inns = int(ba["Inns"])
             career_bat_avg = _safe_float(ba["Ave"])
             career_bat_sr = _safe_float(ba["SR"])
+            bat_runs = int(_safe_float(ba.get("Runs", 0), 0))
 
             bowl_inns = 0
             career_bowl_avg = 0.0
@@ -1501,7 +1508,8 @@ def compute_loi_all_players(
 
             idx = compute_loi_career_indices(
                 bat_inns, career_bat_avg, career_bat_sr,
-                bowl_inns, career_bowl_avg, career_bowl_econ,
+                bat_runs=bat_runs,
+                bowl_inns=bowl_inns, bowl_avg=career_bowl_avg, bowl_econ=career_bowl_econ,
                 boei_scale=boei_scale,
             )
 

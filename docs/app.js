@@ -593,8 +593,8 @@ function renderMethodology() {
     <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label}s is not the same as one who sustains those numbers over 150 ${label}s. Our index rewards both quality and longevity.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">BEI = batting_avg × (strike_rate / 100) × innings<sup>${longevityExp}</sup></div>
-    <p>The <strong>avg × SR/100</strong> term captures a batsman's impact per innings — <em>how many</em> runs they score and <em>how fast</em>. A player averaging 40 at a strike rate of 130 (metric: 52) is far more valuable than one averaging 40 at 70 (metric: 28). The <strong>innings<sup>${longevityExp}</sup></strong> factor provides a controlled longevity bonus — quality per innings dominates, but sustained excellence gets rewarded. This exponent (${longevityExp}) is used uniformly across all formats.</p>
+    <div class="formula">BEI = √(batting_avg × runs_per_innings) × (strike_rate / 100) × innings<sup>${longevityExp}</sup></div>
+    <p>The batting metric uses the <strong>geometric mean</strong> of the career average and runs per innings (RPI), just like our Test formula. Career average (runs ÷ dismissals) rewards not-outs, while RPI (runs ÷ innings) measures raw per-innings production. The geometric mean balances both — a genuine match-winning 80* deserves credit, but a finisher with a high average inflated by many low-scoring not-outs is corrected. This is then multiplied by <strong>SR/100</strong> to capture scoring speed — a player averaging 40 at a strike rate of 130 is far more valuable than one averaging 40 at 70. The <strong>innings<sup>${longevityExp}</sup></strong> exponent (uniform across all formats) provides a controlled longevity bonus.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
     <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>${longevityExp}</sup> × scale</div>
