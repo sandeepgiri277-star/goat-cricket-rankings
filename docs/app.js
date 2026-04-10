@@ -935,6 +935,7 @@ function renderScoreBreakdown(player) {
     <details class="bd-card" open>
       <summary class="bd-header">Score Breakdown</summary>
       ${sections.join('')}
+      <div class="bd-footnote">GOAT = top 1% · Elite = top 5% · Excellent = top 15% · Great = top 20% · Good = top 40% · Average = top 60%</div>
     </details>
   `;
 }
