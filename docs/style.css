@@ -463,6 +463,93 @@ a:hover { text-decoration: underline; }
 .ph-stat .value.bei { color: var(--accent); }
 .ph-stat .value.boei { color: var(--accent2); }
 
+/* ─── Score Breakdown ────────────────────────────────────────────────────── */
+
+.bd-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.bd-header {
+  padding: 0.8rem 1.2rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+.bd-header::-webkit-details-marker { color: var(--text-muted); }
+
+.bd-section {
+  padding: 0.6rem 1.2rem 1rem;
+  border-top: 1px solid var(--border);
+}
+.bd-title {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 0.6rem;
+}
+.bd-title.bei { color: var(--accent); }
+.bd-title.boei { color: var(--accent2); }
+
+.bd-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.bd-step {
+  text-align: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem 0.3rem;
+  min-width: 3.5rem;
+}
+.bd-step.bd-total {
+  background: rgba(99,102,241,0.1);
+  border-color: var(--accent);
+}
+.bd-input {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.bd-result {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+.bd-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  white-space: nowrap;
+}
+.bd-op {
+  font-size: 1rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 0 0.15rem;
+}
+.bd-normalize {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding: 0.4rem 0.6rem;
+  background: rgba(255,255,255,0.02);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.bd-normalize strong {
+  color: var(--text);
+}
+
 /* ─── Methodology ────────────────────────────────────────────────────────── */
 
 .methodology {
@@ -564,6 +651,11 @@ footer {
   .player-header .ph-name { font-size: 1.2rem; }
   .player-header .ph-stats { gap: 1rem; }
   .player-header .ph-stat .value { font-size: 1.1rem; }
+
+  .bd-pipeline { gap: 0.2rem; }
+  .bd-step { padding: 0.3rem 0.4rem; min-width: 2.8rem; }
+  .bd-result { font-size: 0.9rem; }
+  .bd-normalize { font-size: 0.75rem; }
 
   .lb-row { gap: 0.5rem; padding: 0.6rem 0.5rem; }
   .lb-rank { font-size: 1.1rem; min-width: 1.8rem; }

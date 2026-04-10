@@ -987,6 +987,10 @@ def compute_all_players(
                 "career_bat_avg": round(bat_avg, 2) if bat_avg > 0 else None,
                 "career_bowl_avg": round(bowl_avg, 2) if bowl_avg > 0 else None,
                 "career_bowl_sr": round(career_bowl_sr, 1) if career_bowl_sr > 0 else None,
+                "bat_inns": bat_inns,
+                "bowl_inns": bowl_inns,
+                "career_rpi": round(bat_rpi, 2) if bat_rpi > 0 else None,
+                "career_wpi": round(career_wpi, 3) if career_wpi > 0 else None,
             })
         except Exception:
             continue
@@ -1535,6 +1539,7 @@ def compute_loi_all_players(
 
             aei = round(bei + boei, 2)
             franchises = team_map.get(int(pid), []) if team_map else []
+            career_rpi = bat_runs / bat_inns if bat_inns > 0 and bat_runs > 0 else career_bat_avg
             records.append({
                 "player_id": int(pid),
                 "player_name": name,
@@ -1554,6 +1559,9 @@ def compute_loi_all_players(
                 "career_bat_sr": round(career_bat_sr, 2) if career_bat_sr > 0 else None,
                 "career_bowl_avg": round(career_bowl_avg, 2) if career_bowl_avg > 0 else None,
                 "career_bowl_econ": round(career_bowl_econ, 2) if career_bowl_econ > 0 else None,
+                "bat_inns": bat_inns,
+                "bowl_inns": bowl_inns,
+                "career_rpi": round(career_rpi, 2),
             })
         except Exception:
             continue
@@ -1651,6 +1659,9 @@ def build_loi_rankings_json(
             "career_bat_sr": p.get("career_bat_sr"),
             "career_bowl_avg": p.get("career_bowl_avg"),
             "career_bowl_econ": p.get("career_bowl_econ"),
+            "bat_inns": p.get("bat_inns"),
+            "bowl_inns": p.get("bowl_inns"),
+            "career_rpi": p.get("career_rpi"),
         }
         for p in all_players
     ]
@@ -1672,6 +1683,10 @@ def build_loi_rankings_json(
             "rating_k": RATING_K,
             "all_time_avg": round(all_time_avg, 2),
             "all_time_rpo": round(all_time_rpo, 2),
+            "bei_median": round(rating_stats["BEI"][0], 2),
+            "bei_std": round(rating_stats["BEI"][1], 2),
+            "boei_median": round(rating_stats["BoEI"][0], 2),
+            "boei_std": round(rating_stats["BoEI"][1], 2),
         },
         "batting_top25": [player_summary(p) for p in bei_sorted[:TOP_N]],
         "bowling_top25": [player_summary(p) for p in boei_sorted[:TOP_N]],
@@ -1939,6 +1954,10 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi
             "career_bat_avg": p.get("career_bat_avg"),
             "career_bowl_avg": p.get("career_bowl_avg"),
             "career_bowl_sr": p.get("career_bowl_sr"),
+            "bat_inns": p.get("bat_inns"),
+            "bowl_inns": p.get("bowl_inns"),
+            "career_rpi": p.get("career_rpi"),
+            "career_wpi": p.get("career_wpi"),
         }
         for p in all_players
     ]
@@ -1962,6 +1981,10 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi
             "rating_base": RATING_BASE,
             "rating_k": RATING_K,
             "all_time_avg": round(all_time_avg, 2),
+            "bei_median": round(rating_stats["BEI"][0], 2),
+            "bei_std": round(rating_stats["BEI"][1], 2),
+            "boei_median": round(rating_stats["BoEI"][0], 2),
+            "boei_std": round(rating_stats["BoEI"][1], 2),
         },
         "batting_top25": [player_summary(p) for p in bei_sorted[:TOP_N]],
         "bowling_top25": [player_summary(p) for p in boei_sorted[:TOP_N]],

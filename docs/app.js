@@ -710,6 +710,129 @@ function setupSearch() {
   });
 }
 
+function renderScoreBreakdown(player) {
+  const m = DATA.metadata;
+  const isLOI = CURRENT_FORMAT !== 'tests';
+  const α = m.rpi_alpha || 0.3;
+  const longevity = m.longevity_exp || 0.3;
+  const rBase = m.rating_base || 500;
+  const rK = m.rating_k || 250;
+
+  const sections = [];
+
+  // ── Batting breakdown ──
+  if (player.bat_rating > 0 && player.career_bat_avg != null && player.bat_inns > 0) {
+    const avg = player.career_bat_avg;
+    const rpi = player.career_rpi || avg;
+    const inns = player.bat_inns;
+    const qualityMetric = Math.pow(avg, 1 - α) * Math.pow(rpi, α);
+    const longevityFactor = Math.pow(inns, longevity);
+    const pitchAdj = player.bat_pitch_factor || 1;
+
+    let rawBEI;
+    const steps = [];
+    steps.push({label: `Avg<sup>${(1-α).toFixed(1)}</sup>`, value: avg, result: Math.pow(avg, 1-α)});
+    steps.push({label: `RPI<sup>${α.toFixed(1)}</sup>`, value: rpi, result: Math.pow(rpi, α)});
+    if (isLOI && player.career_bat_sr) {
+      const srFactor = player.career_bat_sr / 100;
+      steps.push({label: 'SR / 100', value: player.career_bat_sr, result: srFactor});
+      rawBEI = qualityMetric * srFactor * longevityFactor * pitchAdj;
+    } else {
+      rawBEI = qualityMetric * longevityFactor * pitchAdj;
+    }
+    steps.push({label: `Innings<sup>${longevity}</sup>`, value: inns, result: longevityFactor});
+    if (pitchAdj !== 1) {
+      steps.push({label: 'Pitch adj', value: null, result: pitchAdj});
+    }
+
+    const beiMedian = m.bei_median;
+    const beiStd = m.bei_std;
+    const z = beiStd > 0 ? (player.BEI - beiMedian) / beiStd : 0;
+
+    let stepsHTML = steps.map(s => {
+      const valStr = s.value != null ? `<span class="bd-input">${typeof s.value === 'number' ? s.value.toFixed(1) : s.value}</span> → ` : '';
+      return `<div class="bd-step">${valStr}<span class="bd-result">${s.result.toFixed(2)}</span><div class="bd-label">${s.label}</div></div>`;
+    }).join('<div class="bd-op">×</div>');
+
+    const ratingStr = z >= 0
+      ? `${rBase} + ${rK} × √${z.toFixed(2)}`
+      : `${rBase} + ${rK} × ${z.toFixed(2)}`;
+
+    sections.push(`
+      <div class="bd-section">
+        <div class="bd-title bei">Batting: ${player.bat_rating}${player.bat_rank ? ` (#${player.bat_rank})` : ''}</div>
+        <div class="bd-pipeline">${stepsHTML}<div class="bd-op">=</div><div class="bd-step bd-total"><span class="bd-result">${player.BEI.toFixed(1)}</span><div class="bd-label">Raw BEI</div></div></div>
+        <div class="bd-normalize">z-score = (${player.BEI.toFixed(1)} − ${beiMedian.toFixed(1)}) / ${beiStd.toFixed(1)} = <strong>${z.toFixed(2)}</strong> → Rating = ${ratingStr} = <strong>${player.bat_rating}</strong></div>
+      </div>
+    `);
+  }
+
+  // ── Bowling breakdown ──
+  if (player.bowl_rating > 0 && player.career_bowl_avg != null && player.bowl_inns > 0) {
+    const bowlAvg = player.career_bowl_avg;
+    const bowlInns = player.bowl_inns;
+    const longevityFactor = Math.pow(bowlInns, longevity);
+    const pitchAdj = player.bowl_pitch_factor || 1;
+    const bowlK = m.bowl_k || 1000;
+    const steps = [];
+
+    if (isLOI) {
+      const econ = player.career_bowl_econ || 6;
+      steps.push({label: `${bowlK} / (Avg × Econ/6)`, value: `${bowlAvg.toFixed(1)} × ${(econ/6).toFixed(2)}`, result: bowlK / (bowlAvg * econ / 6)});
+    } else {
+      steps.push({label: `${bowlK} / Bowl Avg`, value: bowlAvg, result: bowlK / bowlAvg});
+      if (player.career_wpi != null) {
+        const baseWpi = m.baseline_wpi || 1.46;
+        const wpiF = Math.sqrt(player.career_wpi / baseWpi);
+        steps.push({label: '√(WPI / baseline)', value: player.career_wpi, result: wpiF});
+      }
+      if (player.career_bowl_sr) {
+        const baseSr = m.baseline_sr || 79.9;
+        const srExp = m.sr_exp || 0.2;
+        const srF = Math.pow(baseSr / player.career_bowl_sr, srExp);
+        steps.push({label: `(${baseSr}/SR)<sup>${srExp}</sup>`, value: player.career_bowl_sr, result: srF});
+      }
+    }
+    steps.push({label: `Innings<sup>${longevity}</sup>`, value: bowlInns, result: longevityFactor});
+    if (pitchAdj !== 1) {
+      steps.push({label: 'Pitch adj', value: null, result: pitchAdj});
+    }
+
+    const boeiMedian = m.boei_median;
+    const boeiStd = m.boei_std;
+    const z = boeiStd > 0 ? (player.BoEI - boeiMedian) / boeiStd : 0;
+
+    let stepsHTML = steps.map(s => {
+      const valStr = s.value != null ? `<span class="bd-input">${typeof s.value === 'number' ? s.value.toFixed(1) : s.value}</span> → ` : '';
+      return `<div class="bd-step">${valStr}<span class="bd-result">${s.result.toFixed(2)}</span><div class="bd-label">${s.label}</div></div>`;
+    }).join('<div class="bd-op">×</div>');
+
+    const ratingStr = z >= 0
+      ? `${rBase} + ${rK} × √${z.toFixed(2)}`
+      : `${rBase} + ${rK} × ${z.toFixed(2)}`;
+
+    sections.push(`
+      <div class="bd-section">
+        <div class="bd-title boei">Bowling: ${player.bowl_rating}${player.bowl_rank ? ` (#${player.bowl_rank})` : ''}</div>
+        <div class="bd-pipeline">${stepsHTML}<div class="bd-op">=</div><div class="bd-step bd-total"><span class="bd-result">${player.BoEI.toFixed(1)}</span><div class="bd-label">Raw BoEI</div></div></div>
+        <div class="bd-normalize">z-score = (${player.BoEI.toFixed(1)} − ${boeiMedian.toFixed(1)}) / ${boeiStd.toFixed(1)} = <strong>${z.toFixed(2)}</strong> → Rating = ${ratingStr} = <strong>${player.bowl_rating}</strong></div>
+      </div>
+    `);
+  }
+
+  if (sections.length === 0) return;
+
+  const bowlFirst = player.bowl_rating > player.bat_rating;
+  if (bowlFirst) sections.reverse();
+
+  document.getElementById('score-breakdown').innerHTML = `
+    <details class="bd-card" open>
+      <summary class="bd-header">Score Breakdown</summary>
+      ${sections.join('')}
+    </details>
+  `;
+}
+
 function showPlayer(name, updateHash = true) {
   const player = DATA.all_players.find(p => p.name === name);
   if (!player) return;
@@ -767,6 +890,7 @@ function showPlayer(name, updateHash = true) {
     <div class="ph-stats">${stats}</div>
   `;
 
+  renderScoreBreakdown(player);
   renderPlayerCareer(player);
 }
 
