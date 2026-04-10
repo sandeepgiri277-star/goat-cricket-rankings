@@ -874,7 +874,7 @@ function renderScoreBreakdown(player) {
 
     if (player.match_avg) {
       const allMatchAvg = all.filter(p => p.match_avg > 0).map(p => p.match_avg);
-      const condPct = _percentile(allMatchAvg.map(v => -v), -player.match_avg);
+      const condPct = _percentile(allMatchAvg, player.match_avg);
       let condLabel, condClass;
       if (condPct >= 60)      { condLabel = 'Tough'; condClass = 'bd-tier-elite'; }
       else if (condPct >= 35) { condLabel = 'Medium'; condClass = 'bd-tier-good'; }
