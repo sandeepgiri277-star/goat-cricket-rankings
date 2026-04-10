@@ -79,6 +79,7 @@ IPL_BOWL_AGG_PATH = CACHE_DIR / "ipl_bowl_agg.pkl"
 IPL_BAT_CUM_CACHE_PATH = CACHE_DIR / "ipl_bat_cum_cache.pkl"
 IPL_BOWL_CUM_CACHE_PATH = CACHE_DIR / "ipl_bowl_cum_cache.pkl"
 IPL_ERA_CACHE_PATH = CACHE_DIR / "ipl_era_cache.pkl"
+IPL_TEAM_MAP_PATH = CACHE_DIR / "ipl_team_map.pkl"
 
 
 
@@ -1455,6 +1456,7 @@ def compute_loi_all_players(
     all_time_avg: float = 31.0,
     all_time_rpo: float = 4.7,
     min_matches: int = LOI_MIN_MATCHES,
+    team_map: dict | None = None,
 ) -> list[dict]:
     bat_agg_idx = bat_agg.set_index("player_id")
     bowl_agg_idx = bowl_agg.set_index("player_id")
@@ -1512,10 +1514,12 @@ def compute_loi_all_players(
             boei = round(boei * bowl_pitch_factor, 2)
 
             aei = round(bei + boei, 2)
+            franchises = team_map.get(int(pid), []) if team_map else []
             records.append({
                 "player_id": int(pid),
                 "player_name": name,
                 "country": country,
+                "franchises": franchises,
                 "BEI": bei,
                 "BoEI": boei,
                 "AEI": aei,
@@ -1575,6 +1579,8 @@ def build_loi_rankings_json(
             "bowl_rating": p["BoEI_rating"],
             "ar_rating": p.get("geo_rating", p["AEI_rating"]),
         }
+        if p.get("franchises"):
+            d["franchises"] = p["franchises"]
         if extra_fields:
             for k in extra_fields:
                 d[k] = p[k]
@@ -1658,6 +1664,7 @@ def run_loi_pipeline(
     min_matches: int = LOI_MIN_MATCHES,
     full_member_only: bool = True,
     country_map: dict | None = None,
+    team_map: dict | None = None,
 ) -> dict:
     """Full pipeline for an LOI format. Returns rankings JSON dict."""
     print(f"\n{'=' * 60}")
@@ -1751,6 +1758,7 @@ def run_loi_pipeline(
         global_match_stats=global_match_stats,
         all_time_avg=all_time_avg, all_time_rpo=all_time_rpo,
         min_matches=min_matches,
+        team_map=team_map,
     )
     print(f"  Computed indices for {len(all_players)} players")
 
@@ -2062,7 +2070,27 @@ def main():
                 c = str(r.get("country", "")).strip()
                 if c and pid not in ipl_country_map:
                     ipl_country_map[pid] = c
+    # Players below international thresholds but known non-Indian
+    _ipl_overrides = {
+        5674: "AUS",    # BJ Hodge
+        326637: "AUS",  # CA Lynn
+        439952: "SA",   # CH Morris
+        4864: "AUS",    # DT Christian
+        5961: "AUS",    # MC Henriques
+        319439: "NZ",   # MJ McClenaghan
+        1194795: "SL",  # M Pathirana
+        261354: "AUS",  # NM Coulter-Nile
+        1182529: "AFG", # Noor Ahmad
+    }
+    for pid, c in _ipl_overrides.items():
+        if pid not in ipl_country_map:
+            ipl_country_map[pid] = c
     print(f"\nBuilt IPL nationality map: {len(ipl_country_map)} players from international data")
+
+    ipl_team_map = {}
+    if IPL_TEAM_MAP_PATH.exists():
+        ipl_team_map = pd.read_pickle(IPL_TEAM_MAP_PATH)
+        print(f"Loaded IPL team map: {len(ipl_team_map)} players")
 
     ipl_rankings = run_loi_pipeline(
         cricket_class=6,
@@ -2077,6 +2105,7 @@ def main():
         min_matches=IPL_MIN_MATCHES,
         full_member_only=False,
         country_map=ipl_country_map,
+        team_map=ipl_team_map,
     )
 
     ipl_out_path = SITE_DIR / "ipl_rankings.json"

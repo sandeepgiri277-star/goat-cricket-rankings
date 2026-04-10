@@ -52,6 +52,20 @@ function getFlag(country) {
   return FLAGS[real] || '\u{1F3CF}';
 }
 
+const IPL_COLORS = {
+  CSK: '#fdc913', MI: '#004ba0', RCB: '#d4213d', KKR: '#3a225d',
+  DC: '#004c93', RR: '#ea1a85', PBKS: '#dd1f2d', SRH: '#ff822a',
+  GT: '#1c1c2b', LSG: '#a72056', DCH: '#00a3e0', GL: '#e04f16', RPS: '#6f42c1',
+};
+
+function franchiseBadges(franchises) {
+  if (!franchises || !franchises.length) return '';
+  return franchises.map(f => {
+    const bg = IPL_COLORS[f] || '#555';
+    return `<span class="franchise-badge" style="background:${bg};color:#fff;padding:1px 5px;border-radius:3px;font-size:0.7em;margin-right:2px;font-weight:600">${f}</span>`;
+  }).join('');
+}
+
 // Known full name → abbreviated name mappings for search
 const FULL_NAMES = {};
 function buildNameIndex() {
@@ -452,6 +466,14 @@ function medalClass(i) {
   return i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
 }
 
+function playerSubtitle(p) {
+  const isIPL = CURRENT_FORMAT === 'ipl';
+  if (isIPL && p.franchises && p.franchises.length) {
+    return `${franchiseBadges(p.franchises)} · ${p.matches} matches`;
+  }
+  return `${p.country} · ${p.matches} matches`;
+}
+
 function renderAllrounderTable() {
   const container = document.getElementById('table-allrounders');
   container.innerHTML = DATA.allrounder_top25.map((p, i) => `
@@ -460,7 +482,7 @@ function renderAllrounderTable() {
       <div class="lb-flag">${getFlag(p.country)}</div>
       <div class="lb-info">
         <div class="lb-name">${p.name}</div>
-        <div class="lb-country">${p.country} · ${p.matches} matches</div>
+        <div class="lb-country">${playerSubtitle(p)}</div>
       </div>
       <div class="lb-primary">
         <div class="lb-primary-val">${p.ar_rating}</div>
@@ -479,7 +501,7 @@ function renderBattingTable() {
       <div class="lb-flag">${getFlag(p.country)}</div>
       <div class="lb-info">
         <div class="lb-name">${p.name}</div>
-        <div class="lb-country">${p.country} · ${p.matches} matches</div>
+        <div class="lb-country">${playerSubtitle(p)}</div>
       </div>
       <div class="lb-primary">
         <div class="lb-primary-val">${p.bat_rating}</div>
@@ -498,7 +520,7 @@ function renderBowlingTable() {
       <div class="lb-flag">${getFlag(p.country)}</div>
       <div class="lb-info">
         <div class="lb-name">${p.name}</div>
-        <div class="lb-country">${p.country} · ${p.matches} matches</div>
+        <div class="lb-country">${playerSubtitle(p)}</div>
       </div>
       <div class="lb-primary">
         <div class="lb-primary-val">${p.bowl_rating}</div>
@@ -664,7 +686,7 @@ function setupSearch() {
       results.innerHTML = matches.map(p => `
         <div class="search-result" data-name="${p.name}">
           <span class="sr-name">${getFlag(p.country)} ${p.name}</span>
-          <span class="sr-meta">${p.country} · ${p.matches} matches</span>
+          <span class="sr-meta">${playerSubtitle(p)}</span>
         </div>
       `).join('');
     }
@@ -745,7 +767,7 @@ function showPlayer(name, updateHash = true) {
   document.getElementById('player-header').innerHTML = `
     <div>
       <div class="ph-name">${getFlag(player.country)} ${player.name}</div>
-      <div class="ph-country">${player.country} · ${player.matches} matches</div>
+      <div class="ph-country">${playerSubtitle(player)}</div>
       ${careerStats}
       ${pitchInfo}
     </div>
