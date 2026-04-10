@@ -41,7 +41,8 @@ const FLAGS = {
   AUS: '\u{1F1E6}\u{1F1FA}', ENG: '\u{1F1EC}\u{1F1E7}', IND: '\u{1F1EE}\u{1F1F3}',
   PAK: '\u{1F1F5}\u{1F1F0}', SA: '\u{1F1FF}\u{1F1E6}', WI: '\u{1F3DD}\uFE0F',
   NZ: '\u{1F1F3}\u{1F1FF}', SL: '\u{1F1F1}\u{1F1F0}', BAN: '\u{1F1E7}\u{1F1E9}',
-  ZIM: '\u{1F1FF}\u{1F1FC}', ICC: '\u{1F3CF}',
+  ZIM: '\u{1F1FF}\u{1F1FC}', AFG: '\u{1F1E6}\u{1F1EB}', IRE: '\u{1F1EE}\u{1F1EA}',
+  ICC: '\u{1F3CF}',
 };
 
 function getFlag(country) {
@@ -580,33 +581,31 @@ function renderMethodology() {
     <h3>The Problem with Career Averages</h3>
     <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label}s is not the same as one who sustains those numbers over 150 ${label}s. Our index rewards both quality and longevity.</p>
 
-    <h3>Why Not Stints?</h3>
-    <p>Our Test rankings use a <strong>stint-based integral</strong> approach — breaking careers into 10-match windows and computing the area under the performance curve. This works well for Tests, where match conditions vary enormously and stint-level analysis captures how a player adapted across different phases of their career.</p>
-    <p>However, in limited-overs cricket, the integral approach has a critical flaw: <strong>a single anomalous stint can disproportionately inflate a player's ranking</strong>. Because batting average in a stint is calculated as runs divided by dismissals, a stretch of not-out innings can produce an astronomical average (e.g., 200+) over just 20 innings. The trapezoidal integration then amplifies this outlier into the career total, potentially pushing a mediocre player's ranking above genuinely elite ones. In Tests, with 10-match windows and longer individual innings, this effect is much less pronounced.</p>
+    <h3>Batting Excellence Index (BEI)</h3>
+    <div class="formula">BEI = batting_avg × (strike_rate / 100) × innings<sup>${m.longevity_exp}</sup></div>
+    <p>The <strong>avg × SR/100</strong> term captures a batsman's impact per innings — <em>how many</em> runs they score and <em>how fast</em>. A player averaging 40 at a strike rate of 130 (metric: 52) is far more valuable than one averaging 40 at 70 (metric: 28). The <strong>innings<sup>${m.longevity_exp}</sup></strong> factor provides a gentle longevity bonus with heavily diminishing returns — quality per innings dominates, but sustained excellence still gets rewarded.</p>
 
-    <h3>Career Formula</h3>
-    <p>For ${label}, we use a direct career formula that captures batting quality, scoring rate, and career length in a single expression:</p>
-    <div class="formula">BEI = batting_avg × (strike_rate / 100) × innings<sup>0.2</sup></div>
-    <p>The <strong>avg × SR/100</strong> term captures a batsman's impact per innings — <em>how many</em> runs they score and <em>how fast</em>. A player averaging 40 at a strike rate of 130 (metric: 52) is far more valuable than one averaging 40 at 70 (metric: 28). The <strong>innings<sup>0.2</sup></strong> factor provides a gentle longevity bonus with heavily diminishing returns — quality per innings dominates, but sustained excellence still gets rewarded. By using career totals, no single hot streak can distort the picture.</p>
+    <h3>Why a Lower Longevity Exponent Than Tests?</h3>
+    <p>Limited-overs formats use an exponent of <strong>${m.longevity_exp}</strong> compared to Tests' higher exponent. The batting metric here (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players of different quality. In Tests, the metric uses <strong>√(avg × runs_per_innings)</strong> which has a narrower spread, so a higher longevity exponent is needed there to properly reward sustained excellence over long careers.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>0.2</sup> × scale</div>
+    <div class="formula">BoEI = (${m.bowl_k} / (bowl_avg × economy / 6)) × innings<sup>${m.longevity_exp}</sup> × scale</div>
     <p>In limited-overs cricket, a bowler's <strong>economy rate</strong> matters alongside their average. Conceding 4 runs per over while taking wickets is far more valuable than conceding 6. The metric penalizes expensive bowlers even if they take wickets frequently. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
 
-    <h3>Minimum Qualification</h3>
-    <p>Players must have played at least <strong>${m.min_matches} matches</strong> to qualify.${CURRENT_FORMAT === 'ipl' ? '' : ' Only ICC Full Member nations are included in the rankings.'}</p>
-
-    <h3>Career Charts</h3>
-    <p>The per-player career charts show stint breakdowns for visualization — they illustrate how a player's form evolved over time, even though the ranking formula uses career totals rather than stint aggregates.</p>
+    <h3>Pitch &amp; Era Normalization</h3>
+    <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
+    ${pitchDesc}
+    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
     ${arDesc}
 
-    <h3>Pitch Difficulty Normalization</h3>
-    <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
-    ${pitchDesc}
-    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
+    <h3>Minimum Qualification</h3>
+    <p>Players must have played at least <strong>${m.min_matches} matches</strong> to qualify.${CURRENT_FORMAT === 'ipl' ? '' : ' Only ICC Full Member nations are included in the rankings.'}</p>
+
+    <h3>Career Charts</h3>
+    <p>The per-player career charts show how a player's form evolved over time in match-window stints. These are for visualization only — the ranking formula uses career totals.</p>
 
     <h3>Rating Scale (0–1000)</h3>
     <p>Pitch-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
@@ -624,13 +623,12 @@ function renderMethodology() {
     <h3>The Problem with Career Averages</h3>
     <p>A player who averages 50 over 20 ${label}s is <strong>not</strong> the same as someone who averages 50 over 180 ${label}s. The second player sustained that level for nine times longer — through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
 
-    <h3>Career Formula</h3>
-    <p>We use a direct career formula that captures quality and career length in a single expression:</p>
+    <h3>Batting Excellence Index (BEI)</h3>
     <div class="formula">BEI = √(batting_avg × runs_per_innings) × innings<sup>${longevityExp}</sup></div>
     <p>The batting metric is the <strong>geometric mean</strong> of the career average and runs per innings. Career average (runs ÷ dismissals) rewards not-outs, while runs per innings (runs ÷ innings) measures raw per-innings production. The geometric mean balances both: it still gives partial credit for not-outs (a genuine 150* deserves more than 150), but it prevents players with high not-out rates from having inflated ratings relative to openers who get out nearly every innings. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a meaningful but controlled longevity bonus.</p>
 
     <h3>Why a Higher Longevity Exponent Than LOIs?</h3>
-    <p>Limited-overs formats use an exponent of 0.2 because the batting metric (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players of different quality. In Tests, the metric is <strong>avg alone</strong>, so the numerical spread is smaller. A higher exponent (${longevityExp}) compensates by giving more credit to sustained excellence over long careers, ensuring that 200-Test legends are properly rewarded relative to 50-Test players with comparable averages.</p>
+    <p>Tests use a longevity exponent of <strong>${longevityExp}</strong> versus <strong>0.2</strong> for limited-overs formats. This is deliberate. In LOIs, the batting metric (<strong>avg × SR/100</strong>) already has a larger numerical range — strike rate differences create natural separation between players. In Tests, the metric is <strong>√(avg × runs_per_innings)</strong> which produces a narrower spread. The higher exponent ensures that 200-Test legends who sustained elite performance across 15+ years, through multiple eras and conditions, are properly rewarded relative to players who shone brightly over 50 Tests.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
     <div class="formula">BoEI = (${m.bowl_k} / bowl_avg) × √(wpi / baseline_wpi) × (baseline_sr / sr)<sup>${m.sr_exp}</sup> × innings<sup>${longevityExp}</sup> × scale</div>
@@ -638,20 +636,20 @@ function renderMethodology() {
     <p>The <strong>strike rate factor</strong> (baseline_sr / sr)<sup>${m.sr_exp}</sup> gives a mild boost to bowlers who take wickets frequently. The baseline SR is ${m.baseline_sr} (mean across all qualifying bowlers). A bowler with SR 50 gets a ~${Math.round(((m.baseline_sr/50)**m.sr_exp - 1)*100)}% boost, while one at SR 80 is roughly neutral. The low exponent (${m.sr_exp}) keeps this gentle — bowling average remains the dominant quality signal, but strike bowlers like Ambrose and Waqar get appropriate recognition over accumulation-style bowlers.</p>
     <p>A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.min_bowl_inns} bowling innings</strong> to qualify.</p>
 
-    <h3>Minimum Qualification</h3>
-    <p>Players must have played at least <strong>${m.total_players > 0 ? '20' : '20'} matches</strong> to qualify. Only ICC Full Member nations are included in the rankings.</p>
-
-    <h3>Career Charts</h3>
-    <p>The per-player career charts show 10-match stint breakdowns for visualization — they illustrate how a player's form evolved over time, even though the ranking formula uses career totals rather than stint aggregates.</p>
+    <h3>Pitch &amp; Era Normalization</h3>
+    <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
+    ${pitchDesc}
+    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
     ${arDesc}
 
-    <h3>Pitch Difficulty Normalization</h3>
-    <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
-    ${pitchDesc}
-    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
+    <h3>Minimum Qualification</h3>
+    <p>Players must have played at least <strong>${m.min_matches || 20} matches</strong> to qualify. Only ICC Full Member nations are included in the rankings.</p>
+
+    <h3>Career Charts</h3>
+    <p>The per-player career charts show 10-match stint breakdowns for visualization — they illustrate how a player's form evolved over time. These are for visualization only — the ranking formula uses career totals.</p>
 
     <h3>Rating Scale (0–1000)</h3>
     <p>Pitch-adjusted indices are converted to an ICC-style rating using z-scores with square-root compression:</p>
@@ -730,15 +728,14 @@ function showPlayer(name, updateHash = true) {
   const card = document.getElementById('player-card');
   card.classList.remove('hidden');
 
+  const bowlFirst = player.bowl_rating > player.bat_rating;
+
   let stats = '';
-  if (player.bat_rating > 0) {
-    const rankLabel = player.bat_rank ? ` (#${player.bat_rank})` : '';
-    stats += `<div class="ph-stat"><div class="label">Bat Rating</div><div class="value bei">${player.bat_rating}${rankLabel}</div></div>`;
-  }
-  if (player.bowl_rating > 0) {
-    const rankLabel = player.bowl_rank ? ` (#${player.bowl_rank})` : '';
-    stats += `<div class="ph-stat"><div class="label">Bowl Rating</div><div class="value boei">${player.bowl_rating}${rankLabel}</div></div>`;
-  }
+  const batStat = player.bat_rating > 0
+    ? `<div class="ph-stat"><div class="label">Bat Rating</div><div class="value bei">${player.bat_rating}${player.bat_rank ? ` (#${player.bat_rank})` : ''}</div></div>` : '';
+  const bowlStat = player.bowl_rating > 0
+    ? `<div class="ph-stat"><div class="label">Bowl Rating</div><div class="value boei">${player.bowl_rating}${player.bowl_rank ? ` (#${player.bowl_rank})` : ''}</div></div>` : '';
+  stats = bowlFirst ? bowlStat + batStat : batStat + bowlStat;
   if (player.ar_rank) {
     stats += `<div class="ph-stat"><div class="label">Allrounder</div><div class="value">${player.ar_rating} (#${player.ar_rank})</div></div>`;
   }
@@ -746,11 +743,14 @@ function showPlayer(name, updateHash = true) {
   let careerStats = '';
   const isLOI = CURRENT_FORMAT !== 'tests';
   const parts = [];
-  if (player.career_bat_avg != null) parts.push(`Bat Avg ${player.career_bat_avg.toFixed(2)}`);
-  if (isLOI && player.career_bat_sr != null) parts.push(`SR ${player.career_bat_sr.toFixed(1)}`);
-  if (player.career_bowl_avg != null) parts.push(`Bowl Avg ${player.career_bowl_avg.toFixed(2)}`);
-  if (isLOI && player.career_bowl_econ != null) parts.push(`Econ ${player.career_bowl_econ.toFixed(2)}`);
-  if (!isLOI && player.career_bowl_sr != null) parts.push(`Bowl SR ${player.career_bowl_sr.toFixed(1)}`);
+  const batParts = [];
+  const bowlParts = [];
+  if (player.career_bat_avg != null) batParts.push(`Bat Avg ${player.career_bat_avg.toFixed(2)}`);
+  if (isLOI && player.career_bat_sr != null) batParts.push(`SR ${player.career_bat_sr.toFixed(1)}`);
+  if (player.career_bowl_avg != null) bowlParts.push(`Bowl Avg ${player.career_bowl_avg.toFixed(2)}`);
+  if (isLOI && player.career_bowl_econ != null) bowlParts.push(`Econ ${player.career_bowl_econ.toFixed(2)}`);
+  if (!isLOI && player.career_bowl_sr != null) bowlParts.push(`Bowl SR ${player.career_bowl_sr.toFixed(1)}`);
+  if (bowlFirst) { parts.push(...bowlParts, ...batParts); } else { parts.push(...batParts, ...bowlParts); }
   if (parts.length > 0) {
     careerStats = `<div class="ph-career">${parts.join(' · ')}</div>`;
   }
@@ -803,8 +803,14 @@ function renderPlayerCareer(player) {
   const hasBowl = bowlVals.some(v => v != null);
 
   const rows = [];
-  if (hasBat) rows.push('bat');
-  if (hasBowl) rows.push('bowl');
+  const bowlFirstChart = player.bowl_rating > player.bat_rating;
+  if (bowlFirstChart) {
+    if (hasBowl) rows.push('bowl');
+    if (hasBat) rows.push('bat');
+  } else {
+    if (hasBat) rows.push('bat');
+    if (hasBowl) rows.push('bowl');
+  }
 
   if (rows.length === 0) {
     document.getElementById('chart-player-career').innerHTML =

@@ -39,7 +39,7 @@ LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle
 LOI_MIN_MATCHES_T20 = 30  # T20I has shorter careers
 IPL_MIN_MATCHES = 50  # IPL has more games per season; 50 ≈ 3+ seasons
 LOI_LONGEVITY_EXP = 0.20  # innings^exp longevity factor for LOIs; lower = quality-dominated, higher = longevity-rewarding
-TEST_LONGEVITY_EXP = 0.35  # higher for Tests: formula uses avg only (no SR), so longevity needs more weight
+TEST_LONGEVITY_EXP = 0.40  # higher for Tests: formula uses avg only (no SR), so longevity needs more weight
 TEST_MIN_BOWL_INNS = 20  # min bowling innings to qualify for Test bowling ranking
 TEST_SR_EXP = 0.20  # mild strike-rate factor: (baseline_sr / sr) ^ 0.2
 
@@ -88,6 +88,13 @@ TEST_GLOBAL_MATCH_CACHE = CACHE_DIR / "test_global_match_stats.pkl"
 ODI_GLOBAL_MATCH_CACHE = CACHE_DIR / "odi_global_match_stats.pkl"
 T20I_GLOBAL_MATCH_CACHE = CACHE_DIR / "t20i_global_match_stats.pkl"
 IPL_GLOBAL_MATCH_CACHE = CACHE_DIR / "ipl_global_match_stats.pkl"
+
+# Cricinfo stats tables use abbreviated names (initials + surname) which can
+# be misleading for players whose names don't follow Western conventions.
+# Map player_id -> correct display name for known cases.
+NAME_CORRECTIONS = {
+    1108375: "Varun Chakravarthy",
+}
 
 # ─── Scraping ────────────────────────────────────────────────────────────────
 
@@ -163,7 +170,12 @@ def scrape_statsguru_aggregate(
         else:
             break
 
-    return pd.DataFrame(all_rows)
+    df = pd.DataFrame(all_rows)
+    if "player_id" in df.columns and "player_name" in df.columns:
+        df["player_name"] = df.apply(
+            lambda r: NAME_CORRECTIONS.get(int(r["player_id"]), r["player_name"]), axis=1
+        )
+    return df
 
 
 def clean_allround_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -1636,6 +1648,7 @@ def build_loi_rankings_json(
             "boei_scale": round(boei_scale, 4),
             "formula": "career",
             "bowl_k": BOWL_K,
+            "longevity_exp": LOI_LONGEVITY_EXP,
             "min_matches": min_matches,
             "min_ar_rating": LOI_MIN_AR_RATING,
             "stint_innings": LOI_STINT_INNINGS,
@@ -1665,6 +1678,7 @@ def run_loi_pipeline(
     full_member_only: bool = True,
     country_map: dict | None = None,
     team_map: dict | None = None,
+    name_overrides: dict | None = None,
 ) -> dict:
     """Full pipeline for an LOI format. Returns rankings JSON dict."""
     print(f"\n{'=' * 60}")
@@ -1919,6 +1933,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi
             "bowl_k": BOWL_K,
             "longevity_exp": TEST_LONGEVITY_EXP,
             "min_bowl_inns": TEST_MIN_BOWL_INNS,
+            "min_matches": MIN_MATCHES,
             "min_ar_rating": MIN_AR_RATING,
             "rating_base": RATING_BASE,
             "rating_k": RATING_K,
