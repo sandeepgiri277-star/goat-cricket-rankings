@@ -967,7 +967,8 @@ function showPlayer(name, updateHash = true) {
   const bowlParts = [];
   if (player.career_bat_avg != null) batParts.push(`Bat Avg ${player.career_bat_avg.toFixed(2)}`);
   if (isLOI && player.career_bat_sr != null) batParts.push(`SR ${player.career_bat_sr.toFixed(1)}`);
-  if (player.career_bowl_avg != null) bowlParts.push(`Bowl Avg ${player.career_bowl_avg.toFixed(2)}`);
+  if (isLOI && player.career_bowl_sr != null) bowlParts.push(`Bowl SR ${player.career_bowl_sr.toFixed(1)}`);
+  if (!isLOI && player.career_bowl_avg != null) bowlParts.push(`Bowl Avg ${player.career_bowl_avg.toFixed(2)}`);
   if (isLOI && player.career_bowl_econ != null) bowlParts.push(`Econ ${player.career_bowl_econ.toFixed(2)}`);
   if (bowlFirst) { parts.push(...bowlParts, ...batParts); } else { parts.push(...batParts, ...bowlParts); }
   if (parts.length > 0) {
