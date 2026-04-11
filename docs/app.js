@@ -1703,6 +1703,12 @@ function switchTab(tabId, updateHash = true) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
+  const showBat = tabId !== 'bowling';
+  const showBowl = tabId !== 'batting';
+  document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
+  document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
+  updateSrRowVisibility();
+
   if (updateHash) {
     history.pushState(null, '', `#${CURRENT_FORMAT}/${tabId}`);
   }
@@ -1881,12 +1887,17 @@ function syncSlidersToParams() {
 
 function updateSrRowVisibility() {
   const isTests = CURRENT_FORMAT === 'tests';
+  const activeTab = document.querySelector('.tab.active');
+  const tab = activeTab ? activeTab.dataset.tab : 'allrounders';
+  const showBat = tab !== 'bowling';
+  const showBowl = tab !== 'batting';
+
   const srRow = document.getElementById('tune-sr-row');
   const wpiRow = document.getElementById('tune-wpi-row');
   const bowlAvgRow = document.getElementById('tune-bowlAvg-row');
-  if (srRow) srRow.classList.toggle('hidden', isTests);
-  if (wpiRow) wpiRow.classList.toggle('hidden', !isTests);
-  if (bowlAvgRow) bowlAvgRow.classList.toggle('hidden', !isTests);
+  if (srRow) srRow.classList.toggle('hidden', isTests || !showBat);
+  if (wpiRow) wpiRow.classList.toggle('hidden', !isTests || !showBowl);
+  if (bowlAvgRow) bowlAvgRow.classList.toggle('hidden', !isTests || !showBowl);
 }
 
 function updateTuneBadge() {
