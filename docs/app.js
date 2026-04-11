@@ -44,6 +44,24 @@ const TUNE_DEFAULTS = {
   longevity: 0.30, pitch: 0.50, alpha: 0.30,
   srWeight: 1.0, bowlK: 1000, ratingK: 250,
 };
+const TUNE_RANGES = {
+  longevity: { min: 0, max: 0.6, step: 0.05 },
+  pitch:     { min: 0, max: 1.0, step: 0.1 },
+  alpha:     { min: 0, max: 1.0, step: 0.05 },
+  srWeight:  { min: 0, max: 2.0, step: 0.1 },
+  bowlK:     { min: 500, max: 2000, step: 100 },
+  ratingK:   { min: 100, max: 500, step: 50 },
+};
+function _sliderToReal(key, pct) {
+  const r = TUNE_RANGES[key];
+  const raw = r.min + (pct / 100) * (r.max - r.min);
+  const decimals = (r.step.toString().split('.')[1] || '').length;
+  return parseFloat((Math.round(raw / r.step) * r.step).toFixed(decimals));
+}
+function _realToSlider(key, val) {
+  const r = TUNE_RANGES[key];
+  return Math.round((val - r.min) / (r.max - r.min) * 100);
+}
 let TUNE_PARAMS = { ...TUNE_DEFAULTS };
 let ORIGINAL_DATA = {};
 
@@ -1769,12 +1787,13 @@ function setupTunePanel() {
     const statusEl = document.getElementById(`tune-${key}-status`);
     const valEl = document.getElementById(`tune-${key}-val`);
     slider.addEventListener('input', () => {
-      const v = parseFloat(slider.value);
-      TUNE_PARAMS[key] = v;
-      if (valEl) valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
+      const pct = parseInt(slider.value, 10);
+      const real = _sliderToReal(key, pct);
+      TUNE_PARAMS[key] = real;
+      if (valEl) valEl.textContent = pct;
       if (statusEl) {
-        statusEl.textContent = _tuneStatusText(key, v);
-        statusEl.classList.toggle('changed', v !== TUNE_DEFAULTS[key]);
+        statusEl.textContent = _tuneStatusText(key, real);
+        statusEl.classList.toggle('changed', real !== TUNE_DEFAULTS[key]);
       }
       onTuneChange();
     });
@@ -1822,12 +1841,12 @@ function syncSlidersToParams() {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
     const valEl = document.getElementById(`tune-${key}-val`);
-    const v = TUNE_PARAMS[key];
-    if (slider) slider.value = v;
-    if (valEl) valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
+    const pct = _realToSlider(key, TUNE_PARAMS[key]);
+    if (slider) slider.value = pct;
+    if (valEl) valEl.textContent = pct;
     if (statusEl) {
-      statusEl.textContent = _tuneStatusText(key, v);
-      statusEl.classList.toggle('changed', v !== TUNE_DEFAULTS[key]);
+      statusEl.textContent = _tuneStatusText(key, TUNE_PARAMS[key]);
+      statusEl.classList.toggle('changed', TUNE_PARAMS[key] !== TUNE_DEFAULTS[key]);
     }
   }
   updateSrRowVisibility();
