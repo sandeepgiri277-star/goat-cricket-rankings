@@ -1755,11 +1755,11 @@ function _tuneStatusText(key, v) {
     return 'Career length dominates rankings';
   }
   if (key === 'pitch') {
-    if (v === 0) return 'Raw stats only — no era/pitch corrections';
+    if (v === 0) return 'Raw stats only — no pitch corrections';
     if (v <= 0.3) return 'Mild adjustment for conditions';
     if (v <= 0.6) return isDefault ? 'Moderate correction (default)' : 'Moderate correction for conditions';
     if (v <= 0.8) return 'Heavy adjustment for conditions';
-    return 'Full pitch/era normalization applied';
+    return 'Full pitch normalization applied';
   }
   if (key === 'alpha') {
     if (v === 0) return 'Trust traditional averages fully';
@@ -1777,11 +1777,11 @@ function _tuneStatusText(key, v) {
   }
   if (key === 'bowlSrWeight') {
     if (v === 0) return 'Only economy matters — pure run prevention';
-    if (v <= 0.2) return 'Economy-focused — wicket-taking barely rewarded';
-    if (v <= 0.4) return 'Economy weighted slightly more than strike rate';
+    if (v <= 0.2) return 'Economy-focused — SR barely matters';
+    if (v <= 0.4) return 'Economy weighted slightly more than SR';
     if (v <= 0.6) return isDefault ? 'Balanced — SR and economy equal (default)' : 'Balanced — SR and economy roughly equal';
-    if (v <= 0.8) return 'Strike rate weighted more — reward wicket-takers';
-    return 'Only strike rate matters — pure wicket-taking';
+    if (v <= 0.8) return 'SR weighted more — reward frequent breakthroughs';
+    return 'Only SR matters — pure wicket speed';
   }
   if (key === 'bowlAvgW') {
     if (v === 0) return 'Bowling average ignored entirely';
@@ -1792,12 +1792,12 @@ function _tuneStatusText(key, v) {
     return 'Average dominates — miserly bowlers rank highest';
   }
   if (key === 'wpiWeight') {
-    if (v === 0) return 'Ignore wicket volume — pure bowling average';
-    if (v <= 0.2) return 'Wicket volume barely matters';
-    if (v <= 0.4) return 'Slight reward for high wicket-takers';
-    if (v <= 0.6) return isDefault ? 'Moderate weight to wicket volume (default)' : 'Moderate weight to wicket volume';
-    if (v <= 0.8) return 'High wicket-takers strongly rewarded';
-    return 'Wicket volume dominates — reward prolific wicket-takers';
+    if (v === 0) return 'Ignore wickets per innings — pure bowling average';
+    if (v <= 0.2) return 'Wickets per innings barely matters';
+    if (v <= 0.4) return 'Slight reward for high WPI';
+    if (v <= 0.6) return isDefault ? 'Moderate weight to WPI (default)' : 'Moderate weight to wickets per innings';
+    if (v <= 0.8) return 'High WPI strongly rewarded';
+    return 'Wickets per innings dominates';
   }
   return '';
 }

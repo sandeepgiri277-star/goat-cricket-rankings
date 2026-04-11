@@ -59,7 +59,7 @@
           <div class="tune-status" id="tune-longevity-status"></div>
         </div>
         <div class="tune-slider-group">
-          <label for="tune-pitch">Should we adjust for pitch and era difficulty?</label>
+          <label for="tune-pitch">Should we adjust for pitch difficulty?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Ignore conditions</span>
             <input type="range" id="tune-pitch" min="0" max="100" step="1" value="50">
@@ -89,11 +89,11 @@
           <div class="tune-status" id="tune-srWeight-status"></div>
         </div>
         <div class="tune-slider-group tune-bowl-only">
-          <label for="tune-bowlSrWeight">What matters more for bowlers — wicket-taking or economy?</label>
+          <label for="tune-bowlSrWeight">What matters more for bowlers — strike rate or economy?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Economy only</span>
             <input type="range" id="tune-bowlSrWeight" min="0" max="100" step="1" value="50">
-            <span class="tune-endpoint">Wicket-taking only</span>
+            <span class="tune-endpoint">Strike rate only</span>
             <span class="tune-val" id="tune-bowlSrWeight-val">50</span>
           </div>
           <div class="tune-status" id="tune-bowlSrWeight-status"></div>
@@ -109,7 +109,7 @@
           <div class="tune-status" id="tune-bowlAvgW-status"></div>
         </div>
         <div class="tune-slider-group tune-bowl-only" id="tune-wpi-row">
-          <label for="tune-wpiWeight">How much should wicket-taking volume matter (Tests)?</label>
+          <label for="tune-wpiWeight">How much should wickets per innings matter (Tests)?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Pure average</span>
             <input type="range" id="tune-wpiWeight" min="0" max="100" step="1" value="50">
