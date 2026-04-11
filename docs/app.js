@@ -34,6 +34,156 @@ const XF_MIN_AR = 500;
 
 const plotlyConfig = { responsive: true, displayModeBar: false };
 
+const FULL_MEMBERS = new Set(['AUS','BAN','ENG','IND','IRE','NZ','PAK','SA','SL','WI','ZIM','AFG']);
+function isFullMember(country) {
+  if (!country) return false;
+  return country.split('/').some(c => FULL_MEMBERS.has(c));
+}
+
+const TUNE_DEFAULTS = {
+  longevity: 0.30, pitch: 0.50, alpha: 0.30,
+  srWeight: 1.0, bowlK: 1000, ratingK: 250,
+};
+let TUNE_PARAMS = { ...TUNE_DEFAULTS };
+let ORIGINAL_DATA = {};
+
+function recomputeRankings() {
+  if (!DATA || CURRENT_FORMAT === 'crossformat') return;
+  const m = DATA.metadata;
+  const isLOI = CURRENT_FORMAT !== 'tests';
+  const p = TUNE_PARAMS;
+  const ratingBase = m.rating_base || 500;
+
+  const allPlayers = DATA.all_players;
+  const boeiScale = m.boei_scale || 1;
+  const baselineWpi = m.baseline_wpi || 1.46;
+  const baselineSr = m.baseline_sr || 79.9;
+  const srExp = m.sr_exp || 0.2;
+  const minBowlInns = m.min_bowl_inns || m.stint_innings || 20;
+  const minArRating = m.min_ar_rating || 250;
+
+  for (const pl of allPlayers) {
+    const avg = pl.career_bat_avg || 0;
+    const rpi = pl.career_rpi || avg;
+    const batInns = pl.bat_inns || 0;
+    const sr = pl.career_bat_sr || 80;
+    const batPf = pl.bat_pitch_factor || 1;
+
+    let bei = 0;
+    if (batInns > 0 && avg > 0) {
+      const quality = Math.pow(avg, 1 - p.alpha) * Math.pow(rpi, p.alpha);
+      bei = quality * Math.pow(batInns, p.longevity) * Math.pow(batPf, p.pitch);
+      if (isLOI) bei *= Math.pow(sr / 100, p.srWeight);
+    }
+    pl.BEI = Math.round(bei * 100) / 100;
+
+    const bowlAvg = pl.career_bowl_avg || 0;
+    const bowlInns = pl.bowl_inns || 0;
+    const bowlPf = pl.bowl_pitch_factor || 1;
+    const bowlSr = pl.career_bowl_sr || 0;
+    const bowlEcon = pl.career_bowl_econ || 0;
+    const wpi = pl.career_wpi || 0;
+
+    let boei = 0;
+    if (bowlInns >= minBowlInns && bowlAvg > 0) {
+      if (isLOI) {
+        if (bowlSr > 0 && bowlEcon > 0) {
+          boei = p.bowlK / (bowlSr * bowlEcon / 6) * Math.pow(bowlInns, p.longevity) * boeiScale;
+        }
+      } else {
+        if (wpi > 0 && baselineWpi > 0) {
+          const srFactor = (bowlSr > 0 && baselineSr > 0) ? Math.pow(baselineSr / bowlSr, srExp) : 1;
+          boei = (p.bowlK / bowlAvg) * Math.sqrt(wpi / baselineWpi) * srFactor * Math.pow(bowlInns, p.longevity) * boeiScale;
+        }
+      }
+      boei *= Math.pow(bowlPf, p.pitch);
+    }
+    pl.BoEI = Math.round(boei * 100) / 100;
+    pl.AEI = Math.round((pl.BEI + pl.BoEI) * 100) / 100;
+  }
+
+  const beiVals = allPlayers.map(pl => pl.BEI);
+  const boeiVals = allPlayers.filter(pl => pl.BoEI > 0).map(pl => pl.BoEI);
+
+  function medianStd(arr) {
+    if (arr.length === 0) return [0, 1];
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const med = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    const mean = arr.reduce((s, v) => s + v, 0) / arr.length;
+    const variance = arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length;
+    return [med, Math.sqrt(variance)];
+  }
+
+  const [beiMed, beiStd] = medianStd(beiVals);
+  const [boeiMed, boeiStd] = medianStd(boeiVals);
+
+  function toRating(val, med, std) {
+    if (std === 0) return ratingBase;
+    const z = (val - med) / std;
+    return Math.round(z >= 0 ? ratingBase + p.ratingK * Math.sqrt(z) : ratingBase + p.ratingK * z);
+  }
+
+  const isFmOnly = CURRENT_FORMAT !== 'ipl';
+
+  for (const pl of allPlayers) {
+    pl.bat_rating = pl.BEI > 0 ? toRating(pl.BEI, beiMed, beiStd) : 0;
+    pl.bowl_rating = pl.BoEI > 0 ? toRating(pl.BoEI, boeiMed, boeiStd) : 0;
+  }
+
+  const ranked = isFmOnly ? allPlayers.filter(pl => isFullMember(pl.country)) : allPlayers;
+  const batSorted = [...ranked].sort((a, b) => b.BEI - a.BEI);
+  const bowlSorted = [...ranked].filter(pl => pl.BoEI > 0).sort((a, b) => b.BoEI - a.BoEI);
+
+  batSorted.forEach((pl, i) => { pl.bat_rank = pl.BEI > 0 ? i + 1 : null; });
+  bowlSorted.forEach((pl, i) => { pl.bowl_rank = pl.BoEI > 0 ? i + 1 : null; });
+
+  const allrounders = [];
+  for (const pl of ranked) {
+    if (pl.bat_rating >= minArRating && pl.bowl_rating >= minArRating) {
+      pl.ar_rating = Math.round(Math.sqrt(pl.bat_rating * pl.bowl_rating));
+      allrounders.push(pl);
+    }
+  }
+  allrounders.sort((a, b) => b.ar_rating - a.ar_rating);
+  allrounders.forEach((pl, i) => { pl.ar_rank = i + 1; });
+
+  DATA.batting_top25 = batSorted.slice(0, 100);
+  DATA.bowling_top25 = bowlSorted.slice(0, 100);
+  DATA.allrounder_top25 = allrounders.slice(0, 100);
+
+  DATA.metadata.bei_median = Math.round(beiMed * 100) / 100;
+  DATA.metadata.bei_std = Math.round(beiStd * 100) / 100;
+  DATA.metadata.boei_median = Math.round(boeiMed * 100) / 100;
+  DATA.metadata.boei_std = Math.round(boeiStd * 100) / 100;
+}
+
+function isCustomParams() {
+  return Object.keys(TUNE_DEFAULTS).some(k => TUNE_PARAMS[k] !== TUNE_DEFAULTS[k]);
+}
+
+function resetParams() {
+  TUNE_PARAMS = { ...TUNE_DEFAULTS };
+  if (DATA && ORIGINAL_DATA[CURRENT_FORMAT]) {
+    DATA.all_players = JSON.parse(JSON.stringify(ORIGINAL_DATA[CURRENT_FORMAT].all_players));
+    DATA.batting_top25 = JSON.parse(JSON.stringify(ORIGINAL_DATA[CURRENT_FORMAT].batting_top25));
+    DATA.bowling_top25 = JSON.parse(JSON.stringify(ORIGINAL_DATA[CURRENT_FORMAT].bowling_top25));
+    DATA.allrounder_top25 = JSON.parse(JSON.stringify(ORIGINAL_DATA[CURRENT_FORMAT].allrounder_top25));
+    DATA.metadata = { ...ORIGINAL_DATA[CURRENT_FORMAT].metadata };
+  }
+}
+
+function storeOriginalData(format) {
+  if (!ALL_DATA[format] || ORIGINAL_DATA[format]) return;
+  ORIGINAL_DATA[format] = {
+    all_players: JSON.parse(JSON.stringify(ALL_DATA[format].all_players)),
+    batting_top25: JSON.parse(JSON.stringify(ALL_DATA[format].batting_top25)),
+    bowling_top25: JSON.parse(JSON.stringify(ALL_DATA[format].bowling_top25)),
+    allrounder_top25: JSON.parse(JSON.stringify(ALL_DATA[format].allrounder_top25)),
+    metadata: { ...ALL_DATA[format].metadata },
+  };
+}
+
 function isMobile() { return window.innerWidth <= 700; }
 
 // Country code → flag emoji
@@ -215,13 +365,28 @@ async function loadData() {
     ALL_DATA.tests = await loadFormatData('tests');
     DATA = ALL_DATA.tests;
     if (!DATA) throw new Error('No data');
+    storeOriginalData('tests');
     buildNameIndex();
+
+    const hash = location.hash.slice(1);
+    const qsIdx = hash.indexOf('?');
+    if (qsIdx !== -1) {
+      decodeTuneParams(hash.slice(qsIdx + 1));
+      syncSlidersToParams();
+      if (isCustomParams()) {
+        resetToOriginalData();
+        recomputeRankings();
+        updateTuneBadge();
+      }
+    }
+    updateSrRowVisibility();
+
     renderAll();
     restoreFromHash();
     document.body.classList.add('loaded');
-    loadFormatData('odis');
-    loadFormatData('t20is');
-    loadFormatData('ipl');
+    loadFormatData('odis').then(() => storeOriginalData('odis'));
+    loadFormatData('t20is').then(() => storeOriginalData('t20is'));
+    loadFormatData('ipl').then(() => storeOriginalData('ipl'));
   } catch (e) {
     document.querySelector('.content').innerHTML =
       '<p style="text-align:center;padding:3rem;color:var(--accent3)">Failed to load rankings data. Make sure rankings.json is available.</p>';
@@ -250,8 +415,15 @@ async function switchFormat(format) {
     }
     CURRENT_FORMAT = format;
     DATA = data;
+    storeOriginalData(format);
     buildNameIndex();
     updateFormatLabels();
+    updateSrRowVisibility();
+    if (isCustomParams()) {
+      resetToOriginalData();
+      recomputeRankings();
+    }
+    updateTuneBadge();
   }
 
   document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
@@ -260,13 +432,16 @@ async function switchFormat(format) {
   renderAll();
 
   const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
+  const tunePanel = document.getElementById('tune-panel');
   if (format === 'crossformat') {
     plTab.style.display = 'none';
+    if (tunePanel) tunePanel.style.display = 'none';
     if (document.querySelector('.tab.active')?.dataset.tab === 'player-lookup') {
       switchTab('allrounders', false);
     }
   } else {
     plTab.style.display = '';
+    if (tunePanel) tunePanel.style.display = '';
     document.getElementById('player-card').classList.add('hidden');
     document.getElementById('player-search').value = '';
   }
@@ -279,7 +454,14 @@ async function switchFormat(format) {
 async function restoreFromHash() {
   const raw = location.hash.slice(1);
   if (!raw) return;
-  const hash = decodeURIComponent(raw);
+  const fullHash = decodeURIComponent(raw);
+
+  const qsIdx = fullHash.indexOf('?');
+  const hash = qsIdx >= 0 ? fullHash.slice(0, qsIdx) : fullHash;
+  if (qsIdx >= 0) {
+    decodeTuneParams(fullHash.slice(qsIdx + 1));
+    syncSlidersToParams();
+  }
 
   let format = CURRENT_FORMAT;
   let rest = hash;
@@ -314,6 +496,7 @@ async function restoreFromHash() {
       if (data) {
         CURRENT_FORMAT = format;
         DATA = data;
+        storeOriginalData(format);
         document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector(`.format-btn[data-format="${format}"]`);
         if (btn) btn.classList.add('active');
@@ -321,6 +504,12 @@ async function restoreFromHash() {
         if (plTab) plTab.style.display = '';
         buildNameIndex();
         updateFormatLabels();
+        updateSrRowVisibility();
+        if (isCustomParams()) {
+          resetToOriginalData();
+          recomputeRankings();
+        }
+        updateTuneBadge();
         renderAll();
       }
     }
@@ -742,10 +931,11 @@ function _barHTML(label, displayVal, pct, tierLabel, tierClass) {
 function renderScoreBreakdown(player) {
   const m = DATA.metadata;
   const isLOI = CURRENT_FORMAT !== 'tests';
-  const α = m.rpi_alpha || 0.3;
-  const longevity = m.longevity_exp || 0.3;
+  const α = TUNE_PARAMS.alpha;
+  const longevity = TUNE_PARAMS.longevity;
   const rBase = m.rating_base || 500;
-  const rK = m.rating_k || 250;
+  const rK = TUNE_PARAMS.ratingK;
+  const pitchExp = TUNE_PARAMS.pitch;
   const all = DATA.all_players;
 
   const sections = [];
@@ -804,12 +994,15 @@ function renderScoreBreakdown(player) {
     const sdLabel = z >= 0 ? `${z.toFixed(1)} standard deviations above` : `${Math.abs(z).toFixed(1)} standard deviations below`;
 
     const formulaParts = [];
-    formulaParts.push(`avg<sup>0.7</sup> × rpi<sup>0.3</sup> = ${avg}^0.7 × ${rpi.toFixed(1)}^0.3 = ${qualityMetric.toFixed(2)}`);
-    if (isLOI && sr) formulaParts.push(`× SR/100 = × ${(sr/100).toFixed(2)}`);
-    formulaParts.push(`× innings<sup>0.3</sup> = × ${inns}^0.3 = × ${longevityFactor.toFixed(2)}`);
-    if (pitchAdj !== 1) {
-      const sqrtAdj = Math.sqrt(pitchAdj);
-      formulaParts.push(`× √pitch_factor = × √${pitchAdj.toFixed(4)} = × ${sqrtAdj.toFixed(4)}`);
+    formulaParts.push(`avg<sup>${(1-α).toFixed(1)}</sup> × rpi<sup>${α.toFixed(1)}</sup> = ${avg}^${(1-α).toFixed(1)} × ${rpi.toFixed(1)}^${α.toFixed(1)} = ${qualityMetric.toFixed(2)}`);
+    if (isLOI && sr) {
+      const srW = TUNE_PARAMS.srWeight;
+      formulaParts.push(`× (SR/100)<sup>${srW.toFixed(1)}</sup> = × ${Math.pow(sr/100, srW).toFixed(2)}`);
+    }
+    formulaParts.push(`× innings<sup>${longevity.toFixed(2)}</sup> = × ${inns}^${longevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
+    if (pitchAdj !== 1 && pitchExp > 0) {
+      const adjVal = Math.pow(pitchAdj, pitchExp);
+      formulaParts.push(`× pitch<sup>${pitchExp.toFixed(1)}</sup> = × ${pitchAdj.toFixed(4)}^${pitchExp.toFixed(1)} = × ${adjVal.toFixed(4)}`);
     }
     formulaParts.push(`= Raw BEI: <strong>${player.BEI.toFixed(1)}</strong>`);
     const zFormula = z >= 0
@@ -831,7 +1024,7 @@ function renderScoreBreakdown(player) {
     const bowlAvg = player.career_bowl_avg;
     const bowlInns = player.bowl_inns;
     const pitchAdj = player.bowl_pitch_factor || 1;
-    const bowlK = m.bowl_k || 1000;
+    const bowlK = TUNE_PARAMS.bowlK;
     const longevityFactor = Math.pow(bowlInns, longevity);
 
     const bowlers = all.filter(p => p.bowl_inns > 0 && p.career_bowl_avg > 0);
@@ -909,10 +1102,10 @@ function renderScoreBreakdown(player) {
         formulaParts.push(`× (${baseSr}/sr)^${srExp} = (${baseSr}/${player.career_bowl_sr})^${srExp} = ${Math.pow(baseSr/player.career_bowl_sr, srExp).toFixed(2)}`);
       }
     }
-    formulaParts.push(`× innings<sup>0.3</sup> = × ${bowlInns}^0.3 = × ${longevityFactor.toFixed(2)}`);
-    if (pitchAdj !== 1) {
-      const sqrtAdj = Math.sqrt(pitchAdj);
-      formulaParts.push(`× √pitch_factor = × √${pitchAdj.toFixed(4)} = × ${sqrtAdj.toFixed(4)}`);
+    formulaParts.push(`× innings<sup>${longevity.toFixed(2)}</sup> = × ${bowlInns}^${longevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
+    if (pitchAdj !== 1 && pitchExp > 0) {
+      const adjVal = Math.pow(pitchAdj, pitchExp);
+      formulaParts.push(`× pitch<sup>${pitchExp.toFixed(1)}</sup> = × ${pitchAdj.toFixed(4)}^${pitchExp.toFixed(1)} = × ${adjVal.toFixed(4)}`);
     }
     formulaParts.push(`= Raw BoEI: <strong>${player.BoEI.toFixed(1)}</strong>`);
     const zFormula = z >= 0
@@ -987,8 +1180,9 @@ function showPlayer(name, updateHash = true) {
   let pitchInfo = '';
   if (player.match_avg && player.bat_pitch_factor) {
     const matchAvg = player.match_avg.toFixed(1);
-    const batF = Math.sqrt(player.bat_pitch_factor).toFixed(2);
-    const bowlF = Math.sqrt(player.bowl_pitch_factor).toFixed(2);
+    const pExp = TUNE_PARAMS.pitch;
+    const batF = Math.pow(player.bat_pitch_factor, pExp).toFixed(2);
+    const bowlF = Math.pow(player.bowl_pitch_factor, pExp).toFixed(2);
     const rpoLabel = player.match_rpo ? ` · Match RPO: ${player.match_rpo.toFixed(2)}` : '';
     pitchInfo = `<div class="ph-era">Match avg: ${matchAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
   }
@@ -1508,6 +1702,116 @@ function setupTheme() {
   });
 }
 
+// ─── Tune Panel ─────────────────────────────────────────────────────────────
+
+function setupTunePanel() {
+  const toggle = document.getElementById('tune-toggle');
+  const body = document.getElementById('tune-body');
+  const arrow = document.getElementById('tune-arrow');
+  const badge = document.getElementById('tune-badge');
+  const resetBtn = document.getElementById('tune-reset');
+  const shareLink = document.getElementById('tune-share');
+
+  toggle.addEventListener('click', () => {
+    body.classList.toggle('hidden');
+    arrow.classList.toggle('open');
+  });
+
+  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlK', 'ratingK'];
+  for (const key of sliderKeys) {
+    const slider = document.getElementById(`tune-${key}`);
+    const valEl = document.getElementById(`tune-${key}-val`);
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      TUNE_PARAMS[key] = v;
+      valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
+      onTuneChange();
+    });
+  }
+
+  resetBtn.addEventListener('click', () => {
+    resetParams();
+    syncSlidersToParams();
+    updateTuneBadge();
+    renderAll();
+  });
+
+  shareLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    const params = encodeTuneParams();
+    const base = `${location.origin}${location.pathname}#${CURRENT_FORMAT}/allrounders`;
+    const url = params ? `${base}?${params}` : base;
+    navigator.clipboard.writeText(url).then(() => {
+      shareLink.textContent = 'Copied!';
+      setTimeout(() => { shareLink.textContent = 'Share this config'; }, 2000);
+    }).catch(() => {
+      prompt('Copy this URL:', url);
+    });
+  });
+}
+
+function onTuneChange() {
+  if (!DATA || CURRENT_FORMAT === 'crossformat') return;
+  resetToOriginalData();
+  recomputeRankings();
+  updateTuneBadge();
+  renderAll();
+}
+
+function resetToOriginalData() {
+  if (!ORIGINAL_DATA[CURRENT_FORMAT]) return;
+  const orig = ORIGINAL_DATA[CURRENT_FORMAT];
+  DATA.all_players = JSON.parse(JSON.stringify(orig.all_players));
+  DATA.metadata = { ...orig.metadata };
+}
+
+function syncSlidersToParams() {
+  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlK', 'ratingK'];
+  for (const key of keys) {
+    const slider = document.getElementById(`tune-${key}`);
+    const valEl = document.getElementById(`tune-${key}-val`);
+    if (slider && valEl) {
+      slider.value = TUNE_PARAMS[key];
+      const v = TUNE_PARAMS[key];
+      valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
+    }
+  }
+  updateSrRowVisibility();
+}
+
+function updateSrRowVisibility() {
+  const srRow = document.getElementById('tune-sr-row');
+  if (srRow) {
+    srRow.classList.toggle('hidden', CURRENT_FORMAT === 'tests');
+  }
+}
+
+function updateTuneBadge() {
+  const badge = document.getElementById('tune-badge');
+  if (badge) badge.classList.toggle('hidden', !isCustomParams());
+}
+
+function encodeTuneParams() {
+  const parts = [];
+  for (const [k, def] of Object.entries(TUNE_DEFAULTS)) {
+    if (TUNE_PARAMS[k] !== def) {
+      parts.push(`${k}=${TUNE_PARAMS[k]}`);
+    }
+  }
+  return parts.join('&');
+}
+
+function decodeTuneParams(qs) {
+  if (!qs) return;
+  const pairs = qs.split('&');
+  for (const pair of pairs) {
+    const [k, v] = pair.split('=');
+    if (k && v && k in TUNE_DEFAULTS) {
+      TUNE_PARAMS[k] = parseFloat(v);
+    }
+  }
+}
+
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 function setupFormatBar() {
@@ -1521,6 +1825,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupFormatBar();
   setupTabs();
   setupSearch();
+  setupTunePanel();
   loadData();
 
   let lastWidth = window.innerWidth;

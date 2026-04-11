@@ -38,6 +38,51 @@
     <button class="tab" data-tab="methodology">Methodology</button>
   </nav>
 
+  <div class="tune-panel" id="tune-panel">
+    <button class="tune-toggle" id="tune-toggle">
+      Customize Rankings <span class="tune-arrow" id="tune-arrow">&#9654;</span>
+      <span class="tune-badge hidden" id="tune-badge">Custom</span>
+    </button>
+    <div class="tune-body hidden" id="tune-body">
+      <div class="tune-sliders">
+        <div class="tune-slider-row">
+          <label for="tune-longevity">Longevity</label>
+          <input type="range" id="tune-longevity" min="0" max="0.6" step="0.05" value="0.30">
+          <span class="tune-val" id="tune-longevity-val">0.30</span>
+        </div>
+        <div class="tune-slider-row">
+          <label for="tune-pitch">Pitch Adjustment</label>
+          <input type="range" id="tune-pitch" min="0" max="1" step="0.1" value="0.5">
+          <span class="tune-val" id="tune-pitch-val">0.50</span>
+        </div>
+        <div class="tune-slider-row">
+          <label for="tune-alpha">RPI Alpha</label>
+          <input type="range" id="tune-alpha" min="0" max="1" step="0.05" value="0.30">
+          <span class="tune-val" id="tune-alpha-val">0.30</span>
+        </div>
+        <div class="tune-slider-row" id="tune-sr-row">
+          <label for="tune-srWeight">SR Weight</label>
+          <input type="range" id="tune-srWeight" min="0" max="2" step="0.1" value="1.0">
+          <span class="tune-val" id="tune-srWeight-val">1.00</span>
+        </div>
+        <div class="tune-slider-row">
+          <label for="tune-bowlK">Bowl K</label>
+          <input type="range" id="tune-bowlK" min="500" max="2000" step="100" value="1000">
+          <span class="tune-val" id="tune-bowlK-val">1000</span>
+        </div>
+        <div class="tune-slider-row">
+          <label for="tune-ratingK">Rating K</label>
+          <input type="range" id="tune-ratingK" min="100" max="500" step="50" value="250">
+          <span class="tune-val" id="tune-ratingK-val">250</span>
+        </div>
+      </div>
+      <div class="tune-actions">
+        <button class="tune-reset" id="tune-reset">Reset to Defaults</button>
+      </div>
+      <div class="tune-hint">Drag sliders to recompute rankings in real time. <a href="#" id="tune-share">Share this config</a></div>
+    </div>
+  </div>
+
   <main class="content">
     <!-- Allrounders Tab -->
     <section class="tab-panel active" id="panel-allrounders">
