@@ -42,7 +42,7 @@ function isFullMember(country) {
 
 const TUNE_DEFAULTS = {
   longevity: 0.30, pitch: 0.50, alpha: 0.30,
-  srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5,
+  srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5, bowlAvgW: 1.0,
   bowlK: 1000, ratingK: 250,
 };
 const TUNE_RANGES = {
@@ -52,6 +52,7 @@ const TUNE_RANGES = {
   srWeight:     { min: 0, max: 2.0, step: 0.1 },
   bowlSrWeight: { min: 0, max: 1.0, step: 0.05 },
   wpiWeight:    { min: 0, max: 1.0, step: 0.05 },
+  bowlAvgW:     { min: 0, max: 2.0, step: 0.1 },
   bowlK:        { min: 500, max: 2000, step: 100 },
   ratingK:      { min: 100, max: 500, step: 50 },
 };
@@ -117,7 +118,7 @@ function recomputeRankings() {
         if (wpi > 0 && baselineWpi > 0) {
           const effSrExp = srExp * 2 * p.bowlSrWeight;
           const srFactor = (bowlSr > 0 && baselineSr > 0) ? Math.pow(baselineSr / bowlSr, effSrExp) : 1;
-          boei = (p.bowlK / bowlAvg) * Math.pow(wpi / baselineWpi, p.wpiWeight) * srFactor * Math.pow(bowlInns, p.longevity) * boeiScale;
+          boei = (p.bowlK / Math.pow(bowlAvg, p.bowlAvgW)) * Math.pow(wpi / baselineWpi, p.wpiWeight) * srFactor * Math.pow(bowlInns, p.longevity) * boeiScale;
         }
       }
       boei *= Math.pow(bowlPf, p.pitch);
@@ -1120,7 +1121,9 @@ function renderScoreBreakdown(player) {
       const econ = player.career_bowl_econ || 6;
       formulaParts.push(`${bowlK} / (SR × econ/6) = ${bowlK} / (${bowlSr.toFixed(1)} × ${(econ/6).toFixed(2)}) = ${(bowlK / (bowlSr * econ / 6)).toFixed(2)}`);
     } else {
-      formulaParts.push(`${bowlK} / avg = ${bowlK} / ${bowlAvg.toFixed(1)} = ${(bowlK / bowlAvg).toFixed(2)}`);
+      const baw = TUNE_PARAMS.bowlAvgW;
+      const avgTerm = bowlK / Math.pow(bowlAvg, baw);
+      formulaParts.push(`${bowlK} / avg<sup>${baw.toFixed(1)}</sup> = ${bowlK} / ${bowlAvg.toFixed(1)}^${baw.toFixed(1)} = ${avgTerm.toFixed(2)}`);
       if (player.career_wpi != null) {
         const baseWpi = m.baseline_wpi || 1.46;
         const wpiW = TUNE_PARAMS.wpiWeight;
@@ -1774,6 +1777,14 @@ function _tuneStatusText(key, v) {
     if (v <= 0.8) return 'Strike rate weighted more — reward wicket-takers';
     return 'Only strike rate matters — pure wicket-taking';
   }
+  if (key === 'bowlAvgW') {
+    if (v === 0) return 'Bowling average ignored entirely';
+    if (v <= 0.4) return 'Average barely matters';
+    if (v <= 0.8) return 'Average matters somewhat';
+    if (v <= 1.2) return isDefault ? 'Standard weight to average (default)' : 'Standard weight to average';
+    if (v <= 1.6) return 'Low averages strongly rewarded';
+    return 'Average dominates — miserly bowlers rank highest';
+  }
   if (key === 'wpiWeight') {
     if (v === 0) return 'Ignore wicket volume — pure bowling average';
     if (v <= 0.2) return 'Wicket volume barely matters';
@@ -1797,7 +1808,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight'];
+  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1852,7 +1863,7 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight'];
+  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1872,8 +1883,10 @@ function updateSrRowVisibility() {
   const isTests = CURRENT_FORMAT === 'tests';
   const srRow = document.getElementById('tune-sr-row');
   const wpiRow = document.getElementById('tune-wpi-row');
+  const bowlAvgRow = document.getElementById('tune-bowlAvg-row');
   if (srRow) srRow.classList.toggle('hidden', isTests);
   if (wpiRow) wpiRow.classList.toggle('hidden', !isTests);
+  if (bowlAvgRow) bowlAvgRow.classList.toggle('hidden', !isTests);
 }
 
 function updateTuneBadge() {
