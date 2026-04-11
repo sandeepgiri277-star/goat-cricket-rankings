@@ -813,6 +813,7 @@ footer {
 .tune-reset:hover { color: var(--accent3); border-color: var(--accent3); }
 .tune-share-btn:hover { color: var(--accent); border-color: var(--accent); }
 .tune-slider-group.hidden { display: none; }
+.tune-sliders.hidden { display: none; }
 .tune-xf-only.hidden { display: none; }
 .tune-section { margin-bottom: 1rem; }
 .tune-section:last-child { margin-bottom: 0; }
