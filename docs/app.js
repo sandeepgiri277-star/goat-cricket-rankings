@@ -73,6 +73,18 @@ function _realToSlider(key, val) {
 let TUNE_PARAMS = { ...TUNE_DEFAULTS };
 let ORIGINAL_DATA = {};
 
+const XF_PARAM_KEYS = {
+  tests: ['longevity', 'pitch', 'alpha', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'],
+  odis:  ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'],
+  t20is: ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'],
+};
+const XF_TUNE_DEFAULTS = {
+  tests: { longevity: 0.30, pitch: 0.50, alpha: 0.30, bowlSrWeight: 0.5, bowlAvgW: 1.0, wpiWeight: 0.5 },
+  odis:  { longevity: 0.30, pitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
+  t20is: { longevity: 0.30, pitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
+};
+let XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
+
 function recomputeRankings() {
   if (!DATA || CURRENT_FORMAT === 'crossformat') return;
   const m = DATA.metadata;
@@ -188,11 +200,27 @@ function recomputeRankings() {
 }
 
 function isCustomParams() {
-  return Object.keys(TUNE_DEFAULTS).some(k => TUNE_PARAMS[k] !== TUNE_DEFAULTS[k]);
+  if (Object.keys(TUNE_DEFAULTS).some(k => TUNE_PARAMS[k] !== TUNE_DEFAULTS[k])) return true;
+  for (const [fmt, keys] of Object.entries(XF_PARAM_KEYS)) {
+    for (const key of keys) {
+      if (XF_TUNE_PARAMS[fmt][key] !== XF_TUNE_DEFAULTS[fmt][key]) return true;
+    }
+  }
+  return false;
 }
 
 function resetParams() {
   TUNE_PARAMS = { ...TUNE_DEFAULTS };
+  XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
+  if (CURRENT_FORMAT === 'crossformat') {
+    for (const fmt of ['tests', 'odis', 't20is']) {
+      if (ALL_DATA[fmt] && ORIGINAL_DATA[fmt]) {
+        ALL_DATA[fmt].all_players = JSON.parse(JSON.stringify(ORIGINAL_DATA[fmt].all_players));
+        ALL_DATA[fmt].metadata = { ...ORIGINAL_DATA[fmt].metadata };
+      }
+    }
+    return;
+  }
   if (DATA && ORIGINAL_DATA[CURRENT_FORMAT]) {
     DATA.all_players = JSON.parse(JSON.stringify(ORIGINAL_DATA[CURRENT_FORMAT].all_players));
     DATA.batting_top25 = JSON.parse(JSON.stringify(ORIGINAL_DATA[CURRENT_FORMAT].batting_top25));
@@ -412,6 +440,7 @@ async function loadData() {
       }
     }
     syncSlidersToParams();
+    syncXfSliders();
     updateSrRowVisibility();
 
     renderAll();
@@ -478,9 +507,11 @@ async function switchFormat(format) {
     document.getElementById('player-search').value = '';
   }
   if (tunePanel) tunePanel.style.display = '';
-  document.querySelectorAll('.tune-sliders:not(.tune-xf-only)').forEach(el => el.classList.toggle('hidden', isXf));
+  const regularSliders = document.getElementById('tune-regular-sliders');
+  if (regularSliders) regularSliders.classList.toggle('hidden', isXf);
   document.querySelectorAll('.tune-xf-only').forEach(el => el.classList.toggle('hidden', !isXf));
   syncSlidersToParams();
+  if (isXf) syncXfSliders();
 
   const activeTab = document.querySelector('.tab.active');
   const tabId = activeTab ? activeTab.dataset.tab : 'allrounders';
@@ -497,6 +528,7 @@ async function restoreFromHash() {
   if (qsIdx >= 0) {
     decodeTuneParams(fullHash.slice(qsIdx + 1));
     syncSlidersToParams();
+    syncXfSliders();
   }
 
   let format = CURRENT_FORMAT;
@@ -1855,6 +1887,8 @@ function setupTunePanel() {
   resetBtn.addEventListener('click', () => {
     resetParams();
     syncSlidersToParams();
+    syncXfSliders();
+    if (CURRENT_FORMAT === 'crossformat') computeCrossFormat();
     updateTuneBadge();
     renderAll();
   });
@@ -1871,10 +1905,63 @@ function setupTunePanel() {
       prompt('Copy this URL:', url);
     });
   });
+
+  for (const [fmt, keys] of Object.entries(XF_PARAM_KEYS)) {
+    for (const key of keys) {
+      const id = `tune-xf-${fmt}-${key}`;
+      const slider = document.getElementById(id);
+      const statusEl = document.getElementById(`${id}-status`);
+      const valEl = document.getElementById(`${id}-val`);
+      if (!slider) continue;
+      slider.addEventListener('input', () => {
+        const pct = parseInt(slider.value, 10);
+        const real = _sliderToReal(key, pct);
+        XF_TUNE_PARAMS[fmt][key] = real;
+        if (valEl) valEl.textContent = pct;
+        if (statusEl) {
+          statusEl.textContent = _tuneStatusText(key, real);
+          statusEl.classList.toggle('changed', real !== XF_TUNE_DEFAULTS[fmt][key]);
+        }
+        onTuneChange();
+      });
+    }
+  }
+}
+
+function syncXfSliders() {
+  for (const [fmt, keys] of Object.entries(XF_PARAM_KEYS)) {
+    for (const key of keys) {
+      const id = `tune-xf-${fmt}-${key}`;
+      const slider = document.getElementById(id);
+      const statusEl = document.getElementById(`${id}-status`);
+      const valEl = document.getElementById(`${id}-val`);
+      const v = XF_TUNE_PARAMS[fmt][key];
+      const pct = _realToSlider(key, v);
+      if (slider) slider.value = pct;
+      if (valEl) valEl.textContent = pct;
+      if (statusEl) {
+        statusEl.textContent = _tuneStatusText(key, v);
+        statusEl.classList.toggle('changed', v !== XF_TUNE_DEFAULTS[fmt][key]);
+      }
+    }
+  }
 }
 
 function onTuneChange() {
   if (CURRENT_FORMAT === 'crossformat') {
+    const savedParams = { ...TUNE_PARAMS };
+    for (const fmt of ['tests', 'odis', 't20is']) {
+      if (!ALL_DATA[fmt] || !ORIGINAL_DATA[fmt]) continue;
+      DATA = ALL_DATA[fmt];
+      CURRENT_FORMAT = fmt;
+      const xfP = XF_TUNE_PARAMS[fmt];
+      TUNE_PARAMS = { ...TUNE_DEFAULTS, ...xfP };
+      resetToOriginalData();
+      recomputeRankings();
+    }
+    TUNE_PARAMS = savedParams;
+    CURRENT_FORMAT = 'crossformat';
+    DATA = null;
     computeCrossFormat();
     updateTuneBadge();
     renderAll();
@@ -1938,6 +2025,13 @@ function encodeTuneParams() {
       parts.push(`${k}=${TUNE_PARAMS[k]}`);
     }
   }
+  for (const [fmt, keys] of Object.entries(XF_PARAM_KEYS)) {
+    for (const key of keys) {
+      if (XF_TUNE_PARAMS[fmt][key] !== XF_TUNE_DEFAULTS[fmt][key]) {
+        parts.push(`xf_${fmt}_${key}=${XF_TUNE_PARAMS[fmt][key]}`);
+      }
+    }
+  }
   return parts.join('&');
 }
 
@@ -1946,7 +2040,14 @@ function decodeTuneParams(qs) {
   const pairs = qs.split('&');
   for (const pair of pairs) {
     const [k, v] = pair.split('=');
-    if (k && v && k in TUNE_DEFAULTS) {
+    if (!k || !v) continue;
+    const xfMatch = k.match(/^xf_(tests|odis|t20is)_(.+)$/);
+    if (xfMatch) {
+      const [, fmt, param] = xfMatch;
+      if (XF_TUNE_PARAMS[fmt] && param in XF_TUNE_PARAMS[fmt]) {
+        XF_TUNE_PARAMS[fmt][param] = parseFloat(v);
+      }
+    } else if (k in TUNE_DEFAULTS) {
       TUNE_PARAMS[k] = parseFloat(v);
     }
   }

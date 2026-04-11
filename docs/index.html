@@ -47,7 +47,7 @@
     <div class="tune-body hidden" id="tune-body">
       <p class="tune-intro">What makes a GOAT? You decide. Drag the sliders and the rankings recalculate instantly.</p>
 
-      <div class="tune-sliders">
+      <div class="tune-sliders" id="tune-regular-sliders">
         <div class="tune-slider-group">
           <label for="tune-longevity">How much should career length matter?</label>
           <div class="tune-slider-wrap">
@@ -119,37 +119,127 @@
           <div class="tune-status" id="tune-wpiWeight-status"></div>
         </div>
       </div>
-      <div class="tune-sliders tune-xf-only hidden">
-        <div class="tune-slider-group">
-          <label for="tune-xfTests">How much should Tests count?</label>
-          <div class="tune-slider-wrap">
-            <span class="tune-endpoint">Ignore</span>
-            <input type="range" id="tune-xfTests" min="0" max="100" step="1" value="50">
-            <span class="tune-endpoint">Double weight</span>
-            <span class="tune-val" id="tune-xfTests-val">50</span>
+      <div class="tune-xf-only hidden" id="tune-xf-sections">
+
+        <div class="tune-section">
+          <h4 class="tune-section-title">Format Weights</h4>
+          <div class="tune-sliders">
+            <div class="tune-slider-group">
+              <label for="tune-xfTests">How much should Tests count?</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xfTests" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Double weight</span><span class="tune-val" id="tune-xfTests-val">50</span></div>
+              <div class="tune-status" id="tune-xfTests-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label for="tune-xfOdis">How much should ODIs count?</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xfOdis" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Double weight</span><span class="tune-val" id="tune-xfOdis-val">50</span></div>
+              <div class="tune-status" id="tune-xfOdis-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label for="tune-xfT20is">How much should T20Is count?</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xfT20is" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Double weight</span><span class="tune-val" id="tune-xfT20is-val">50</span></div>
+              <div class="tune-status" id="tune-xfT20is-status"></div>
+            </div>
           </div>
-          <div class="tune-status" id="tune-xfTests-status"></div>
         </div>
-        <div class="tune-slider-group">
-          <label for="tune-xfOdis">How much should ODIs count?</label>
-          <div class="tune-slider-wrap">
-            <span class="tune-endpoint">Ignore</span>
-            <input type="range" id="tune-xfOdis" min="0" max="100" step="1" value="50">
-            <span class="tune-endpoint">Double weight</span>
-            <span class="tune-val" id="tune-xfOdis-val">50</span>
+
+        <div class="tune-section">
+          <h4 class="tune-section-title">Tests</h4>
+          <div class="tune-sliders">
+            <div class="tune-slider-group">
+              <label>Career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-tests-longevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-tests-longevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-longevity-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Pitch difficulty</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-tests-pitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-tests-pitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-pitch-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Not-out correction</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Trust avg</span><input type="range" id="tune-xf-tests-alpha" min="0" max="100" step="1" value="30"><span class="tune-endpoint">Correct</span><span class="tune-val" id="tune-xf-tests-alpha-val">30</span></div>
+              <div class="tune-status" id="tune-xf-tests-alpha-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowl SR vs economy</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Economy</span><input type="range" id="tune-xf-tests-bowlSrWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">SR</span><span class="tune-val" id="tune-xf-tests-bowlSrWeight-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-bowlSrWeight-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowling average</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-tests-bowlAvgW" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Dominates</span><span class="tune-val" id="tune-xf-tests-bowlAvgW-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-bowlAvgW-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Wickets per innings</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-tests-wpiWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Dominates</span><span class="tune-val" id="tune-xf-tests-wpiWeight-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-wpiWeight-status"></div>
+            </div>
           </div>
-          <div class="tune-status" id="tune-xfOdis-status"></div>
         </div>
-        <div class="tune-slider-group">
-          <label for="tune-xfT20is">How much should T20Is count?</label>
-          <div class="tune-slider-wrap">
-            <span class="tune-endpoint">Ignore</span>
-            <input type="range" id="tune-xfT20is" min="0" max="100" step="1" value="50">
-            <span class="tune-endpoint">Double weight</span>
-            <span class="tune-val" id="tune-xfT20is-val">50</span>
+
+        <div class="tune-section">
+          <h4 class="tune-section-title">ODIs</h4>
+          <div class="tune-sliders">
+            <div class="tune-slider-group">
+              <label>Career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-odis-longevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-odis-longevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-longevity-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Pitch difficulty</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-odis-pitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-odis-pitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-pitch-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Not-out correction</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Trust avg</span><input type="range" id="tune-xf-odis-alpha" min="0" max="100" step="1" value="30"><span class="tune-endpoint">Correct</span><span class="tune-val" id="tune-xf-odis-alpha-val">30</span></div>
+              <div class="tune-status" id="tune-xf-odis-alpha-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Batting strike rate</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore SR</span><input type="range" id="tune-xf-odis-srWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Heavy SR</span><span class="tune-val" id="tune-xf-odis-srWeight-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-srWeight-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowl SR vs economy</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Economy</span><input type="range" id="tune-xf-odis-bowlSrWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">SR</span><span class="tune-val" id="tune-xf-odis-bowlSrWeight-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-bowlSrWeight-status"></div>
+            </div>
           </div>
-          <div class="tune-status" id="tune-xfT20is-status"></div>
         </div>
+
+        <div class="tune-section">
+          <h4 class="tune-section-title">T20Is</h4>
+          <div class="tune-sliders">
+            <div class="tune-slider-group">
+              <label>Career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-t20is-longevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-t20is-longevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-longevity-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Pitch difficulty</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-t20is-pitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-t20is-pitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-pitch-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Not-out correction</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Trust avg</span><input type="range" id="tune-xf-t20is-alpha" min="0" max="100" step="1" value="30"><span class="tune-endpoint">Correct</span><span class="tune-val" id="tune-xf-t20is-alpha-val">30</span></div>
+              <div class="tune-status" id="tune-xf-t20is-alpha-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Batting strike rate</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore SR</span><input type="range" id="tune-xf-t20is-srWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Heavy SR</span><span class="tune-val" id="tune-xf-t20is-srWeight-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-srWeight-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowl SR vs economy</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Economy</span><input type="range" id="tune-xf-t20is-bowlSrWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">SR</span><span class="tune-val" id="tune-xf-t20is-bowlSrWeight-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-bowlSrWeight-status"></div>
+            </div>
+          </div>
+        </div>
+
       </div>
       <div class="tune-actions">
         <button class="tune-reset" id="tune-reset">Reset to Defaults</button>

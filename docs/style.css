@@ -813,6 +813,20 @@ footer {
 .tune-reset:hover { color: var(--accent3); border-color: var(--accent3); }
 .tune-share-btn:hover { color: var(--accent); border-color: var(--accent); }
 .tune-slider-group.hidden { display: none; }
+.tune-xf-only.hidden { display: none; }
+.tune-section { margin-bottom: 1rem; }
+.tune-section:last-child { margin-bottom: 0; }
+.tune-section-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin: 0 0 0.6rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
 
 @media (max-width: 700px) {
   .tune-sliders { grid-template-columns: 1fr; gap: 1rem; }
