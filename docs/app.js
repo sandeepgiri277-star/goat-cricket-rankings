@@ -1753,19 +1753,6 @@ function _tuneStatusText(key, v) {
     if (v <= 1.5) return 'Fast scorers significantly rewarded';
     return 'Strike rate dominates the batting score';
   }
-  if (key === 'bowlK') {
-    if (v <= 700) return 'Bowlers rarely crack the all-rounder list';
-    if (v <= 900) return 'Batting-heavy all-rounder rankings';
-    if (v <= 1100) return isDefault ? 'Bat & bowl roughly equal (default)' : 'Bat and bowl roughly equal';
-    if (v <= 1500) return 'Great bowlers rise in all-rounder rankings';
-    return 'Bowling dominates — top bowlers rank highest';
-  }
-  if (key === 'ratingK') {
-    if (v <= 150) return 'Ratings are tightly bunched together';
-    if (v <= 250) return isDefault ? 'Standard spread (default)' : 'Moderate spread';
-    if (v <= 350) return 'Clear gaps between tiers';
-    return 'Top players rated far above the rest';
-  }
   return '';
 }
 
@@ -1781,7 +1768,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlK', 'ratingK'];
+  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1836,7 +1823,7 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlK', 'ratingK'];
+  const keys = ['longevity', 'pitch', 'alpha', 'srWeight'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);

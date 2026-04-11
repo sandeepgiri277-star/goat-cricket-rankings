@@ -47,81 +47,46 @@
     <div class="tune-body hidden" id="tune-body">
       <p class="tune-intro">Disagree with the rankings? Adjust the weights below and watch them update in real time.</p>
 
-      <div class="tune-section">
-        <h4 class="tune-section-title">General</h4>
-        <div class="tune-sliders">
-          <div class="tune-slider-group">
-            <label for="tune-longevity">How much should career length matter?</label>
-            <div class="tune-slider-wrap">
-              <span class="tune-endpoint">Peak matters</span>
-              <input type="range" id="tune-longevity" min="0" max="100" step="1" value="50">
-              <span class="tune-endpoint">Long careers rewarded</span>
-              <span class="tune-val" id="tune-longevity-val">50</span>
-            </div>
-            <div class="tune-status" id="tune-longevity-status"></div>
+      <div class="tune-sliders">
+        <div class="tune-slider-group">
+          <label for="tune-longevity">How much should career length matter?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Peak matters</span>
+            <input type="range" id="tune-longevity" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Long careers rewarded</span>
+            <span class="tune-val" id="tune-longevity-val">50</span>
           </div>
-          <div class="tune-slider-group">
-            <label for="tune-pitch">Should we adjust for pitch and era difficulty?</label>
-            <div class="tune-slider-wrap">
-              <span class="tune-endpoint">Ignore conditions</span>
-              <input type="range" id="tune-pitch" min="0" max="100" step="1" value="50">
-              <span class="tune-endpoint">Full adjustment</span>
-              <span class="tune-val" id="tune-pitch-val">50</span>
-            </div>
-            <div class="tune-status" id="tune-pitch-status"></div>
-          </div>
-          <div class="tune-slider-group">
-            <label for="tune-ratingK">How much should the best stand out?</label>
-            <div class="tune-slider-wrap">
-              <span class="tune-endpoint">Compressed</span>
-              <input type="range" id="tune-ratingK" min="0" max="100" step="1" value="38">
-              <span class="tune-endpoint">Spread out</span>
-              <span class="tune-val" id="tune-ratingK-val">38</span>
-            </div>
-            <div class="tune-status" id="tune-ratingK-status"></div>
-          </div>
+          <div class="tune-status" id="tune-longevity-status"></div>
         </div>
-      </div>
-
-      <div class="tune-section">
-        <h4 class="tune-section-title">Batting</h4>
-        <div class="tune-sliders">
-          <div class="tune-slider-group">
-            <label for="tune-alpha">How much should not-outs inflate a batting average?</label>
-            <div class="tune-slider-wrap">
-              <span class="tune-endpoint">Trust averages</span>
-              <input type="range" id="tune-alpha" min="0" max="100" step="1" value="30">
-              <span class="tune-endpoint">Correct for not-outs</span>
-              <span class="tune-val" id="tune-alpha-val">30</span>
-            </div>
-            <div class="tune-status" id="tune-alpha-status"></div>
+        <div class="tune-slider-group">
+          <label for="tune-pitch">Should we adjust for pitch and era difficulty?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore conditions</span>
+            <input type="range" id="tune-pitch" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Full adjustment</span>
+            <span class="tune-val" id="tune-pitch-val">50</span>
           </div>
-          <div class="tune-slider-group" id="tune-sr-row">
-            <label for="tune-srWeight">How important is scoring speed (strike rate)?</label>
-            <div class="tune-slider-wrap">
-              <span class="tune-endpoint">Ignore SR</span>
-              <input type="range" id="tune-srWeight" min="0" max="100" step="1" value="50">
-              <span class="tune-endpoint">Heavily reward fast scoring</span>
-              <span class="tune-val" id="tune-srWeight-val">50</span>
-            </div>
-            <div class="tune-status" id="tune-srWeight-status"></div>
-          </div>
+          <div class="tune-status" id="tune-pitch-status"></div>
         </div>
-      </div>
-
-      <div class="tune-section">
-        <h4 class="tune-section-title">Bowling</h4>
-        <div class="tune-sliders tune-sliders-single">
-          <div class="tune-slider-group">
-            <label for="tune-bowlK">How much should bowling be valued relative to batting?</label>
-            <div class="tune-slider-wrap">
-              <span class="tune-endpoint">Batting dominates</span>
-              <input type="range" id="tune-bowlK" min="0" max="100" step="1" value="33">
-              <span class="tune-endpoint">Bowling dominates</span>
-              <span class="tune-val" id="tune-bowlK-val">33</span>
-            </div>
-            <div class="tune-status" id="tune-bowlK-status"></div>
+        <div class="tune-slider-group">
+          <label for="tune-alpha">How much should not-outs inflate a batting average?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Trust averages</span>
+            <input type="range" id="tune-alpha" min="0" max="100" step="1" value="30">
+            <span class="tune-endpoint">Correct for not-outs</span>
+            <span class="tune-val" id="tune-alpha-val">30</span>
           </div>
+          <div class="tune-status" id="tune-alpha-status"></div>
+        </div>
+        <div class="tune-slider-group" id="tune-sr-row">
+          <label for="tune-srWeight">How important is scoring speed (strike rate)?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore SR</span>
+            <input type="range" id="tune-srWeight" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Heavily reward fast scoring</span>
+            <span class="tune-val" id="tune-srWeight-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-srWeight-status"></div>
         </div>
       </div>
       <div class="tune-actions">
