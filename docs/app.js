@@ -1704,13 +1704,59 @@ function setupTheme() {
 
 // ─── Tune Panel ─────────────────────────────────────────────────────────────
 
+function _tuneStatusText(key, v) {
+  const d = TUNE_DEFAULTS[key];
+  const isDefault = v === d;
+  if (key === 'longevity') {
+    if (v === 0) return 'Career length ignored — pure peak performance';
+    if (v <= 0.15) return 'Career length barely matters';
+    if (v <= 0.3) return isDefault ? 'Balanced (default)' : 'Moderate weight to career length';
+    if (v <= 0.45) return 'Long careers strongly rewarded';
+    return 'Career length dominates rankings';
+  }
+  if (key === 'pitch') {
+    if (v === 0) return 'Raw stats only — no era/pitch corrections';
+    if (v <= 0.3) return 'Mild adjustment for conditions';
+    if (v <= 0.6) return isDefault ? 'Moderate correction (default)' : 'Moderate correction for conditions';
+    if (v <= 0.8) return 'Heavy adjustment for conditions';
+    return 'Full pitch/era normalization applied';
+  }
+  if (key === 'alpha') {
+    if (v === 0) return 'Trust traditional averages fully';
+    if (v <= 0.2) return 'Slight not-out correction';
+    if (v <= 0.4) return isDefault ? 'Balanced correction (default)' : 'Moderate correction';
+    if (v <= 0.6) return 'Strong not-out penalty for high N.O. rates';
+    return 'Almost entirely using runs per innings';
+  }
+  if (key === 'srWeight') {
+    if (v === 0) return 'Strike rate ignored — pure run-scoring';
+    if (v <= 0.5) return 'Minor strike rate bonus';
+    if (v <= 1.1) return isDefault ? 'Equal weight to SR & avg (default)' : 'Moderate strike rate influence';
+    if (v <= 1.5) return 'Fast scorers significantly rewarded';
+    return 'Strike rate dominates the batting score';
+  }
+  if (key === 'bowlK') {
+    if (v <= 700) return 'Bowlers rarely crack the all-rounder list';
+    if (v <= 900) return 'Batting-heavy all-rounder rankings';
+    if (v <= 1100) return isDefault ? 'Bat & bowl roughly equal (default)' : 'Bat and bowl roughly equal';
+    if (v <= 1500) return 'Great bowlers rise in all-rounder rankings';
+    return 'Bowling dominates — top bowlers rank highest';
+  }
+  if (key === 'ratingK') {
+    if (v <= 150) return 'Ratings are tightly bunched together';
+    if (v <= 250) return isDefault ? 'Standard spread (default)' : 'Moderate spread';
+    if (v <= 350) return 'Clear gaps between tiers';
+    return 'Top players rated far above the rest';
+  }
+  return '';
+}
+
 function setupTunePanel() {
   const toggle = document.getElementById('tune-toggle');
   const body = document.getElementById('tune-body');
   const arrow = document.getElementById('tune-arrow');
-  const badge = document.getElementById('tune-badge');
   const resetBtn = document.getElementById('tune-reset');
-  const shareLink = document.getElementById('tune-share');
+  const shareBtn = document.getElementById('tune-share');
 
   toggle.addEventListener('click', () => {
     body.classList.toggle('hidden');
@@ -1720,11 +1766,14 @@ function setupTunePanel() {
   const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlK', 'ratingK'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
-    const valEl = document.getElementById(`tune-${key}-val`);
+    const statusEl = document.getElementById(`tune-${key}-status`);
     slider.addEventListener('input', () => {
       const v = parseFloat(slider.value);
       TUNE_PARAMS[key] = v;
-      valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
+      if (statusEl) {
+        statusEl.textContent = _tuneStatusText(key, v);
+        statusEl.classList.toggle('changed', v !== TUNE_DEFAULTS[key]);
+      }
       onTuneChange();
     });
   }
@@ -1736,14 +1785,14 @@ function setupTunePanel() {
     renderAll();
   });
 
-  shareLink.addEventListener('click', (e) => {
+  shareBtn.addEventListener('click', (e) => {
     e.preventDefault();
     const params = encodeTuneParams();
     const base = `${location.origin}${location.pathname}#${CURRENT_FORMAT}/allrounders`;
     const url = params ? `${base}?${params}` : base;
     navigator.clipboard.writeText(url).then(() => {
-      shareLink.textContent = 'Copied!';
-      setTimeout(() => { shareLink.textContent = 'Share this config'; }, 2000);
+      shareBtn.textContent = 'Link Copied!';
+      setTimeout(() => { shareBtn.textContent = 'Copy Link to This Config'; }, 2000);
     }).catch(() => {
       prompt('Copy this URL:', url);
     });
@@ -1769,11 +1818,13 @@ function syncSlidersToParams() {
   const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlK', 'ratingK'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
-    const valEl = document.getElementById(`tune-${key}-val`);
-    if (slider && valEl) {
+    const statusEl = document.getElementById(`tune-${key}-status`);
+    if (slider) {
       slider.value = TUNE_PARAMS[key];
-      const v = TUNE_PARAMS[key];
-      valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
+    }
+    if (statusEl) {
+      statusEl.textContent = _tuneStatusText(key, TUNE_PARAMS[key]);
+      statusEl.classList.toggle('changed', TUNE_PARAMS[key] !== TUNE_DEFAULTS[key]);
     }
   }
   updateSrRowVisibility();
@@ -1781,9 +1832,7 @@ function syncSlidersToParams() {
 
 function updateSrRowVisibility() {
   const srRow = document.getElementById('tune-sr-row');
-  if (srRow) {
-    srRow.classList.toggle('hidden', CURRENT_FORMAT === 'tests');
-  }
+  if (srRow) srRow.classList.toggle('hidden', CURRENT_FORMAT === 'tests');
 }
 
 function updateTuneBadge() {

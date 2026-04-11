@@ -703,14 +703,15 @@ footer {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font: 600 0.85rem var(--font);
-  padding: 0.6rem 1rem;
+  font: 600 0.9rem var(--font);
+  padding: 0.7rem 1.2rem;
   cursor: pointer;
   transition: color var(--transition), border-color var(--transition);
   width: 100%;
   text-align: left;
 }
 .tune-toggle:hover { color: var(--text); border-color: var(--accent); }
+.tune-toggle-text { flex: 1; }
 .tune-arrow { font-size: 0.65rem; transition: transform 0.2s; }
 .tune-arrow.open { transform: rotate(90deg); }
 .tune-badge {
@@ -720,7 +721,6 @@ footer {
   font-weight: 700;
   padding: 0.15rem 0.5rem;
   border-radius: 3px;
-  margin-left: auto;
 }
 .tune-badge.hidden { display: none; }
 .tune-body {
@@ -728,78 +728,98 @@ footer {
   border: 1px solid var(--border);
   border-top: none;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  padding: 1rem 1.2rem;
+  padding: 1.2rem 1.5rem 1.5rem;
 }
 .tune-body.hidden { display: none; }
+.tune-intro {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0 0 1.2rem;
+}
 .tune-sliders {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem 2rem;
+  gap: 1.4rem 2.5rem;
 }
-.tune-slider-row {
+.tune-slider-group { }
+.tune-slider-group label {
+  font-size: 0.8rem;
+  color: var(--text);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+.tune-slider-wrap {
   display: flex;
   align-items: center;
   gap: 0.6rem;
 }
-.tune-label-wrap {
-  min-width: 10rem;
-  flex-shrink: 0;
-}
-.tune-slider-row label {
-  font-size: 0.78rem;
-  color: var(--text);
-  font-weight: 600;
-  display: block;
-}
-.tune-desc {
-  font-size: 0.68rem;
+.tune-endpoint {
+  font-size: 0.65rem;
   color: var(--text-muted);
-  display: block;
-  line-height: 1.3;
-  margin-top: 0.15rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  min-width: 4rem;
 }
-.tune-slider-row input[type="range"] {
+.tune-endpoint:first-child { text-align: right; }
+.tune-endpoint:last-child { text-align: left; }
+.tune-slider-wrap input[type="range"] {
   flex: 1;
-  height: 4px;
+  height: 5px;
   accent-color: var(--accent);
   cursor: pointer;
+  border-radius: 3px;
 }
-.tune-val {
-  font-size: 0.78rem;
+.tune-status {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 0.3rem;
+  min-height: 1em;
+  transition: color var(--transition);
+}
+.tune-status.changed {
+  color: var(--accent);
   font-weight: 600;
-  color: var(--text);
-  min-width: 2.5rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 .tune-actions {
-  margin-top: 0.8rem;
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
   display: flex;
   gap: 0.8rem;
+  align-items: center;
 }
-.tune-reset {
+.tune-reset, .tune-share-btn {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
   font: 500 0.78rem var(--font);
-  padding: 0.4rem 1rem;
+  padding: 0.45rem 1rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: color var(--transition), border-color var(--transition);
 }
 .tune-reset:hover { color: var(--accent3); border-color: var(--accent3); }
-.tune-hint {
+.tune-share-btn:hover { color: var(--accent); border-color: var(--accent); }
+.tune-slider-group.hidden { display: none; }
+.tune-section { margin-bottom: 1rem; }
+.tune-section:last-of-type { margin-bottom: 0; }
+.tune-section-title {
   font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
   opacity: 0.6;
-  margin-top: 0.6rem;
+  margin: 0 0 0.6rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
 }
-.tune-hint a { color: var(--accent); text-decoration: none; }
-.tune-hint a:hover { text-decoration: underline; }
-.tune-slider-row.hidden { display: none; }
+.tune-sliders-single { grid-template-columns: 1fr; }
 
 @media (max-width: 700px) {
-  .tune-sliders { grid-template-columns: 1fr; gap: 0.6rem; }
+  .tune-sliders { grid-template-columns: 1fr; gap: 1rem; }
   .tune-panel { padding: 0 0.75rem; }
   .hero h1 { font-size: 1.5rem; }
   .hero { padding: 1.5rem 1rem 1.2rem; }
