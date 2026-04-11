@@ -44,6 +44,7 @@ const TUNE_DEFAULTS = {
   longevity: 0.30, pitch: 0.50, alpha: 0.30,
   srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5, bowlAvgW: 1.0,
   bowlK: 1000, ratingK: 250,
+  xfTests: 1.0, xfOdis: 1.0, xfT20is: 1.0,
 };
 const TUNE_RANGES = {
   longevity:    { min: 0, max: 0.6, step: 0.05 },
@@ -55,6 +56,9 @@ const TUNE_RANGES = {
   bowlAvgW:     { min: 0, max: 2.0, step: 0.1 },
   bowlK:        { min: 500, max: 2000, step: 100 },
   ratingK:      { min: 100, max: 500, step: 50 },
+  xfTests:      { min: 0, max: 2.0, step: 0.1 },
+  xfOdis:       { min: 0, max: 2.0, step: 0.1 },
+  xfT20is:      { min: 0, max: 2.0, step: 0.1 },
 };
 function _sliderToReal(key, pct) {
   const r = TUNE_RANGES[key];
@@ -262,6 +266,10 @@ function computeCrossFormat() {
   const t20is = ALL_DATA.t20is;
   if (!tests || !odis || !t20is) return null;
 
+  const wT = TUNE_PARAMS.xfTests;
+  const wO = TUNE_PARAMS.xfOdis;
+  const wI = TUNE_PARAMS.xfT20is;
+
   const playerMap = {};
   for (const [key, data] of [['tests', tests], ['odis', odis], ['t20is', t20is]]) {
     for (const p of data.all_players) {
@@ -275,8 +283,8 @@ function computeCrossFormat() {
 
   for (const [name, fmts] of Object.entries(playerMap)) {
     if (fmts.tests && fmts.odis && fmts.t20is) {
-      const bat = fmts.tests.bat_rating + fmts.odis.bat_rating + fmts.t20is.bat_rating;
-      const bowl = fmts.tests.bowl_rating + fmts.odis.bowl_rating + fmts.t20is.bowl_rating;
+      const bat = Math.round(wT * fmts.tests.bat_rating + wO * fmts.odis.bat_rating + wI * fmts.t20is.bat_rating);
+      const bowl = Math.round(wT * fmts.tests.bowl_rating + wO * fmts.odis.bowl_rating + wI * fmts.t20is.bowl_rating);
       const entry = {
         name, country: fmts.tests.country, bat_total: bat, bowl_total: bowl,
         bat_tests: fmts.tests.bat_rating, bat_odis: fmts.odis.bat_rating, bat_t20is: fmts.t20is.bat_rating,
@@ -292,8 +300,8 @@ function computeCrossFormat() {
     }
 
     if (fmts.tests && fmts.odis) {
-      const bat = fmts.tests.bat_rating + fmts.odis.bat_rating;
-      const bowl = fmts.tests.bowl_rating + fmts.odis.bowl_rating;
+      const bat = Math.round(wT * fmts.tests.bat_rating + wO * fmts.odis.bat_rating);
+      const bowl = Math.round(wT * fmts.tests.bowl_rating + wO * fmts.odis.bowl_rating);
       const entry = {
         name, country: fmts.tests.country, bat_total: bat, bowl_total: bowl,
         bat_tests: fmts.tests.bat_rating, bat_odis: fmts.odis.bat_rating,
@@ -458,18 +466,21 @@ async function switchFormat(format) {
 
   const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
   const tunePanel = document.getElementById('tune-panel');
-  if (format === 'crossformat') {
+  const isXf = format === 'crossformat';
+  if (isXf) {
     plTab.style.display = 'none';
-    if (tunePanel) tunePanel.style.display = 'none';
     if (document.querySelector('.tab.active')?.dataset.tab === 'player-lookup') {
       switchTab('allrounders', false);
     }
   } else {
     plTab.style.display = '';
-    if (tunePanel) tunePanel.style.display = '';
     document.getElementById('player-card').classList.add('hidden');
     document.getElementById('player-search').value = '';
   }
+  if (tunePanel) tunePanel.style.display = '';
+  document.querySelectorAll('.tune-sliders:not(.tune-xf-only)').forEach(el => el.classList.toggle('hidden', isXf));
+  document.querySelectorAll('.tune-xf-only').forEach(el => el.classList.toggle('hidden', !isXf));
+  syncSlidersToParams();
 
   const activeTab = document.querySelector('.tab.active');
   const tabId = activeTab ? activeTab.dataset.tab : 'allrounders';
@@ -1799,6 +1810,15 @@ function _tuneStatusText(key, v) {
     if (v <= 0.8) return 'High WPI strongly rewarded';
     return 'Wickets per innings dominates';
   }
+  if (key === 'xfTests' || key === 'xfOdis' || key === 'xfT20is') {
+    const label = key === 'xfTests' ? 'Tests' : key === 'xfOdis' ? 'ODIs' : 'T20Is';
+    if (v === 0) return `${label} ignored entirely`;
+    if (v <= 0.4) return `${label} barely counts`;
+    if (v <= 0.8) return `${label} underweighted`;
+    if (v <= 1.2) return isDefault ? `Equal weight (default)` : `Standard weight`;
+    if (v <= 1.6) return `${label} weighted more`;
+    return `${label} dominates the ranking`;
+  }
   return '';
 }
 
@@ -1814,7 +1834,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
+  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW', 'xfTests', 'xfOdis', 'xfT20is'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1854,7 +1874,13 @@ function setupTunePanel() {
 }
 
 function onTuneChange() {
-  if (!DATA || CURRENT_FORMAT === 'crossformat') return;
+  if (CURRENT_FORMAT === 'crossformat') {
+    computeCrossFormat();
+    updateTuneBadge();
+    renderAll();
+    return;
+  }
+  if (!DATA) return;
   resetToOriginalData();
   recomputeRankings();
   updateTuneBadge();
@@ -1869,7 +1895,7 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
+  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW', 'xfTests', 'xfOdis', 'xfT20is'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);

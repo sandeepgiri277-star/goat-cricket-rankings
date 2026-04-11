@@ -119,6 +119,38 @@
           <div class="tune-status" id="tune-wpiWeight-status"></div>
         </div>
       </div>
+      <div class="tune-sliders tune-xf-only hidden">
+        <div class="tune-slider-group">
+          <label for="tune-xfTests">How much should Tests count?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore</span>
+            <input type="range" id="tune-xfTests" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Double weight</span>
+            <span class="tune-val" id="tune-xfTests-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-xfTests-status"></div>
+        </div>
+        <div class="tune-slider-group">
+          <label for="tune-xfOdis">How much should ODIs count?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore</span>
+            <input type="range" id="tune-xfOdis" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Double weight</span>
+            <span class="tune-val" id="tune-xfOdis-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-xfOdis-status"></div>
+        </div>
+        <div class="tune-slider-group">
+          <label for="tune-xfT20is">How much should T20Is count?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore</span>
+            <input type="range" id="tune-xfT20is" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Double weight</span>
+            <span class="tune-val" id="tune-xfT20is-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-xfT20is-status"></div>
+        </div>
+      </div>
       <div class="tune-actions">
         <button class="tune-reset" id="tune-reset">Reset to Defaults</button>
         <button class="tune-share-btn" id="tune-share">Copy Link to This Config</button>
