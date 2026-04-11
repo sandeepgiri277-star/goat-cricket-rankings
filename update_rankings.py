@@ -545,7 +545,14 @@ def _scrape_all_time_aggregate(cricket_class: int = 1, extra_params: str = "") -
             return {"runs": runs, "wkts": wkts, "ave": round(ave, 2), "rpo": round(rpo, 2)}
     except Exception as e:
         print(f"    WARNING: Failed to scrape all-time aggregate: {e}")
-    return {"runs": 0, "wkts": 0, "ave": 31.91, "rpo": 4.7}
+    defaults = {
+        1: {"ave": 31.91, "rpo": 2.91},   # Test
+        2: {"ave": 30.07, "rpo": 4.91},   # ODI
+        3: {"ave": 20.96, "rpo": 7.50},   # T20I
+        6: {"ave": 27.18, "rpo": 8.39},   # IPL (class 6 + trophy=117)
+    }
+    fb = defaults.get(cricket_class, {"ave": 31.91, "rpo": 4.7})
+    return {"runs": 0, "wkts": 0, "ave": fb["ave"], "rpo": fb["rpo"]}
 
 
 def _lookup_match_stats(
