@@ -1002,8 +1002,8 @@ function renderScoreBreakdown(player) {
       if (condPct >= 60)      { condLabel = 'Tough'; condClass = 'bd-tier-elite'; }
       else if (condPct >= 35) { condLabel = 'Medium'; condClass = 'bd-tier-good'; }
       else                    { condLabel = 'Easy'; condClass = 'bd-tier-avg'; }
-      const econSuffix = isLOI && player.match_rpo ? ` · Match econ ${player.match_rpo.toFixed(2)}` : '';
-      bars += _barHTML('Conditions', `Match avg ${player.match_avg.toFixed(1)}${econSuffix}`, condPct, condLabel, condClass);
+      const econSuffix = isLOI && player.match_rpo ? ` · Pitch econ ${player.match_rpo.toFixed(2)}` : '';
+      bars += _barHTML('Conditions', `Pitch avg ${player.match_avg.toFixed(1)}${econSuffix}`, condPct, condLabel, condClass);
     }
 
     const beiMedian = m.bei_median;
@@ -1094,8 +1094,13 @@ function renderScoreBreakdown(player) {
       if (condPct >= 60)      { condLabel = 'Tough'; condClass = 'bd-tier-elite'; }
       else if (condPct >= 35) { condLabel = 'Medium'; condClass = 'bd-tier-good'; }
       else                    { condLabel = 'Easy'; condClass = 'bd-tier-avg'; }
-      const econSuffix = isLOI && player.match_rpo ? ` · Match econ ${player.match_rpo.toFixed(2)}` : '';
-      bars += _barHTML('Conditions', `Match avg ${player.match_avg.toFixed(1)}${econSuffix}`, condPct, condLabel, condClass);
+      let condValue;
+      if (isLOI && player.match_rpo) {
+        condValue = `Pitch avg ${player.match_avg.toFixed(1)} · Pitch econ ${player.match_rpo.toFixed(2)}`;
+      } else {
+        condValue = `Pitch avg ${player.match_avg.toFixed(1)}`;
+      }
+      bars += _barHTML('Conditions', condValue, condPct, condLabel, condClass);
     }
 
     const boeiMedian = m.boei_median;
