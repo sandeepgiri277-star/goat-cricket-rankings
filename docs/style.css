@@ -770,6 +770,16 @@ footer {
   cursor: pointer;
   border-radius: 3px;
 }
+.tune-val {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 2.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
 .tune-status {
   font-size: 0.72rem;
   color: var(--text-muted);

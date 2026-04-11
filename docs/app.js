@@ -1767,9 +1767,11 @@ function setupTunePanel() {
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
+    const valEl = document.getElementById(`tune-${key}-val`);
     slider.addEventListener('input', () => {
       const v = parseFloat(slider.value);
       TUNE_PARAMS[key] = v;
+      if (valEl) valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
       if (statusEl) {
         statusEl.textContent = _tuneStatusText(key, v);
         statusEl.classList.toggle('changed', v !== TUNE_DEFAULTS[key]);
@@ -1819,12 +1821,13 @@ function syncSlidersToParams() {
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
-    if (slider) {
-      slider.value = TUNE_PARAMS[key];
-    }
+    const valEl = document.getElementById(`tune-${key}-val`);
+    const v = TUNE_PARAMS[key];
+    if (slider) slider.value = v;
+    if (valEl) valEl.textContent = Number.isInteger(v) ? v : v.toFixed(2);
     if (statusEl) {
-      statusEl.textContent = _tuneStatusText(key, TUNE_PARAMS[key]);
-      statusEl.classList.toggle('changed', TUNE_PARAMS[key] !== TUNE_DEFAULTS[key]);
+      statusEl.textContent = _tuneStatusText(key, v);
+      statusEl.classList.toggle('changed', v !== TUNE_DEFAULTS[key]);
     }
   }
   updateSrRowVisibility();
