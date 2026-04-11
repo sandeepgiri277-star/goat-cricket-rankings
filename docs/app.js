@@ -1692,6 +1692,11 @@ function switchTab(tabId, updateHash = true) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
+  const isBowling = tabId === 'bowling';
+  document.querySelectorAll('.tune-bat-only').forEach(el => {
+    el.classList.toggle('hidden', isBowling);
+  });
+
   if (updateHash) {
     history.pushState(null, '', `#${CURRENT_FORMAT}/${tabId}`);
   }
