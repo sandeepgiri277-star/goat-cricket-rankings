@@ -558,16 +558,16 @@ function renderMethodology() {
   const pitchDesc = isLOI
     ? `<p>For each player, we compute the <strong>overall batting average</strong> and <strong>runs per over</strong> across all ${label} matches they appeared in, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
       <div class="formula">
-        Batting factor = (All-time avg / Match avg) × (All-time RPO / Match RPO)<br>
-        Bowling factor = (Match avg / All-time avg) × (Match RPO / All-time RPO)
+        Raw factor = (All-time avg / Match avg) × (All-time RPO / Match RPO)<br>
+        Applied adjustment = √(Raw factor)
       </div>
-      <p>This captures both era effects <strong>and</strong> the specific venues and conditions a player faced. A batsman who played mostly on difficult, low-scoring pitches gets a boost. A bowler who benefited from seaming conditions gets a corresponding penalty. Home/away splits are indirectly accounted for.</p>`
+      <p>The raw factor captures both era effects <strong>and</strong> the specific venues and conditions a player faced. We apply a <strong>square root</strong> to soften the adjustment, since match averages are a noisy proxy for true pitch difficulty — they conflate pitch conditions, opposition quality, and team composition. The sqrt ensures conditions still matter but prevents the adjustment from being overly aggressive. Bowling factors are computed inversely (Match avg / All-time avg × Match RPO / All-time RPO), then also square-rooted.</p>`
     : `<p>For each player, we compute the <strong>overall batting average</strong> (total runs ÷ total wickets) across all Test matches they appeared in, and compare it to the all-time average (${m.all_time_avg}):</p>
       <div class="formula">
-        Batting factor = All-time avg / Match avg<br>
-        Bowling factor = Match avg / All-time avg
+        Raw factor = All-time avg / Match avg<br>
+        Applied adjustment = √(Raw factor)
       </div>
-      <p>A player who faced predominantly tough conditions (e.g., match avg = 28) gets a batting boost of ~1.14× and a bowling penalty of ~0.88×. A player whose matches were high-scoring (e.g., match avg = 34) gets a batting penalty of ~0.94× and a bowling boost of ~1.07×. This is strictly more granular than era-based normalization — it accounts for the specific grounds, pitch conditions, and opposition strength each player actually faced.</p>`;
+      <p>The raw factor captures the specific grounds, pitch conditions, and opposition strength each player actually faced. We apply a <strong>square root</strong> to soften the adjustment — match averages are an imperfect proxy for true difficulty, conflating pitch conditions with opposition quality and team composition. The sqrt means a player in tough conditions (e.g., match avg = 28, raw factor 1.14) receives a ~1.07× boost rather than the full 1.14×, while one in easy conditions (e.g., match avg = 34, raw factor 0.94) receives a ~0.97× penalty rather than the full 0.94×. Bowling factors are computed inversely (Match avg / All-time avg), then also square-rooted.</p>`;
 
   const arDesc = `<p>The AEI captures a player's combined contribution with bat and ball. However, allrounders are <strong>ranked by the geometric mean</strong> of their batting and bowling ratings — √(bat_rating × bowl_rating) — which naturally rewards <strong>balance</strong> between the two disciplines. A player who is elite in one but weak in the other will rank below someone who is very good in both. A player must achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`;
 
@@ -603,7 +603,7 @@ function renderMethodology() {
     <h3>Pitch &amp; Era Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
     ${pitchDesc}
-    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
+    <p>These softened factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
@@ -637,7 +637,7 @@ function renderMethodology() {
     <h3>Pitch &amp; Era Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
     ${pitchDesc}
-    <p>These factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
+    <p>These softened factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
@@ -807,7 +807,10 @@ function renderScoreBreakdown(player) {
     formulaParts.push(`avg<sup>0.7</sup> × rpi<sup>0.3</sup> = ${avg}^0.7 × ${rpi.toFixed(1)}^0.3 = ${qualityMetric.toFixed(2)}`);
     if (isLOI && sr) formulaParts.push(`× SR/100 = × ${(sr/100).toFixed(2)}`);
     formulaParts.push(`× innings<sup>0.3</sup> = × ${inns}^0.3 = × ${longevityFactor.toFixed(2)}`);
-    if (pitchAdj !== 1) formulaParts.push(`× pitch adj = × ${pitchAdj.toFixed(2)}`);
+    if (pitchAdj !== 1) {
+      const sqrtAdj = Math.sqrt(pitchAdj);
+      formulaParts.push(`× √pitch_factor = × √${pitchAdj.toFixed(4)} = × ${sqrtAdj.toFixed(4)}`);
+    }
     formulaParts.push(`= Raw BEI: <strong>${player.BEI.toFixed(1)}</strong>`);
     const zFormula = z >= 0
       ? `Rating = ${rBase} + ${rK} × √${z.toFixed(2)} = <strong>${player.bat_rating}</strong>`
@@ -907,7 +910,10 @@ function renderScoreBreakdown(player) {
       }
     }
     formulaParts.push(`× innings<sup>0.3</sup> = × ${bowlInns}^0.3 = × ${longevityFactor.toFixed(2)}`);
-    if (pitchAdj !== 1) formulaParts.push(`× pitch adj = × ${pitchAdj.toFixed(2)}`);
+    if (pitchAdj !== 1) {
+      const sqrtAdj = Math.sqrt(pitchAdj);
+      formulaParts.push(`× √pitch_factor = × √${pitchAdj.toFixed(4)} = × ${sqrtAdj.toFixed(4)}`);
+    }
     formulaParts.push(`= Raw BoEI: <strong>${player.BoEI.toFixed(1)}</strong>`);
     const zFormula = z >= 0
       ? `Rating = ${rBase} + ${rK} × √${z.toFixed(2)} = <strong>${player.bowl_rating}</strong>`
@@ -981,8 +987,8 @@ function showPlayer(name, updateHash = true) {
   let pitchInfo = '';
   if (player.match_avg && player.bat_pitch_factor) {
     const matchAvg = player.match_avg.toFixed(1);
-    const batF = player.bat_pitch_factor.toFixed(2);
-    const bowlF = player.bowl_pitch_factor.toFixed(2);
+    const batF = Math.sqrt(player.bat_pitch_factor).toFixed(2);
+    const bowlF = Math.sqrt(player.bowl_pitch_factor).toFixed(2);
     const rpoLabel = player.match_rpo ? ` · Match RPO: ${player.match_rpo.toFixed(2)}` : '';
     pitchInfo = `<div class="ph-era">Match avg: ${matchAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
   }

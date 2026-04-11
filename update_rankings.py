@@ -36,6 +36,7 @@ RATING_BASE = 500   # median player = 500
 RATING_K = 250      # sqrt-compressed: 1000+=GOAT, 900+=elite, 800+=great
 LONGEVITY_EXP = 0.30  # unified innings^exp across all formats
 RPI_ALPHA = 0.30      # avg^(1-α) × RPI^α  — lower α = less not-out correction
+PITCH_EXP = 0.50      # pitch_factor^exp — sqrt softens the noisy match-avg proxy
 MIN_AR_RATING = 250  # min rating in both bat & bowl to qualify as allrounder (Tests)
 LOI_MIN_AR_RATING = 250  # same threshold; ranking uses geometric mean to handle balance
 LOI_MIN_MATCHES_T20 = 30  # T20I has shorter careers
@@ -969,8 +970,8 @@ def compute_all_players(
             pf = compute_player_pitch_factors(
                 df_clean, global_match_stats or {}, all_time_avg
             )
-            bei = round(idx["BEI"] * pf["bat_pitch_factor"], 2)
-            boei = round(idx["BoEI"] * pf["bowl_pitch_factor"], 2)
+            bei = round(idx["BEI"] * pf["bat_pitch_factor"] ** PITCH_EXP, 2)
+            boei = round(idx["BoEI"] * pf["bowl_pitch_factor"] ** PITCH_EXP, 2)
             aei = round(bei + boei, 2)
 
             info_row = player_info[player_info["player_id"] == int(pid)]
@@ -1543,8 +1544,8 @@ def compute_loi_all_players(
             match_rpo = pf["match_rpo"]
             bat_pitch_factor = pf["bat_pitch_factor"]
             bowl_pitch_factor = pf["bowl_pitch_factor"]
-            bei = round(bei * bat_pitch_factor, 2)
-            boei = round(boei * bowl_pitch_factor, 2)
+            bei = round(bei * bat_pitch_factor ** PITCH_EXP, 2)
+            boei = round(boei * bowl_pitch_factor ** PITCH_EXP, 2)
 
             aei = round(bei + boei, 2)
             franchises = team_map.get(int(pid), []) if team_map else []
@@ -1687,6 +1688,7 @@ def build_loi_rankings_json(
             "bowl_k": BOWL_K,
             "longevity_exp": LONGEVITY_EXP,
             "rpi_alpha": RPI_ALPHA,
+            "pitch_exp": PITCH_EXP,
             "min_matches": min_matches,
             "min_ar_rating": LOI_MIN_AR_RATING,
             "stint_innings": LOI_STINT_INNINGS,
@@ -1986,6 +1988,7 @@ def build_rankings_json(all_players: list[dict], boei_scale: float, baseline_wpi
             "bowl_k": BOWL_K,
             "longevity_exp": LONGEVITY_EXP,
             "rpi_alpha": RPI_ALPHA,
+            "pitch_exp": PITCH_EXP,
             "min_bowl_inns": TEST_MIN_BOWL_INNS,
             "min_matches": MIN_MATCHES,
             "min_ar_rating": MIN_AR_RATING,
