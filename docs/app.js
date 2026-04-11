@@ -42,15 +42,16 @@ function isFullMember(country) {
 
 const TUNE_DEFAULTS = {
   longevity: 0.30, pitch: 0.50, alpha: 0.30,
-  srWeight: 1.0, bowlK: 1000, ratingK: 250,
+  srWeight: 1.0, bowlSrWeight: 0.5, bowlK: 1000, ratingK: 250,
 };
 const TUNE_RANGES = {
-  longevity: { min: 0, max: 0.6, step: 0.05 },
-  pitch:     { min: 0, max: 1.0, step: 0.1 },
-  alpha:     { min: 0, max: 1.0, step: 0.05 },
-  srWeight:  { min: 0, max: 2.0, step: 0.1 },
-  bowlK:     { min: 500, max: 2000, step: 100 },
-  ratingK:   { min: 100, max: 500, step: 50 },
+  longevity:    { min: 0, max: 0.6, step: 0.05 },
+  pitch:        { min: 0, max: 1.0, step: 0.1 },
+  alpha:        { min: 0, max: 1.0, step: 0.05 },
+  srWeight:     { min: 0, max: 2.0, step: 0.1 },
+  bowlSrWeight: { min: 0, max: 1.0, step: 0.05 },
+  bowlK:        { min: 500, max: 2000, step: 100 },
+  ratingK:      { min: 100, max: 500, step: 50 },
 };
 function _sliderToReal(key, pct) {
   const r = TUNE_RANGES[key];
@@ -106,11 +107,14 @@ function recomputeRankings() {
     if (bowlInns >= minBowlInns && bowlAvg > 0) {
       if (isLOI) {
         if (bowlSr > 0 && bowlEcon > 0) {
-          boei = p.bowlK / (bowlSr * bowlEcon / 6) * Math.pow(bowlInns, p.longevity) * boeiScale;
+          const w = p.bowlSrWeight;
+          const combo = Math.pow(bowlSr, 2 * w) * Math.pow(bowlEcon / 6, 2 * (1 - w));
+          boei = p.bowlK / combo * Math.pow(bowlInns, p.longevity) * boeiScale;
         }
       } else {
         if (wpi > 0 && baselineWpi > 0) {
-          const srFactor = (bowlSr > 0 && baselineSr > 0) ? Math.pow(baselineSr / bowlSr, srExp) : 1;
+          const effSrExp = srExp * 2 * p.bowlSrWeight;
+          const srFactor = (bowlSr > 0 && baselineSr > 0) ? Math.pow(baselineSr / bowlSr, effSrExp) : 1;
           boei = (p.bowlK / bowlAvg) * Math.sqrt(wpi / baselineWpi) * srFactor * Math.pow(bowlInns, p.longevity) * boeiScale;
         }
       }
@@ -1692,11 +1696,6 @@ function switchTab(tabId, updateHash = true) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
-  const isBowling = tabId === 'bowling';
-  document.querySelectorAll('.tune-bat-only').forEach(el => {
-    el.classList.toggle('hidden', isBowling);
-  });
-
   if (updateHash) {
     history.pushState(null, '', `#${CURRENT_FORMAT}/${tabId}`);
   }
@@ -1763,6 +1762,14 @@ function _tuneStatusText(key, v) {
     if (v <= 1.5) return 'Fast scorers significantly rewarded';
     return 'Strike rate dominates the batting score';
   }
+  if (key === 'bowlSrWeight') {
+    if (v === 0) return 'Only economy matters — pure run prevention';
+    if (v <= 0.2) return 'Economy-focused — wicket-taking barely rewarded';
+    if (v <= 0.4) return 'Economy weighted slightly more than strike rate';
+    if (v <= 0.6) return isDefault ? 'Balanced — SR and economy equal (default)' : 'Balanced — SR and economy roughly equal';
+    if (v <= 0.8) return 'Strike rate weighted more — reward wicket-takers';
+    return 'Only strike rate matters — pure wicket-taking';
+  }
   return '';
 }
 
@@ -1778,7 +1785,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight'];
+  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1833,7 +1840,7 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['longevity', 'pitch', 'alpha', 'srWeight'];
+  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
