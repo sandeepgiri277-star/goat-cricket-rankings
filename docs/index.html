@@ -98,6 +98,16 @@
           </div>
           <div class="tune-status" id="tune-bowlSrWeight-status"></div>
         </div>
+        <div class="tune-slider-group" id="tune-wpi-row">
+          <label for="tune-wpiWeight">How much should wicket-taking volume matter (Tests)?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Pure average</span>
+            <input type="range" id="tune-wpiWeight" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Reward prolific wicket-takers</span>
+            <span class="tune-val" id="tune-wpiWeight-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-wpiWeight-status"></div>
+        </div>
       </div>
       <div class="tune-actions">
         <button class="tune-reset" id="tune-reset">Reset to Defaults</button>

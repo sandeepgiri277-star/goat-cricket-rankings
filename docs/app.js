@@ -42,7 +42,8 @@ function isFullMember(country) {
 
 const TUNE_DEFAULTS = {
   longevity: 0.30, pitch: 0.50, alpha: 0.30,
-  srWeight: 1.0, bowlSrWeight: 0.5, bowlK: 1000, ratingK: 250,
+  srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5,
+  bowlK: 1000, ratingK: 250,
 };
 const TUNE_RANGES = {
   longevity:    { min: 0, max: 0.6, step: 0.05 },
@@ -50,6 +51,7 @@ const TUNE_RANGES = {
   alpha:        { min: 0, max: 1.0, step: 0.05 },
   srWeight:     { min: 0, max: 2.0, step: 0.1 },
   bowlSrWeight: { min: 0, max: 1.0, step: 0.05 },
+  wpiWeight:    { min: 0, max: 1.0, step: 0.05 },
   bowlK:        { min: 500, max: 2000, step: 100 },
   ratingK:      { min: 100, max: 500, step: 50 },
 };
@@ -115,7 +117,7 @@ function recomputeRankings() {
         if (wpi > 0 && baselineWpi > 0) {
           const effSrExp = srExp * 2 * p.bowlSrWeight;
           const srFactor = (bowlSr > 0 && baselineSr > 0) ? Math.pow(baselineSr / bowlSr, effSrExp) : 1;
-          boei = (p.bowlK / bowlAvg) * Math.sqrt(wpi / baselineWpi) * srFactor * Math.pow(bowlInns, p.longevity) * boeiScale;
+          boei = (p.bowlK / bowlAvg) * Math.pow(wpi / baselineWpi, p.wpiWeight) * srFactor * Math.pow(bowlInns, p.longevity) * boeiScale;
         }
       }
       boei *= Math.pow(bowlPf, p.pitch);
@@ -1121,7 +1123,9 @@ function renderScoreBreakdown(player) {
       formulaParts.push(`${bowlK} / avg = ${bowlK} / ${bowlAvg.toFixed(1)} = ${(bowlK / bowlAvg).toFixed(2)}`);
       if (player.career_wpi != null) {
         const baseWpi = m.baseline_wpi || 1.46;
-        formulaParts.push(`× √(wpi/baseline) = √(${player.career_wpi.toFixed(3)}/${baseWpi}) = ${Math.sqrt(player.career_wpi/baseWpi).toFixed(2)}`);
+        const wpiW = TUNE_PARAMS.wpiWeight;
+        const wpiVal = Math.pow(player.career_wpi / baseWpi, wpiW);
+        formulaParts.push(`× (wpi/baseline)<sup>${wpiW.toFixed(2)}</sup> = (${player.career_wpi.toFixed(3)}/${baseWpi})^${wpiW.toFixed(2)} = ${wpiVal.toFixed(2)}`);
       }
       if (player.career_bowl_sr) {
         const baseSr = m.baseline_sr || 79.9;
@@ -1770,6 +1774,14 @@ function _tuneStatusText(key, v) {
     if (v <= 0.8) return 'Strike rate weighted more — reward wicket-takers';
     return 'Only strike rate matters — pure wicket-taking';
   }
+  if (key === 'wpiWeight') {
+    if (v === 0) return 'Ignore wicket volume — pure bowling average';
+    if (v <= 0.2) return 'Wicket volume barely matters';
+    if (v <= 0.4) return 'Slight reward for high wicket-takers';
+    if (v <= 0.6) return isDefault ? 'Moderate weight to wicket volume (default)' : 'Moderate weight to wicket volume';
+    if (v <= 0.8) return 'High wicket-takers strongly rewarded';
+    return 'Wicket volume dominates — reward prolific wicket-takers';
+  }
   return '';
 }
 
@@ -1785,7 +1797,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'];
+  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1840,7 +1852,7 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'];
+  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1857,8 +1869,11 @@ function syncSlidersToParams() {
 }
 
 function updateSrRowVisibility() {
+  const isTests = CURRENT_FORMAT === 'tests';
   const srRow = document.getElementById('tune-sr-row');
-  if (srRow) srRow.classList.toggle('hidden', CURRENT_FORMAT === 'tests');
+  const wpiRow = document.getElementById('tune-wpi-row');
+  if (srRow) srRow.classList.toggle('hidden', isTests);
+  if (wpiRow) wpiRow.classList.toggle('hidden', !isTests);
 }
 
 function updateTuneBadge() {
