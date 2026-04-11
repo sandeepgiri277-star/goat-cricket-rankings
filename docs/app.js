@@ -372,13 +372,13 @@ async function loadData() {
     const qsIdx = hash.indexOf('?');
     if (qsIdx !== -1) {
       decodeTuneParams(hash.slice(qsIdx + 1));
-      syncSlidersToParams();
       if (isCustomParams()) {
         resetToOriginalData();
         recomputeRankings();
         updateTuneBadge();
       }
     }
+    syncSlidersToParams();
     updateSrRowVisibility();
 
     renderAll();
