@@ -1551,17 +1551,24 @@ function renderCrossFormatAll() {
   document.getElementById('player-count').textContent =
     `${CROSS_FORMAT_DATA.all3.batting.length} players`;
 
+  const fmtLabels = { tests: 'Tests', odis: 'ODIs', t20is: 'T20Is' };
+  const activeFmts = [];
+  if (TUNE_PARAMS.xfTests > 0) activeFmts.push('tests');
+  if (TUNE_PARAMS.xfOdis > 0) activeFmts.push('odis');
+  if (TUNE_PARAMS.xfT20is > 0) activeFmts.push('t20is');
+  const fmtStr = activeFmts.map(f => fmtLabels[f]).join(' + ');
+
   document.getElementById('heading-allrounders').textContent = 'Cross-Format Allrounder GOATs';
   document.querySelector('#panel-allrounders .panel-desc').textContent =
-    'The greatest allrounders across international formats, ranked by geometric mean of combined batting and bowling ratings. Must have combined batting \u2265 500 and bowling \u2265 500.';
+    `Ranked by geometric mean of weighted ${fmtStr} batting and bowling ratings. Players need both ratings above ${XF_MIN_AR} to qualify.`;
 
   document.getElementById('heading-batting').textContent = 'Cross-Format Batting GOATs';
   document.querySelector('#panel-batting .panel-desc').textContent =
-    'The greatest batsmen across international formats, ranked by the sum of format-specific batting ratings.';
+    `Ranked by weighted ${fmtStr} batting rating.`;
 
   document.getElementById('heading-bowling').textContent = 'Cross-Format Bowling GOATs';
   document.querySelector('#panel-bowling .panel-desc').textContent =
-    'The greatest bowlers across international formats, ranked by the sum of format-specific bowling ratings.';
+    `Ranked by weighted ${fmtStr} bowling rating.`;
 
   renderXFCategory('allrounders', 'ar_total', CROSS_FORMAT_DATA.all3.allrounders, true);
   renderXFCategory('batting', 'bat_total', CROSS_FORMAT_DATA.all3.batting, false);
