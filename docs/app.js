@@ -811,21 +811,23 @@ function renderMethodology() {
     ? `<p>For each player, we compute the <strong>overall batting average</strong> and <strong>runs per over</strong> across all ${label} matches they appeared in, and compare them to the all-time averages (avg: ${m.all_time_avg}, RPO: ${m.all_time_rpo}):</p>
       <div class="formula">
         Raw factor = (All-time avg / Match avg) × (All-time RPO / Match RPO)<br>
-        Applied adjustment = √(Raw factor)
+        Applied batting adjustment = factor<sup>${TUNE_PARAMS.batPitch.toFixed(2)}</sup> &nbsp; | &nbsp; Applied bowling adjustment = inverse_factor<sup>${TUNE_PARAMS.bowlPitch.toFixed(2)}</sup>
       </div>
-      <p>The raw factor captures both era effects <strong>and</strong> the specific venues and conditions a player faced. We apply a <strong>square root</strong> to soften the adjustment, since match averages are a noisy proxy for true pitch difficulty — they conflate pitch conditions, opposition quality, and team composition. The sqrt ensures conditions still matter but prevents the adjustment from being overly aggressive. Bowling factors are computed inversely (Match avg / All-time avg × Match RPO / All-time RPO), then also square-rooted.</p>`
+      <p>The raw factor captures both era effects <strong>and</strong> the specific venues and conditions a player faced. We raise it to the <strong>pitch exponent</strong> (tunable, currently ${TUNE_PARAMS.batPitch.toFixed(2)} for batting, ${TUNE_PARAMS.bowlPitch.toFixed(2)} for bowling) to control the strength of the adjustment. At 0.5 (square root) the adjustment is softened significantly; at 1.0 it's applied in full. Bowling factors are computed inversely (higher match avg / RPO = easier for bowlers).</p>`
     : `<p>For each player, we compute the <strong>overall batting average</strong> (total runs ÷ total wickets) across all Test matches they appeared in, and compare it to the all-time average (${m.all_time_avg}):</p>
       <div class="formula">
         Raw factor = All-time avg / Match avg<br>
-        Applied adjustment = √(Raw factor)
+        Applied batting adjustment = factor<sup>${TUNE_PARAMS.batPitch.toFixed(2)}</sup> &nbsp; | &nbsp; Applied bowling adjustment = inverse_factor<sup>${TUNE_PARAMS.bowlPitch.toFixed(2)}</sup>
       </div>
-      <p>The raw factor captures the specific grounds, pitch conditions, and opposition strength each player actually faced. We apply a <strong>square root</strong> to soften the adjustment — match averages are an imperfect proxy for true difficulty, conflating pitch conditions with opposition quality and team composition. The sqrt means a player in tough conditions (e.g., match avg = 28, raw factor 1.14) receives a ~1.07× boost rather than the full 1.14×, while one in easy conditions (e.g., match avg = 34, raw factor 0.94) receives a ~0.97× penalty rather than the full 0.94×. Bowling factors are computed inversely (Match avg / All-time avg), then also square-rooted.</p>`;
+      <p>The raw factor captures the specific grounds, pitch conditions, and opposition strength each player actually faced. We raise it to the <strong>pitch exponent</strong> (tunable, currently ${TUNE_PARAMS.batPitch.toFixed(2)} for batting, ${TUNE_PARAMS.bowlPitch.toFixed(2)} for bowling) to control the strength of the adjustment. At 0.5 (sqrt) the adjustment is softened — a player in tough conditions (e.g., match avg = 28, raw factor 1.14) receives a ~1.07× boost. At 1.0 the full factor is applied. Bowling factors are computed inversely (Match avg / All-time avg).</p>`;
 
   const arDesc = `<p>The AEI captures a player's combined contribution with bat and ball. However, allrounders are <strong>ranked by the geometric mean</strong> of their batting and bowling ratings — √(bat_rating × bowl_rating) — which naturally rewards <strong>balance</strong> between the two disciplines. A player who is elite in one but weak in the other will rank below someone who is very good in both. A player must achieve a minimum rating of <strong>${m.min_ar_rating}</strong> in both batting and bowling to qualify.</p>`;
 
   const arRankFormula = `AEI = BEI + BoEI<br>Ranking metric = √(bat_rating × bowl_rating)`;
 
-  const longevityExp = m.longevity_exp || 0.3;
+  const batLongExp = TUNE_PARAMS.batLongevity;
+  const bowlLongExp = TUNE_PARAMS.bowlLongevity;
+  const alphaVal = TUNE_PARAMS.alpha;
 
   const ratingDesc = `
     <h3>Rating Scale</h3>
@@ -845,17 +847,17 @@ function renderMethodology() {
     <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label}s is not the same as one who sustains those numbers over 150 ${label}s. Our index rewards both quality and longevity.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">BEI = avg<sup>0.7</sup> × RPI<sup>0.3</sup> × (strike_rate / 100) × innings<sup>${longevityExp}</sup></div>
-    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>0.7</sup> × RPI<sup>0.3</sup>) applies a moderate not-out correction — a genuine match-winning 80* still gets substantial credit, but a finisher with a high average inflated by many low-scoring not-outs is tempered. This exponent (0.3) is uniform across all formats. The result is multiplied by <strong>SR/100</strong> to capture scoring speed — a player averaging 40 at a strike rate of 130 is far more valuable than one averaging 40 at 70. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a controlled longevity bonus.</p>
+    <div class="formula">BEI = avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup> × (SR / 100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
+    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>) applies a not-out correction — the higher the RPI exponent, the more players with inflated averages from not-outs are tempered. The result is multiplied by <strong>(SR/100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup></strong> to capture scoring speed. The <strong>innings<sup>${batLongExp.toFixed(2)}</sup></strong> exponent provides a controlled longevity bonus. All these parameters are tunable.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">BoEI = (${m.bowl_k} / (bowl_SR × economy / 6)) × innings<sup>${longevityExp}</sup> × scale</div>
-    <p>In limited-overs cricket, a bowler's value comes from two independent factors: <strong>strike rate</strong> (balls per wicket — how quickly they take wickets) and <strong>economy rate</strong> (runs per over — how well they contain). Both are weighted equally. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
+    <div class="formula">BoEI = (${m.bowl_k} / (SR<sup>${(2*TUNE_PARAMS.bowlSrWeight).toFixed(1)}</sup> × (econ/6)<sup>${(2*(1-TUNE_PARAMS.bowlSrWeight)).toFixed(1)}</sup>)) × innings<sup>${bowlLongExp.toFixed(2)}</sup> × scale</div>
+    <p>In limited-overs cricket, a bowler's value comes from two factors: <strong>strike rate</strong> (balls per wicket) and <strong>economy rate</strong> (runs per over). The balance between them is tunable. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
 
     <h3>Pitch &amp; Era Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
     ${pitchDesc}
-    <p>These softened factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
+    <p>These pitch factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>. The pitch exponents for batting and bowling can be tuned independently.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
@@ -864,8 +866,8 @@ function renderMethodology() {
     <h3>Minimum Qualification</h3>
     <p>Players must have played at least <strong>${m.min_matches} matches</strong> to qualify.${CURRENT_FORMAT === 'ipl' ? '' : ' Only ICC Full Member nations are included in the rankings.'}</p>
 
-    <h3>Career Charts</h3>
-    <p>The per-player career charts show how a player's form evolved over time in match-window stints. These are for visualization only — the ranking formula uses career totals.</p>
+    <h3>Score Breakdown</h3>
+    <p>Click on any player to see the factors going into their score — quality metrics, longevity, and pitch difficulty adjustments — showing exactly how their rating was computed.</p>
 
     ${ratingDesc}
     `;
@@ -877,19 +879,19 @@ function renderMethodology() {
     <p>A player who averages 50 over 20 ${label}s is <strong>not</strong> the same as someone who averages 50 over 180 ${label}s. The second player sustained that level for nine times longer — through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">BEI = avg<sup>0.7</sup> × RPI<sup>0.3</sup> × innings<sup>${longevityExp}</sup></div>
-    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>0.7</sup> × RPI<sup>0.3</sup>) applies a moderate not-out correction — it still gives substantial credit for not-outs (a genuine 150* deserves more than 150), but prevents players with high not-out rates from having inflated ratings relative to openers who get out nearly every innings. This exponent (0.3) is uniform across all formats. The <strong>innings<sup>${longevityExp}</sup></strong> exponent provides a meaningful but controlled longevity bonus.</p>
+    <div class="formula">BEI = avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
+    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>) applies a not-out correction — the higher the RPI exponent, the more players with inflated averages from not-outs are tempered. The <strong>innings<sup>${batLongExp.toFixed(2)}</sup></strong> exponent provides a meaningful but controlled longevity bonus. All these parameters are tunable.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">BoEI = (${m.bowl_k} / bowl_avg) × √(wpi / baseline_wpi) × (baseline_sr / sr)<sup>${m.sr_exp}</sup> × innings<sup>${longevityExp}</sup> × scale</div>
-    <p>Bowling averages are "lower is better," so we flip them. The <strong>wickets per innings (wpi)</strong> factor captures volume — a strike bowler averaging 22 and taking 2.5 wickets per innings scores far higher than a part-timer averaging 22 but taking 1 per innings. We use wickets per <em>innings</em> rather than per match because it normalizes for matches where a bowler didn't get to bowl both innings (rain, declarations, one-sided games). The square root dampens the volume factor so quality still dominates.</p>
-    <p>The <strong>strike rate factor</strong> (baseline_sr / sr)<sup>${m.sr_exp}</sup> gives a mild boost to bowlers who take wickets frequently. The baseline SR is ${m.baseline_sr} (mean across all qualifying bowlers). A bowler with SR 50 gets a ~${Math.round(((m.baseline_sr/50)**m.sr_exp - 1)*100)}% boost, while one at SR 80 is roughly neutral. The low exponent (${m.sr_exp}) keeps this gentle — bowling average remains the dominant quality signal, but strike bowlers like Ambrose and Waqar get appropriate recognition over accumulation-style bowlers.</p>
-    <p>A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.min_bowl_inns} bowling innings</strong> to qualify.</p>
+    <div class="formula">BoEI = (${m.bowl_k} / avg<sup>${TUNE_PARAMS.bowlAvgW.toFixed(1)}</sup>) × (wpi / baseline)<sup>${TUNE_PARAMS.wpiWeight.toFixed(2)}</sup> × (baseline_sr / sr)<sup>${(m.sr_exp * 2 * TUNE_PARAMS.bowlSrWeight).toFixed(2)}</sup> × innings<sup>${bowlLongExp.toFixed(2)}</sup> × scale</div>
+    <p>Bowling averages are "lower is better," so we flip them. The <strong>bowling average</strong> exponent (${TUNE_PARAMS.bowlAvgW.toFixed(1)}) controls how much average matters. The <strong>wickets per innings (wpi)</strong> factor captures volume — a strike bowler averaging 22 and taking 2.5 wickets per innings scores far higher than a part-timer averaging 22 but taking 1 per innings. The wpi exponent (${TUNE_PARAMS.wpiWeight.toFixed(2)}) controls how strongly this is rewarded.</p>
+    <p>The <strong>strike rate factor</strong> gives a boost to bowlers who take wickets frequently. The baseline SR is ${m.baseline_sr} (mean across all qualifying bowlers). The SR exponent (${(m.sr_exp * 2 * TUNE_PARAMS.bowlSrWeight).toFixed(2)}) is tunable via the bowl SR weight slider.</p>
+    <p>A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>${m.min_bowl_inns} bowling innings</strong> to qualify. All bowling parameters are tunable.</p>
 
     <h3>Pitch &amp; Era Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
     ${pitchDesc}
-    <p>These softened factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>.</p>
+    <p>These pitch factors are applied to BEI and BoEI <strong>before</strong> the rating conversion, so the final ratings reflect how impressive a player's performance was <em>relative to the difficulty of the conditions they faced</em>. The pitch exponents for batting and bowling can be tuned independently.</p>
 
     <h3>Allrounder Excellence Index (AEI)</h3>
     <div class="formula">${arRankFormula}</div>
@@ -898,8 +900,8 @@ function renderMethodology() {
     <h3>Minimum Qualification</h3>
     <p>Players must have played at least <strong>${m.min_matches || 20} matches</strong> to qualify. Only ICC Full Member nations are included in the rankings.</p>
 
-    <h3>Career Charts</h3>
-    <p>The per-player career charts show 10-match stint breakdowns for visualization — they illustrate how a player's form evolved over time. These are for visualization only — the ranking formula uses career totals.</p>
+    <h3>Score Breakdown</h3>
+    <p>Click on any player to see the factors going into their score — quality metrics, longevity, and pitch difficulty adjustments — showing exactly how their rating was computed.</p>
 
     ${ratingDesc}
     `;
@@ -1684,33 +1686,54 @@ function renderXFArChart(divId, players) {
 function renderCrossFormatMethodology() {
   const el = document.getElementById('methodology-content');
   if (!el) return;
+
+  const t = TUNE_PARAMS.xfTests, o = TUNE_PARAMS.xfOdis, i = TUNE_PARAMS.xfT20is;
+  const sum = t + o + i || 1;
+  const pctT = Math.round(t / sum * 100), pctO = Math.round(o / sum * 100), pctI = Math.round(i / sum * 100);
+  const activeFmts = [];
+  if (t > 0) activeFmts.push('Tests');
+  if (o > 0) activeFmts.push('ODIs');
+  if (i > 0) activeFmts.push('T20Is');
+  const fmtStr = activeFmts.join(' + ');
+
+  const weightParts = [];
+  if (t > 0) weightParts.push(`${pctT}% Tests`);
+  if (o > 0) weightParts.push(`${pctO}% ODIs`);
+  if (i > 0) weightParts.push(`${pctI}% T20Is`);
+  const weightStr = weightParts.join(', ');
+
+  const formulaParts = [];
+  if (t > 0) formulaParts.push(`w<sub>T</sub> \u00d7 Test rating`);
+  if (o > 0) formulaParts.push(`w<sub>O</sub> \u00d7 ODI rating`);
+  if (i > 0) formulaParts.push(`w<sub>I</sub> \u00d7 T20I rating`);
+  const formulaStr = formulaParts.join(' + ');
+
   el.innerHTML = `
     <h2>Cross-Format Methodology</h2>
 
     <h3>Concept</h3>
-    <p>The Cross-Format GOAT rankings identify the greatest cricketers across multiple international formats. Instead of looking at one format in isolation, we combine a player's per-format ratings to find those who excelled across the board.</p>
+    <p>The Cross-Format GOAT rankings identify the greatest cricketers across multiple international formats. Each format's rating is computed independently using its own formula and tunable parameters, then combined using a <strong>weighted average</strong>.</p>
 
     <h3>Qualification</h3>
-    <p>For <strong>"All 3 Formats"</strong>, a player must appear in the individual rankings for Tests, ODIs, <em>and</em> T20Is \u2014 meaning they met the minimum match and innings thresholds in each format independently. Players like Bradman, who only played Tests, are excluded.</p>
-    <p>For <strong>"Test + ODI"</strong>, a player must appear in both Test and ODI rankings. This captures the great players from the pre-T20 era.</p>
+    <p>A player must appear in the individual rankings for every format with non-zero weight (currently: ${fmtStr}) \u2014 meaning they met the minimum match and innings thresholds in each format independently.</p>
+
+    <h3>Format Weights</h3>
+    <p>The current weighting is <strong>${weightStr}</strong>. Weights are normalized to sum to 100%, so the combined rating is a weighted average rather than a raw sum. You can adjust these weights using the segmented bar at the top of the tune panel.</p>
 
     <h3>Batting GOAT</h3>
-    <div class="formula">Combined Batting Rating = Test bat rating + ODI bat rating + T20I bat rating</div>
-    <p>Each format's batting rating is computed independently using its own methodology \u2014 stint-based integral for Tests, career formula (avg \u00d7 SR/100 \u00d7 innings<sup>0.2</sup>) for LOIs \u2014 with pitch difficulty normalization. The sum rewards players who were elite batsmen across all formats they played. A higher total means consistent excellence across more formats.</p>
+    <div class="formula">Combined Batting Rating = ${formulaStr}</div>
+    <p>Each format's batting rating is computed independently using the career formula (quality \u00d7 longevity \u00d7 pitch adjustment) with pitch difficulty normalization. The per-format batting parameters (longevity, pitch difficulty, not-out correction, strike rate weight) can be tuned independently. The weighted average rewards players who excelled across formats proportional to each format's assigned importance.</p>
 
     <h3>Bowling GOAT</h3>
-    <div class="formula">Combined Bowling Rating = Test bowl rating + ODI bowl rating + T20I bowl rating</div>
-    <p>Same principle as batting. Bowlers who adapted their skills to the different demands of each format \u2014 the patience of Tests, the containment of ODIs, and the death bowling of T20s \u2014 accumulate a higher combined rating.</p>
+    <div class="formula">Combined Bowling Rating = ${formulaStr}</div>
+    <p>Same principle as batting. Each format's bowling rating uses its own tunable parameters (longevity, pitch, SR vs economy, etc.) and the results are combined with the same format weights.</p>
 
     <h3>Allrounder GOAT</h3>
     <div class="formula">Combined AR Rating = \u221a(Combined Bat Rating \u00d7 Combined Bowl Rating)</div>
-    <p>The geometric mean of combined batting and bowling ratings rewards players who contributed significantly with <strong>both</strong> bat and ball across formats. A player must have a combined batting rating of at least <strong>${XF_MIN_AR}</strong> and a combined bowling rating of at least <strong>${XF_MIN_AR}</strong> to qualify. This filters out pure batsmen and pure bowlers.</p>
+    <p>The geometric mean of combined batting and bowling ratings rewards players who contributed significantly with <strong>both</strong> bat and ball across formats. A player must have a combined batting rating of at least <strong>${XF_MIN_AR}</strong> and a combined bowling rating of at least <strong>${XF_MIN_AR}</strong> to qualify.</p>
 
-    <h3>Why Sum?</h3>
-    <p>We use a simple sum rather than an average because it naturally rewards versatility across more formats. A player who excels in 3 formats has demonstrated the ability to adapt across very different game situations \u2014 the urgency of T20s, the tactical depth of ODIs, and the mental and physical challenge of Tests. Being great in more formats means a higher combined rating.</p>
-
-    <h3>Why Not Average?</h3>
-    <p>An average would rank a player with 950 in Tests + 950 in ODIs + 200 in T20Is (avg: 700) below one with 750 across all three (avg: 750). But the first player achieved far more sustained excellence in two formats than the second. The sum captures this: total greatness across formats, not average greatness.</p>
+    <h3>Why Weighted Average?</h3>
+    <p>Weights are normalized so the combined rating is always on the same scale as individual format ratings (roughly 0\u20131000+). This means a combined rating of 900 is comparable to a single-format rating of 900. Setting a format to 0% excludes it entirely, letting you create custom combinations like Tests + ODIs only.</p>
   `;
 }
 
