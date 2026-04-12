@@ -601,8 +601,8 @@ function updateFormatLabels() {
   document.getElementById('heading-allrounders').textContent = `Top 100 ${label} Allrounders`;
   document.getElementById('heading-batting').textContent = `Top 100 ${label} Batters`;
   document.getElementById('heading-bowling').textContent = `Top 100 ${label} Bowlers`;
-  document.querySelector('#panel-batting .panel-desc').textContent = `The greatest batsmen in ${label} cricket history, ranked by career batting excellence. Click any player to explore their career.`;
-  document.querySelector('#panel-bowling .panel-desc').textContent = `The greatest bowlers in ${label} cricket history, ranked by career bowling excellence. Click any player to explore their career.`;
+  document.querySelector('#panel-batting .panel-desc').textContent = `The greatest batsmen in ${label} cricket history, ranked by career batting excellence. Click any player to explore their score breakdown.`;
+  document.querySelector('#panel-bowling .panel-desc').textContent = `The greatest bowlers in ${label} cricket history, ranked by career bowling excellence. Click any player to explore their score breakdown.`;
 }
 
 function renderAll() {
