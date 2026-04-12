@@ -742,6 +742,7 @@ footer {
   gap: 1.4rem 2.5rem;
 }
 .tune-slider-group { }
+.tune-ar-header { grid-column: 1 / -1; margin-bottom: -0.6rem; }
 .tune-slider-group label {
   font-size: 0.8rem;
   color: var(--text);
