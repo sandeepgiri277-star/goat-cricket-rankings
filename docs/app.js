@@ -868,7 +868,7 @@ function renderMethodology() {
     <h2>${label} Methodology</h2>
 
     <h3>The Problem with Career Averages</h3>
-    <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label}s is not the same as one who sustains those numbers over 150 ${label}s. Our index rewards both quality and longevity.</p>
+    <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label} matches is not the same as one who sustains those numbers over 150 ${label} matches. Our index rewards both quality and longevity.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
     <div class="formula">BEI = avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup> × (SR / 100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
@@ -900,7 +900,7 @@ function renderMethodology() {
     <h2>${label} Methodology</h2>
 
     <h3>The Problem with Career Averages</h3>
-    <p>A player who averages 50 over 20 ${label}s is <strong>not</strong> the same as someone who averages 50 over 180 ${label}s. The second player sustained that level for nine times longer — through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
+    <p>A player who averages 50 over 20 ${label} matches is <strong>not</strong> the same as someone who averages 50 over 180 ${label} matches. The second player sustained that level for nine times longer — through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
     <div class="formula">BEI = avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
