@@ -1349,17 +1349,6 @@ def compute_loi_baseline_wpm(bat_cache: dict, bowl_cache: dict, min_matches: int
     return float(np.mean(wpms)) if wpms else 1.0
 
 
-def compute_loi_baseline_wpi(bowl_agg: pd.DataFrame, min_bowl_inns: int = 20) -> float:
-    """Mean wickets-per-innings across qualifying LOI bowlers."""
-    wpis = []
-    for _, r in bowl_agg.iterrows():
-        inns = int(_safe_float(r.get("Inns", 0), 0))
-        wkts = int(_safe_float(r.get("Wkts", 0), 0))
-        if inns >= min_bowl_inns and wkts > 0:
-            wpis.append(wkts / inns)
-    return float(np.mean(wpis)) if wpis else 1.0
-
-
 def compute_loi_boei_scale(
     bat_agg: pd.DataFrame, bowl_agg: pd.DataFrame, min_matches: int = LOI_MIN_MATCHES,
 ) -> float:
@@ -1525,15 +1514,14 @@ def compute_loi_all_players(
             career_bowl_avg = 0.0
             career_bowl_sr = 0.0
             career_bowl_econ = 0.0
-            career_wpi = 0.0
+            balls_bowled = 0
             if pid in bowl_agg_idx.index:
                 bo = bowl_agg_idx.loc[pid]
                 bowl_inns = int(_safe_float(bo["Inns"], 0))
                 career_bowl_avg = _safe_float(bo["Ave"])
                 career_bowl_sr = _safe_float(bo.get("SR", 0))
                 career_bowl_econ = _safe_float(bo["Econ"])
-                bowl_wkts = int(_safe_float(bo.get("Wkts", 0), 0))
-                career_wpi = bowl_wkts / bowl_inns if bowl_inns > 0 else 0.0
+                balls_bowled = int(_safe_float(bo.get("Balls", 0), 0))
 
             idx = compute_loi_career_indices(
                 bat_inns, career_bat_avg, career_bat_sr,
@@ -1584,7 +1572,7 @@ def compute_loi_all_players(
                 "career_bowl_avg": round(career_bowl_avg, 2) if career_bowl_avg > 0 else None,
                 "career_bowl_sr": round(career_bowl_sr, 1) if career_bowl_sr > 0 else None,
                 "career_bowl_econ": round(career_bowl_econ, 2) if career_bowl_econ > 0 else None,
-                "career_wpi": round(career_wpi, 3) if career_wpi > 0 else None,
+                "balls_bowled": balls_bowled if balls_bowled > 0 else None,
                 "bat_inns": bat_inns,
                 "bowl_inns": bowl_inns,
                 "career_rpi": round(career_rpi, 2),
@@ -1600,7 +1588,6 @@ def build_loi_rankings_json(
     all_players: list[dict],
     boei_scale: float,
     baseline_wpm: float = 1.0,
-    baseline_wpi: float = 1.0,
     all_time_avg: float = 31.0,
     all_time_rpo: float = 4.7,
     format_name: str = "ODI",
@@ -1687,7 +1674,7 @@ def build_loi_rankings_json(
             "career_bowl_avg": p.get("career_bowl_avg"),
             "career_bowl_sr": p.get("career_bowl_sr"),
             "career_bowl_econ": p.get("career_bowl_econ"),
-            "career_wpi": p.get("career_wpi"),
+            "balls_bowled": p.get("balls_bowled"),
             "bat_inns": p.get("bat_inns"),
             "bowl_inns": p.get("bowl_inns"),
             "career_rpi": p.get("career_rpi"),
@@ -1713,7 +1700,6 @@ def build_loi_rankings_json(
             "rating_k": RATING_K,
             "all_time_avg": round(all_time_avg, 2),
             "all_time_rpo": round(all_time_rpo, 2),
-            "baseline_wpi": round(baseline_wpi, 2),
             "bei_median": round(rating_stats["BEI"][0], 2),
             "bei_std": round(rating_stats["BEI"][1], 2),
             "boei_median": round(rating_stats["BoEI"][0], 2),
@@ -1818,14 +1804,10 @@ def run_loi_pipeline(
         cricket_class, extra_params, global_match_cache_path, force=force_scrape,
     )
 
-    # 4. Baseline WPM, WPI, and BoEI scale
+    # 4. Baseline WPM and BoEI scale
     print(f"\nComputing {format_name} baseline wpm...")
     baseline_wpm = compute_loi_baseline_wpm(bat_cache, bowl_cache, min_matches=min_matches)
     print(f"  BASELINE_WPM = {baseline_wpm:.2f}")
-
-    print(f"Computing {format_name} baseline wpi...")
-    baseline_wpi = compute_loi_baseline_wpi(bowl_agg, min_bowl_inns=LOI_STINT_INNINGS)
-    print(f"  BASELINE_WPI = {baseline_wpi:.2f}")
 
     print(f"Computing {format_name} BoEI scale...")
     boei_scale = compute_loi_boei_scale(bat_agg, bowl_agg, min_matches=min_matches)
@@ -1846,7 +1828,7 @@ def run_loi_pipeline(
     print(f"Building {format_name} rankings JSON...")
     rankings = build_loi_rankings_json(
         all_players, boei_scale,
-        baseline_wpm=baseline_wpm, baseline_wpi=baseline_wpi,
+        baseline_wpm=baseline_wpm,
         all_time_avg=all_time_avg,
         all_time_rpo=all_time_rpo, format_name=format_name,
         full_member_only=full_member_only, min_matches=min_matches,

@@ -86,13 +86,13 @@ function activeParams() {
 
 const XF_PARAM_KEYS = {
   tests: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'],
-  odis:  ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight'],
-  t20is: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight'],
+  odis:  ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight'],
+  t20is: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight'],
 };
 const XF_TUNE_DEFAULTS = {
   tests: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, bowlSrWeight: 0.5, bowlAvgW: 1.0, wpiWeight: 0.5 },
-  odis:  { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5 },
-  t20is: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5 },
+  odis:  { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
+  t20is: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
 };
 let XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
 
@@ -124,6 +124,7 @@ function computeIndices(allPlayers, p, m, isLOI) {
     const bowlSr = pl.career_bowl_sr || 0;
     const bowlEcon = pl.career_bowl_econ || 0;
     const wpi = pl.career_wpi || 0;
+    const ballsBowled = pl.balls_bowled || 0;
 
     let boei = 0;
     if (bowlInns >= minBowlInns && bowlAvg > 0) {
@@ -131,10 +132,8 @@ function computeIndices(allPlayers, p, m, isLOI) {
         if (bowlSr > 0 && bowlEcon > 0) {
           const w = p.bowlSrWeight;
           const combo = Math.pow(bowlSr, 2 * w) * Math.pow(bowlEcon / 6, 2 * (1 - w));
-          boei = p.bowlK / combo * Math.pow(bowlInns, p.bowlLongevity) * boeiScale;
-          if (wpi > 0 && baselineWpi > 0 && p.wpiWeight > 0) {
-            boei *= Math.pow(wpi / baselineWpi, p.wpiWeight);
-          }
+          const longevityBase = ballsBowled > 0 ? ballsBowled : bowlInns;
+          boei = p.bowlK / combo * Math.pow(longevityBase, p.bowlLongevity) * boeiScale;
         }
       } else {
         if (wpi > 0 && baselineWpi > 0) {
@@ -909,8 +908,8 @@ function renderMethodology() {
     <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>) applies a not-out correction — the higher the RPI exponent, the more players with inflated averages from not-outs are tempered. The result is multiplied by <strong>(SR/100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup></strong> to capture scoring speed. The <strong>innings<sup>${batLongExp.toFixed(2)}</sup></strong> exponent provides a controlled longevity bonus. All these parameters are tunable.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
-    <div class="formula">BoEI = (${m.bowl_k} / (SR<sup>${(2*TUNE_PARAMS.bowlSrWeight).toFixed(1)}</sup> × (econ/6)<sup>${(2*(1-TUNE_PARAMS.bowlSrWeight)).toFixed(1)}</sup>)) × (wpi/baseline)<sup>${TUNE_PARAMS.wpiWeight.toFixed(2)}</sup> × innings<sup>${bowlLongExp.toFixed(2)}</sup> × scale</div>
-    <p>In limited-overs cricket, a bowler's value comes from <strong>strike rate</strong> (balls per wicket), <strong>economy rate</strong> (runs per over), and <strong>wickets per innings</strong> (volume of wicket-taking). The SR/economy balance and WPI impact are tunable. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
+    <div class="formula">BoEI = (${m.bowl_k} / (SR<sup>${(2*TUNE_PARAMS.bowlSrWeight).toFixed(1)}</sup> × (econ/6)<sup>${(2*(1-TUNE_PARAMS.bowlSrWeight)).toFixed(1)}</sup>)) × balls<sup>${bowlLongExp.toFixed(2)}</sup> × scale</div>
+    <p>In limited-overs cricket, a bowler's value comes from two quality factors — <strong>strike rate</strong> (balls per wicket) and <strong>economy rate</strong> (runs per over) — plus a longevity factor based on <strong>total balls bowled</strong>. Using balls bowled rather than innings ensures that part-time bowlers (who bowl a few overs per game) are naturally weighted less than full-time bowlers with the same SR and economy. The SR/economy balance is tunable. A data-driven scaling factor (×${m.boei_scale}) ensures that BEI and BoEI are on comparable scales. Bowlers must have at least <strong>20 bowling innings</strong> to qualify.</p>
 
     <h3>Pitch &amp; Era Normalization</h3>
     <p>Not all conditions are created equal. Averaging 50 on seaming pitches against quality attacks is a far greater achievement than averaging 50 on flat roads. We normalize for this by looking at the <strong>specific matches</strong> each player appeared in.</p>
@@ -1148,18 +1147,20 @@ function renderScoreBreakdown(player) {
   if (player.bowl_rating > 0 && player.career_bowl_avg != null && player.bowl_inns > 0) {
     const bowlAvg = player.career_bowl_avg;
     const bowlInns = player.bowl_inns;
+    const ballsBowled = player.balls_bowled || 0;
     const pitchAdj = player.bowl_pitch_factor || 1;
     const bowlK = TUNE_PARAMS.bowlK;
-    const longevityFactor = Math.pow(bowlInns, bowlLongevity);
+    const longevityBase = isLOI && ballsBowled > 0 ? ballsBowled : bowlInns;
+    const longevityFactor = Math.pow(longevityBase, bowlLongevity);
 
     const bowlers = all.filter(p => p.bowl_inns > 0 && p.career_bowl_avg > 0);
     const allBowlAvg = bowlers.map(p => p.career_bowl_avg);
-    const allBowlInns = bowlers.map(p => p.bowl_inns);
+    const allLongevity = isLOI ? bowlers.map(p => p.balls_bowled || p.bowl_inns) : bowlers.map(p => p.bowl_inns);
 
     const bowlAvgPct = _percentile(allBowlAvg.map(v => -v), -bowlAvg);
     const [bowlAvgTier, bowlAvgTierClass] = _tier(bowlAvgPct);
-    const bowlInnsPct = _percentile(allBowlInns, bowlInns);
-    const [bowlInnsTier, bowlInnsTierClass] = _tier(bowlInnsPct);
+    const longPct = _percentile(allLongevity, longevityBase);
+    const [longTier, longTierClass] = _tier(longPct);
 
     let bars = '';
 
@@ -1192,7 +1193,8 @@ function renderScoreBreakdown(player) {
       }
     }
 
-    bars += _barHTML('Longevity', `${bowlInns} innings`, bowlInnsPct, bowlInnsTier, bowlInnsTierClass);
+    const longLabel = isLOI && ballsBowled > 0 ? `${ballsBowled} balls` : `${bowlInns} innings`;
+    bars += _barHTML('Longevity', longLabel, longPct, longTier, longTierClass);
 
     if (player.match_avg) {
       const allMatchAvg = all.filter(p => p.match_avg > 0).map(p => p.match_avg);
@@ -1236,7 +1238,8 @@ function renderScoreBreakdown(player) {
         formulaParts.push(`× (${baseSr}/sr)^${srExp} = (${baseSr}/${player.career_bowl_sr})^${srExp} = ${Math.pow(baseSr/player.career_bowl_sr, srExp).toFixed(2)}`);
       }
     }
-    formulaParts.push(`× innings<sup>${bowlLongevity.toFixed(2)}</sup> = × ${bowlInns}^${bowlLongevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
+    const longTermLabel = isLOI && ballsBowled > 0 ? 'balls' : 'innings';
+    formulaParts.push(`× ${longTermLabel}<sup>${bowlLongevity.toFixed(2)}</sup> = × ${longevityBase}^${bowlLongevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
     if (pitchAdj !== 1 && bowlPitchExp > 0) {
       const adjVal = Math.pow(pitchAdj, bowlPitchExp);
       formulaParts.push(`× pitch<sup>${bowlPitchExp.toFixed(1)}</sup> = × ${pitchAdj.toFixed(4)}^${bowlPitchExp.toFixed(1)} = × ${adjVal.toFixed(4)}`);
@@ -2144,7 +2147,7 @@ function updateSrRowVisibility() {
   const wpiRow = document.getElementById('tune-wpi-row');
   const bowlAvgRow = document.getElementById('tune-bowlAvg-row');
   if (srRow) srRow.classList.toggle('hidden', isTests || !showBat);
-  if (wpiRow) wpiRow.classList.toggle('hidden', !showBowl);
+  if (wpiRow) wpiRow.classList.toggle('hidden', !isTests || !showBowl);
   if (bowlAvgRow) bowlAvgRow.classList.toggle('hidden', !isTests || !showBowl);
 }
 
