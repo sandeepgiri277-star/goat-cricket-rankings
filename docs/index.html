@@ -48,8 +48,9 @@
       <p class="tune-intro">What makes a GOAT? You decide. Drag the sliders and the rankings recalculate instantly.</p>
 
       <div class="tune-sliders" id="tune-regular-sliders">
+        <h4 class="tune-section-title tune-ar-header tune-bat-only">Batting Factors</h4>
         <div class="tune-slider-group tune-bat-only">
-          <label for="tune-batLongevity">How much should batting career length matter?</label>
+          <label for="tune-batLongevity">How much should career length matter?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Peak matters</span>
             <input type="range" id="tune-batLongevity" min="0" max="100" step="1" value="50">
@@ -59,7 +60,7 @@
           <div class="tune-status" id="tune-batLongevity-status"></div>
         </div>
         <div class="tune-slider-group tune-bat-only">
-          <label for="tune-batPitch">Adjust for batting conditions?</label>
+          <label for="tune-batPitch">Adjust for conditions?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Ignore conditions</span>
             <input type="range" id="tune-batPitch" min="0" max="100" step="1" value="50">
@@ -68,28 +69,8 @@
           </div>
           <div class="tune-status" id="tune-batPitch-status"></div>
         </div>
-        <div class="tune-slider-group tune-bowl-only">
-          <label for="tune-bowlLongevity">How much should bowling career length matter?</label>
-          <div class="tune-slider-wrap">
-            <span class="tune-endpoint">Peak matters</span>
-            <input type="range" id="tune-bowlLongevity" min="0" max="100" step="1" value="50">
-            <span class="tune-endpoint">Long careers rewarded</span>
-            <span class="tune-val" id="tune-bowlLongevity-val">50</span>
-          </div>
-          <div class="tune-status" id="tune-bowlLongevity-status"></div>
-        </div>
-        <div class="tune-slider-group tune-bowl-only">
-          <label for="tune-bowlPitch">Adjust for bowling conditions?</label>
-          <div class="tune-slider-wrap">
-            <span class="tune-endpoint">Ignore conditions</span>
-            <input type="range" id="tune-bowlPitch" min="0" max="100" step="1" value="50">
-            <span class="tune-endpoint">Full adjustment</span>
-            <span class="tune-val" id="tune-bowlPitch-val">50</span>
-          </div>
-          <div class="tune-status" id="tune-bowlPitch-status"></div>
-        </div>
         <div class="tune-slider-group tune-bat-only">
-          <label for="tune-alpha">How much should not-outs inflate a batting average?</label>
+          <label for="tune-alpha">How much should not-outs inflate average?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Trust averages</span>
             <input type="range" id="tune-alpha" min="0" max="100" step="1" value="30">
@@ -99,7 +80,7 @@
           <div class="tune-status" id="tune-alpha-status"></div>
         </div>
         <div class="tune-slider-group tune-bat-only" id="tune-sr-row">
-          <label for="tune-srWeight">How important is batting strike rate?</label>
+          <label for="tune-srWeight">How important is strike rate?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Ignore SR</span>
             <input type="range" id="tune-srWeight" min="0" max="100" step="1" value="50">
@@ -108,8 +89,29 @@
           </div>
           <div class="tune-status" id="tune-srWeight-status"></div>
         </div>
+        <h4 class="tune-section-title tune-ar-header tune-bowl-only">Bowling Factors</h4>
         <div class="tune-slider-group tune-bowl-only">
-          <label for="tune-bowlSrWeight">What matters more for bowlers — strike rate or economy?</label>
+          <label for="tune-bowlLongevity">How much should career length matter?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Peak matters</span>
+            <input type="range" id="tune-bowlLongevity" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Long careers rewarded</span>
+            <span class="tune-val" id="tune-bowlLongevity-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-bowlLongevity-status"></div>
+        </div>
+        <div class="tune-slider-group tune-bowl-only">
+          <label for="tune-bowlPitch">Adjust for conditions?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore conditions</span>
+            <input type="range" id="tune-bowlPitch" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Full adjustment</span>
+            <span class="tune-val" id="tune-bowlPitch-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-bowlPitch-status"></div>
+        </div>
+        <div class="tune-slider-group tune-bowl-only">
+          <label for="tune-bowlSrWeight">Strike rate or economy?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Economy only</span>
             <input type="range" id="tune-bowlSrWeight" min="0" max="100" step="1" value="50">
@@ -119,7 +121,7 @@
           <div class="tune-status" id="tune-bowlSrWeight-status"></div>
         </div>
         <div class="tune-slider-group tune-bowl-only" id="tune-bowlAvg-row">
-          <label for="tune-bowlAvgW">How much should bowling average matter (Tests)?</label>
+          <label for="tune-bowlAvgW">How much should average matter (Tests)?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Ignore average</span>
             <input type="range" id="tune-bowlAvgW" min="0" max="100" step="1" value="50">

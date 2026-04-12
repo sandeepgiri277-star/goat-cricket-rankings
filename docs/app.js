@@ -1724,8 +1724,10 @@ function switchTab(tabId, updateHash = true) {
 
   const showBat = tabId !== 'bowling';
   const showBowl = tabId !== 'batting';
+  const isAR = tabId === 'allrounders';
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
+  document.querySelectorAll('.tune-ar-header').forEach(el => el.classList.toggle('hidden', !isAR));
   updateSrRowVisibility();
 
   if (updateHash) {
