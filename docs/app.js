@@ -211,9 +211,28 @@ function isCustomParams() {
   return false;
 }
 
+const BAT_PARAM_KEYS = ['batLongevity', 'batPitch', 'alpha', 'srWeight'];
+const BOWL_PARAM_KEYS = ['bowlLongevity', 'bowlPitch', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'];
+
 function resetParams() {
   TUNE_PARAMS = { ...TUNE_DEFAULTS };
   XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
+  resetToOriginalDataAll();
+}
+
+function resetParamsSection(keys) {
+  for (const k of keys) {
+    if (k in TUNE_DEFAULTS) TUNE_PARAMS[k] = TUNE_DEFAULTS[k];
+  }
+  for (const [fmt, fmtKeys] of Object.entries(XF_PARAM_KEYS)) {
+    for (const k of keys) {
+      if (fmtKeys.includes(k)) XF_TUNE_PARAMS[fmt][k] = XF_TUNE_DEFAULTS[fmt][k];
+    }
+  }
+  resetToOriginalDataAll();
+}
+
+function resetToOriginalDataAll() {
   if (CURRENT_FORMAT === 'crossformat') {
     for (const fmt of ['tests', 'odis', 't20is']) {
       if (ALL_DATA[fmt] && ORIGINAL_DATA[fmt]) {
@@ -1884,6 +1903,18 @@ function setupTunePanel() {
     updateTuneBadge();
     renderAll();
   });
+
+  function handleSectionReset(keys) {
+    resetParamsSection(keys);
+    syncSlidersToParams();
+    syncXfSliders();
+    recomputeRankings();
+    if (CURRENT_FORMAT === 'crossformat') computeCrossFormat();
+    updateTuneBadge();
+    renderAll();
+  }
+  document.getElementById('reset-bat').addEventListener('click', () => handleSectionReset(BAT_PARAM_KEYS));
+  document.getElementById('reset-bowl').addEventListener('click', () => handleSectionReset(BOWL_PARAM_KEYS));
 
   shareBtn.addEventListener('click', (e) => {
     e.preventDefault();

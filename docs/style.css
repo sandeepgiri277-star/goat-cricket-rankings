@@ -742,7 +742,15 @@ footer {
   gap: 1.4rem 2.5rem;
 }
 .tune-slider-group { }
-.tune-ar-header { grid-column: 1 / -1; margin-bottom: -0.6rem; }
+.tune-ar-header { grid-column: 1 / -1; margin-bottom: -0.6rem; display: flex; align-items: center; justify-content: space-between; }
+.tune-ar-header.hidden { display: none; }
+.tune-section-reset {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  font: 500 0.68rem var(--font); padding: 0.2rem 0.6rem; border-radius: var(--radius-sm);
+  cursor: pointer; transition: color var(--transition), border-color var(--transition);
+  text-transform: none; letter-spacing: 0;
+}
+.tune-section-reset:hover { color: var(--accent3); border-color: var(--accent3); }
 .tune-slider-group label {
   font-size: 0.8rem;
   color: var(--text);
