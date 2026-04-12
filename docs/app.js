@@ -73,7 +73,16 @@ function _realToSlider(key, val) {
   return Math.round((val - r.min) / (r.max - r.min) * 100);
 }
 let TUNE_PARAMS = { ...TUNE_DEFAULTS };
+let AR_TUNE_PARAMS = { ...TUNE_DEFAULTS };
 let ORIGINAL_DATA = {};
+
+function activeTab() {
+  const el = document.querySelector('.tab.active');
+  return el ? el.dataset.tab : 'allrounders';
+}
+function activeParams() {
+  return activeTab() === 'allrounders' ? AR_TUNE_PARAMS : TUNE_PARAMS;
+}
 
 const XF_PARAM_KEYS = {
   tests: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'],
@@ -87,22 +96,15 @@ const XF_TUNE_DEFAULTS = {
 };
 let XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
 
-function recomputeRankings() {
-  if (!DATA || CURRENT_FORMAT === 'crossformat') return;
-  const m = DATA.metadata;
-  const isLOI = CURRENT_FORMAT !== 'tests';
-  const p = TUNE_PARAMS;
-  const ratingBase = m.rating_base || 500;
-
-  const allPlayers = DATA.all_players;
+function computeIndices(allPlayers, p, m, isLOI) {
   const boeiScale = m.boei_scale || 1;
   const baselineWpi = m.baseline_wpi || 1.46;
   const baselineSr = m.baseline_sr || 79.9;
   const srExp = m.sr_exp || 0.2;
   const minBowlInns = m.min_bowl_inns || m.stint_innings || 20;
-  const minArRating = m.min_ar_rating || 250;
+  const ratingBase = m.rating_base || 500;
 
-  for (const pl of allPlayers) {
+  const results = allPlayers.map(pl => {
     const avg = pl.career_bat_avg || 0;
     const rpi = pl.career_rpi || avg;
     const batInns = pl.bat_inns || 0;
@@ -115,7 +117,6 @@ function recomputeRankings() {
       bei = quality * Math.pow(batInns, p.batLongevity) * Math.pow(batPf, p.batPitch);
       if (isLOI) bei *= Math.pow(sr / 100, p.srWeight);
     }
-    pl.BEI = Math.round(bei * 100) / 100;
 
     const bowlAvg = pl.career_bowl_avg || 0;
     const bowlInns = pl.bowl_inns || 0;
@@ -141,12 +142,12 @@ function recomputeRankings() {
       }
       boei *= Math.pow(bowlPf, p.bowlPitch);
     }
-    pl.BoEI = Math.round(boei * 100) / 100;
-    pl.AEI = Math.round((pl.BEI + pl.BoEI) * 100) / 100;
-  }
 
-  const beiVals = allPlayers.map(pl => pl.BEI);
-  const boeiVals = allPlayers.filter(pl => pl.BoEI > 0).map(pl => pl.BoEI);
+    return { player: pl, bei: Math.round(bei * 100) / 100, boei: Math.round(boei * 100) / 100 };
+  });
+
+  const beiVals = results.map(r => r.bei);
+  const boeiVals = results.filter(r => r.boei > 0).map(r => r.boei);
 
   function medianStd(arr) {
     if (arr.length === 0) return [0, 1];
@@ -167,32 +168,57 @@ function recomputeRankings() {
     return Math.round(z >= 0 ? ratingBase + p.ratingK * Math.sqrt(z) : ratingBase + p.ratingK * z);
   }
 
+  for (const r of results) {
+    r.bat_rating = r.bei > 0 ? toRating(r.bei, beiMed, beiStd) : 0;
+    r.bowl_rating = r.boei > 0 ? toRating(r.boei, boeiMed, boeiStd) : 0;
+  }
+
+  return { results, beiMed, beiStd, boeiMed, boeiStd };
+}
+
+function recomputeRankings() {
+  if (!DATA || CURRENT_FORMAT === 'crossformat') return;
+  const m = DATA.metadata;
+  const isLOI = CURRENT_FORMAT !== 'tests';
+  const allPlayers = DATA.all_players;
+  const minArRating = m.min_ar_rating || 250;
   const isFmOnly = CURRENT_FORMAT !== 'ipl';
 
-  for (const pl of allPlayers) {
-    pl.bat_rating = pl.BEI > 0 ? toRating(pl.BEI, beiMed, beiStd) : 0;
-    pl.bowl_rating = pl.BoEI > 0 ? toRating(pl.BoEI, boeiMed, boeiStd) : 0;
+  const { results, beiMed, beiStd, boeiMed, boeiStd } = computeIndices(allPlayers, TUNE_PARAMS, m, isLOI);
+  for (const r of results) {
+    r.player.BEI = r.bei;
+    r.player.BoEI = r.boei;
+    r.player.AEI = Math.round((r.bei + r.boei) * 100) / 100;
+    r.player.bat_rating = r.bat_rating;
+    r.player.bowl_rating = r.bowl_rating;
   }
 
   const ranked = isFmOnly ? allPlayers.filter(pl => isFullMember(pl.country)) : allPlayers;
   const batSorted = [...ranked].sort((a, b) => b.BEI - a.BEI);
   const bowlSorted = [...ranked].filter(pl => pl.BoEI > 0).sort((a, b) => b.BoEI - a.BoEI);
-
   batSorted.forEach((pl, i) => { pl.bat_rank = pl.BEI > 0 ? i + 1 : null; });
   bowlSorted.forEach((pl, i) => { pl.bowl_rank = pl.BoEI > 0 ? i + 1 : null; });
 
+  DATA.batting_top25 = batSorted.slice(0, 100);
+  DATA.bowling_top25 = bowlSorted.slice(0, 100);
+
+  const arRes = computeIndices(allPlayers, AR_TUNE_PARAMS, m, isLOI);
   const allrounders = [];
-  for (const pl of ranked) {
-    if (pl.bat_rating >= minArRating && pl.bowl_rating >= minArRating) {
-      pl.ar_rating = Math.round(Math.sqrt(pl.bat_rating * pl.bowl_rating));
-      allrounders.push(pl);
+  for (const r of arRes.results) {
+    if (r.bat_rating >= minArRating && r.bowl_rating >= minArRating) {
+      const arEntry = {
+        ...r.player,
+        bat_rating: r.bat_rating,
+        bowl_rating: r.bowl_rating,
+        BEI: r.bei,
+        BoEI: r.boei,
+        ar_rating: Math.round(Math.sqrt(r.bat_rating * r.bowl_rating)),
+      };
+      allrounders.push(arEntry);
     }
   }
   allrounders.sort((a, b) => b.ar_rating - a.ar_rating);
   allrounders.forEach((pl, i) => { pl.ar_rank = i + 1; });
-
-  DATA.batting_top25 = batSorted.slice(0, 100);
-  DATA.bowling_top25 = bowlSorted.slice(0, 100);
   DATA.allrounder_top25 = allrounders.slice(0, 100);
 
   DATA.metadata.bei_median = Math.round(beiMed * 100) / 100;
@@ -203,6 +229,7 @@ function recomputeRankings() {
 
 function isCustomParams() {
   if (Object.keys(TUNE_DEFAULTS).some(k => TUNE_PARAMS[k] !== TUNE_DEFAULTS[k])) return true;
+  if (Object.keys(TUNE_DEFAULTS).some(k => AR_TUNE_PARAMS[k] !== TUNE_DEFAULTS[k])) return true;
   for (const [fmt, keys] of Object.entries(XF_PARAM_KEYS)) {
     for (const key of keys) {
       if (XF_TUNE_PARAMS[fmt][key] !== XF_TUNE_DEFAULTS[fmt][key]) return true;
@@ -216,17 +243,21 @@ const BOWL_PARAM_KEYS = ['bowlLongevity', 'bowlPitch', 'bowlSrWeight', 'bowlAvgW
 
 function resetParams() {
   TUNE_PARAMS = { ...TUNE_DEFAULTS };
+  AR_TUNE_PARAMS = { ...TUNE_DEFAULTS };
   XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
   resetToOriginalDataAll();
 }
 
 function resetParamsSection(keys) {
+  const p = activeParams();
   for (const k of keys) {
-    if (k in TUNE_DEFAULTS) TUNE_PARAMS[k] = TUNE_DEFAULTS[k];
+    if (k in TUNE_DEFAULTS) p[k] = TUNE_DEFAULTS[k];
   }
-  for (const [fmt, fmtKeys] of Object.entries(XF_PARAM_KEYS)) {
-    for (const k of keys) {
-      if (fmtKeys.includes(k)) XF_TUNE_PARAMS[fmt][k] = XF_TUNE_DEFAULTS[fmt][k];
+  if (CURRENT_FORMAT === 'crossformat') {
+    for (const [fmt, fmtKeys] of Object.entries(XF_PARAM_KEYS)) {
+      for (const k of keys) {
+        if (fmtKeys.includes(k)) XF_TUNE_PARAMS[fmt][k] = XF_TUNE_DEFAULTS[fmt][k];
+      }
     }
   }
   resetToOriginalDataAll();
@@ -1775,6 +1806,7 @@ function switchTab(tabId, updateHash = true) {
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
   document.querySelectorAll('.tune-ar-header').forEach(el => el.classList.toggle('hidden', !isAR));
+  syncSlidersToParams();
   updateSrRowVisibility();
 
   if (updateHash) {
@@ -1890,7 +1922,7 @@ function setupTunePanel() {
     slider.addEventListener('input', () => {
       const pct = parseInt(slider.value, 10);
       const real = _sliderToReal(key, pct);
-      TUNE_PARAMS[key] = real;
+      activeParams()[key] = real;
       if (valEl) valEl.textContent = pct;
       if (statusEl) {
         statusEl.textContent = _tuneStatusText(key, real);
@@ -2081,16 +2113,17 @@ function resetToOriginalData() {
 
 function syncSlidersToParams() {
   const keys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
+  const p = activeParams();
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
     const valEl = document.getElementById(`tune-${key}-val`);
-    const pct = _realToSlider(key, TUNE_PARAMS[key]);
+    const pct = _realToSlider(key, p[key]);
     if (slider) slider.value = pct;
     if (valEl) valEl.textContent = pct;
     if (statusEl) {
-      statusEl.textContent = _tuneStatusText(key, TUNE_PARAMS[key]);
-      statusEl.classList.toggle('changed', TUNE_PARAMS[key] !== TUNE_DEFAULTS[key]);
+      statusEl.textContent = _tuneStatusText(key, p[key]);
+      statusEl.classList.toggle('changed', p[key] !== TUNE_DEFAULTS[key]);
     }
   }
   updateXfWeightBar();
@@ -2124,6 +2157,11 @@ function encodeTuneParams() {
       parts.push(`${k}=${TUNE_PARAMS[k]}`);
     }
   }
+  for (const [k, def] of Object.entries(TUNE_DEFAULTS)) {
+    if (AR_TUNE_PARAMS[k] !== def) {
+      parts.push(`ar_${k}=${AR_TUNE_PARAMS[k]}`);
+    }
+  }
   for (const [fmt, keys] of Object.entries(XF_PARAM_KEYS)) {
     for (const key of keys) {
       if (XF_TUNE_PARAMS[fmt][key] !== XF_TUNE_DEFAULTS[fmt][key]) {
@@ -2141,10 +2179,16 @@ function decodeTuneParams(qs) {
     const [k, v] = pair.split('=');
     if (!k || !v) continue;
     const xfMatch = k.match(/^xf_(tests|odis|t20is)_(.+)$/);
+    const arMatch = k.match(/^ar_(.+)$/);
     if (xfMatch) {
       const [, fmt, param] = xfMatch;
       if (XF_TUNE_PARAMS[fmt] && param in XF_TUNE_PARAMS[fmt]) {
         XF_TUNE_PARAMS[fmt][param] = parseFloat(v);
+      }
+    } else if (arMatch) {
+      const param = arMatch[1];
+      if (param in TUNE_DEFAULTS) {
+        AR_TUNE_PARAMS[param] = parseFloat(v);
       }
     } else if (k in TUNE_DEFAULTS) {
       TUNE_PARAMS[k] = parseFloat(v);
