@@ -41,14 +41,16 @@ function isFullMember(country) {
 }
 
 const TUNE_DEFAULTS = {
-  longevity: 0.30, pitch: 0.50, alpha: 0.30,
-  srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5, bowlAvgW: 1.0,
+  batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50,
+  alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5, bowlAvgW: 1.0,
   bowlK: 1000, ratingK: 250,
   xfTests: 33, xfOdis: 33, xfT20is: 34,
 };
 const TUNE_RANGES = {
-  longevity:    { min: 0, max: 0.6, step: 0.05 },
-  pitch:        { min: 0, max: 1.0, step: 0.1 },
+  batLongevity:  { min: 0, max: 0.6, step: 0.05 },
+  bowlLongevity: { min: 0, max: 0.6, step: 0.05 },
+  batPitch:      { min: 0, max: 1.0, step: 0.1 },
+  bowlPitch:     { min: 0, max: 1.0, step: 0.1 },
   alpha:        { min: 0, max: 1.0, step: 0.05 },
   srWeight:     { min: 0, max: 2.0, step: 0.1 },
   bowlSrWeight: { min: 0, max: 1.0, step: 0.05 },
@@ -74,14 +76,14 @@ let TUNE_PARAMS = { ...TUNE_DEFAULTS };
 let ORIGINAL_DATA = {};
 
 const XF_PARAM_KEYS = {
-  tests: ['longevity', 'pitch', 'alpha', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'],
-  odis:  ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'],
-  t20is: ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight'],
+  tests: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'],
+  odis:  ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight'],
+  t20is: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight'],
 };
 const XF_TUNE_DEFAULTS = {
-  tests: { longevity: 0.30, pitch: 0.50, alpha: 0.30, bowlSrWeight: 0.5, bowlAvgW: 1.0, wpiWeight: 0.5 },
-  odis:  { longevity: 0.30, pitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
-  t20is: { longevity: 0.30, pitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
+  tests: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, bowlSrWeight: 0.5, bowlAvgW: 1.0, wpiWeight: 0.5 },
+  odis:  { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
+  t20is: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
 };
 let XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
 
@@ -110,7 +112,7 @@ function recomputeRankings() {
     let bei = 0;
     if (batInns > 0 && avg > 0) {
       const quality = Math.pow(avg, 1 - p.alpha) * Math.pow(rpi, p.alpha);
-      bei = quality * Math.pow(batInns, p.longevity) * Math.pow(batPf, p.pitch);
+      bei = quality * Math.pow(batInns, p.batLongevity) * Math.pow(batPf, p.batPitch);
       if (isLOI) bei *= Math.pow(sr / 100, p.srWeight);
     }
     pl.BEI = Math.round(bei * 100) / 100;
@@ -128,16 +130,16 @@ function recomputeRankings() {
         if (bowlSr > 0 && bowlEcon > 0) {
           const w = p.bowlSrWeight;
           const combo = Math.pow(bowlSr, 2 * w) * Math.pow(bowlEcon / 6, 2 * (1 - w));
-          boei = p.bowlK / combo * Math.pow(bowlInns, p.longevity) * boeiScale;
+          boei = p.bowlK / combo * Math.pow(bowlInns, p.bowlLongevity) * boeiScale;
         }
       } else {
         if (wpi > 0 && baselineWpi > 0) {
           const effSrExp = srExp * 2 * p.bowlSrWeight;
           const srFactor = (bowlSr > 0 && baselineSr > 0) ? Math.pow(baselineSr / bowlSr, effSrExp) : 1;
-          boei = (p.bowlK / Math.pow(bowlAvg, p.bowlAvgW)) * Math.pow(wpi / baselineWpi, p.wpiWeight) * srFactor * Math.pow(bowlInns, p.longevity) * boeiScale;
+          boei = (p.bowlK / Math.pow(bowlAvg, p.bowlAvgW)) * Math.pow(wpi / baselineWpi, p.wpiWeight) * srFactor * Math.pow(bowlInns, p.bowlLongevity) * boeiScale;
         }
       }
-      boei *= Math.pow(bowlPf, p.pitch);
+      boei *= Math.pow(bowlPf, p.bowlPitch);
     }
     pl.BoEI = Math.round(boei * 100) / 100;
     pl.AEI = Math.round((pl.BEI + pl.BoEI) * 100) / 100;
@@ -993,10 +995,12 @@ function renderScoreBreakdown(player) {
   const m = DATA.metadata;
   const isLOI = CURRENT_FORMAT !== 'tests';
   const α = TUNE_PARAMS.alpha;
-  const longevity = TUNE_PARAMS.longevity;
+  const batLongevity = TUNE_PARAMS.batLongevity;
+  const bowlLongevity = TUNE_PARAMS.bowlLongevity;
   const rBase = m.rating_base || 500;
   const rK = TUNE_PARAMS.ratingK;
-  const pitchExp = TUNE_PARAMS.pitch;
+  const batPitchExp = TUNE_PARAMS.batPitch;
+  const bowlPitchExp = TUNE_PARAMS.bowlPitch;
   const all = DATA.all_players;
 
   const sections = [];
@@ -1010,7 +1014,7 @@ function renderScoreBreakdown(player) {
     const pitchAdj = player.bat_pitch_factor || 1;
 
     const qualityMetric = Math.pow(avg, 1 - α) * Math.pow(rpi, α);
-    const longevityFactor = Math.pow(inns, longevity);
+    const longevityFactor = Math.pow(inns, batLongevity);
 
     const batters = all.filter(p => p.bat_inns > 0 && p.career_bat_avg > 0);
     const allAvg = batters.map(p => p.career_bat_avg);
@@ -1060,10 +1064,10 @@ function renderScoreBreakdown(player) {
       const srW = TUNE_PARAMS.srWeight;
       formulaParts.push(`× (SR/100)<sup>${srW.toFixed(1)}</sup> = × ${Math.pow(sr/100, srW).toFixed(2)}`);
     }
-    formulaParts.push(`× innings<sup>${longevity.toFixed(2)}</sup> = × ${inns}^${longevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
-    if (pitchAdj !== 1 && pitchExp > 0) {
-      const adjVal = Math.pow(pitchAdj, pitchExp);
-      formulaParts.push(`× pitch<sup>${pitchExp.toFixed(1)}</sup> = × ${pitchAdj.toFixed(4)}^${pitchExp.toFixed(1)} = × ${adjVal.toFixed(4)}`);
+    formulaParts.push(`× innings<sup>${batLongevity.toFixed(2)}</sup> = × ${inns}^${batLongevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
+    if (pitchAdj !== 1 && batPitchExp > 0) {
+      const adjVal = Math.pow(pitchAdj, batPitchExp);
+      formulaParts.push(`× pitch<sup>${batPitchExp.toFixed(1)}</sup> = × ${pitchAdj.toFixed(4)}^${batPitchExp.toFixed(1)} = × ${adjVal.toFixed(4)}`);
     }
     formulaParts.push(`= Raw BEI: <strong>${player.BEI.toFixed(1)}</strong>`);
     const zFormula = z >= 0
@@ -1086,7 +1090,7 @@ function renderScoreBreakdown(player) {
     const bowlInns = player.bowl_inns;
     const pitchAdj = player.bowl_pitch_factor || 1;
     const bowlK = TUNE_PARAMS.bowlK;
-    const longevityFactor = Math.pow(bowlInns, longevity);
+    const longevityFactor = Math.pow(bowlInns, bowlLongevity);
 
     const bowlers = all.filter(p => p.bowl_inns > 0 && p.career_bowl_avg > 0);
     const allBowlAvg = bowlers.map(p => p.career_bowl_avg);
@@ -1172,10 +1176,10 @@ function renderScoreBreakdown(player) {
         formulaParts.push(`× (${baseSr}/sr)^${srExp} = (${baseSr}/${player.career_bowl_sr})^${srExp} = ${Math.pow(baseSr/player.career_bowl_sr, srExp).toFixed(2)}`);
       }
     }
-    formulaParts.push(`× innings<sup>${longevity.toFixed(2)}</sup> = × ${bowlInns}^${longevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
-    if (pitchAdj !== 1 && pitchExp > 0) {
-      const adjVal = Math.pow(pitchAdj, pitchExp);
-      formulaParts.push(`× pitch<sup>${pitchExp.toFixed(1)}</sup> = × ${pitchAdj.toFixed(4)}^${pitchExp.toFixed(1)} = × ${adjVal.toFixed(4)}`);
+    formulaParts.push(`× innings<sup>${bowlLongevity.toFixed(2)}</sup> = × ${bowlInns}^${bowlLongevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
+    if (pitchAdj !== 1 && bowlPitchExp > 0) {
+      const adjVal = Math.pow(pitchAdj, bowlPitchExp);
+      formulaParts.push(`× pitch<sup>${bowlPitchExp.toFixed(1)}</sup> = × ${pitchAdj.toFixed(4)}^${bowlPitchExp.toFixed(1)} = × ${adjVal.toFixed(4)}`);
     }
     formulaParts.push(`= Raw BoEI: <strong>${player.BoEI.toFixed(1)}</strong>`);
     const zFormula = z >= 0
@@ -1250,9 +1254,8 @@ function showPlayer(name, updateHash = true) {
   let pitchInfo = '';
   if (player.match_avg && player.bat_pitch_factor) {
     const matchAvg = player.match_avg.toFixed(1);
-    const pExp = TUNE_PARAMS.pitch;
-    const batF = Math.pow(player.bat_pitch_factor, pExp).toFixed(2);
-    const bowlF = Math.pow(player.bowl_pitch_factor, pExp).toFixed(2);
+    const batF = Math.pow(player.bat_pitch_factor, TUNE_PARAMS.batPitch).toFixed(2);
+    const bowlF = Math.pow(player.bowl_pitch_factor, TUNE_PARAMS.bowlPitch).toFixed(2);
     const rpoLabel = player.match_rpo ? ` · Match RPO: ${player.match_rpo.toFixed(2)}` : '';
     pitchInfo = `<div class="ph-era">Match avg: ${matchAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
   }
@@ -1763,14 +1766,14 @@ function setupTheme() {
 function _tuneStatusText(key, v) {
   const d = TUNE_DEFAULTS[key];
   const isDefault = v === d;
-  if (key === 'longevity') {
+  if (key === 'batLongevity' || key === 'bowlLongevity') {
     if (v === 0) return 'Career length ignored — pure peak performance';
     if (v <= 0.15) return 'Career length barely matters';
     if (v <= 0.3) return isDefault ? 'Balanced (default)' : 'Moderate weight to career length';
     if (v <= 0.45) return 'Long careers strongly rewarded';
     return 'Career length dominates rankings';
   }
-  if (key === 'pitch') {
+  if (key === 'batPitch' || key === 'bowlPitch') {
     if (v === 0) return 'Raw stats only — no pitch corrections';
     if (v <= 0.3) return 'Mild adjustment for conditions';
     if (v <= 0.6) return isDefault ? 'Moderate correction (default)' : 'Moderate correction for conditions';
@@ -1830,7 +1833,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
+  const sliderKeys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -2016,7 +2019,7 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
+  const keys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);

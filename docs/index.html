@@ -48,25 +48,45 @@
       <p class="tune-intro">What makes a GOAT? You decide. Drag the sliders and the rankings recalculate instantly.</p>
 
       <div class="tune-sliders" id="tune-regular-sliders">
-        <div class="tune-slider-group">
-          <label for="tune-longevity">How much should career length matter?</label>
+        <div class="tune-slider-group tune-bat-only">
+          <label for="tune-batLongevity">How much should batting career length matter?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Peak matters</span>
-            <input type="range" id="tune-longevity" min="0" max="100" step="1" value="50">
+            <input type="range" id="tune-batLongevity" min="0" max="100" step="1" value="50">
             <span class="tune-endpoint">Long careers rewarded</span>
-            <span class="tune-val" id="tune-longevity-val">50</span>
+            <span class="tune-val" id="tune-batLongevity-val">50</span>
           </div>
-          <div class="tune-status" id="tune-longevity-status"></div>
+          <div class="tune-status" id="tune-batLongevity-status"></div>
         </div>
-        <div class="tune-slider-group">
-          <label for="tune-pitch">Should we adjust for pitch difficulty?</label>
+        <div class="tune-slider-group tune-bat-only">
+          <label for="tune-batPitch">Adjust for batting conditions?</label>
           <div class="tune-slider-wrap">
             <span class="tune-endpoint">Ignore conditions</span>
-            <input type="range" id="tune-pitch" min="0" max="100" step="1" value="50">
+            <input type="range" id="tune-batPitch" min="0" max="100" step="1" value="50">
             <span class="tune-endpoint">Full adjustment</span>
-            <span class="tune-val" id="tune-pitch-val">50</span>
+            <span class="tune-val" id="tune-batPitch-val">50</span>
           </div>
-          <div class="tune-status" id="tune-pitch-status"></div>
+          <div class="tune-status" id="tune-batPitch-status"></div>
+        </div>
+        <div class="tune-slider-group tune-bowl-only">
+          <label for="tune-bowlLongevity">How much should bowling career length matter?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Peak matters</span>
+            <input type="range" id="tune-bowlLongevity" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Long careers rewarded</span>
+            <span class="tune-val" id="tune-bowlLongevity-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-bowlLongevity-status"></div>
+        </div>
+        <div class="tune-slider-group tune-bowl-only">
+          <label for="tune-bowlPitch">Adjust for bowling conditions?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore conditions</span>
+            <input type="range" id="tune-bowlPitch" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Full adjustment</span>
+            <span class="tune-val" id="tune-bowlPitch-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-bowlPitch-status"></div>
         </div>
         <div class="tune-slider-group tune-bat-only">
           <label for="tune-alpha">How much should not-outs inflate a batting average?</label>
@@ -136,19 +156,29 @@
           <h4 class="tune-section-title">Tests</h4>
           <div class="tune-sliders">
             <div class="tune-slider-group">
-              <label>Career length</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-tests-longevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-tests-longevity-val">50</span></div>
-              <div class="tune-status" id="tune-xf-tests-longevity-status"></div>
+              <label>Batting career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-tests-batLongevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-tests-batLongevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-batLongevity-status"></div>
             </div>
             <div class="tune-slider-group">
-              <label>Pitch difficulty</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-tests-pitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-tests-pitch-val">50</span></div>
-              <div class="tune-status" id="tune-xf-tests-pitch-status"></div>
+              <label>Batting conditions</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-tests-batPitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-tests-batPitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-batPitch-status"></div>
             </div>
             <div class="tune-slider-group">
               <label>Not-out correction</label>
               <div class="tune-slider-wrap"><span class="tune-endpoint">Trust avg</span><input type="range" id="tune-xf-tests-alpha" min="0" max="100" step="1" value="30"><span class="tune-endpoint">Correct</span><span class="tune-val" id="tune-xf-tests-alpha-val">30</span></div>
               <div class="tune-status" id="tune-xf-tests-alpha-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowling career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-tests-bowlLongevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-tests-bowlLongevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-bowlLongevity-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowling conditions</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-tests-bowlPitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-tests-bowlPitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-bowlPitch-status"></div>
             </div>
             <div class="tune-slider-group">
               <label>Bowl SR vs economy</label>
@@ -172,14 +202,14 @@
           <h4 class="tune-section-title">ODIs</h4>
           <div class="tune-sliders">
             <div class="tune-slider-group">
-              <label>Career length</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-odis-longevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-odis-longevity-val">50</span></div>
-              <div class="tune-status" id="tune-xf-odis-longevity-status"></div>
+              <label>Batting career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-odis-batLongevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-odis-batLongevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-batLongevity-status"></div>
             </div>
             <div class="tune-slider-group">
-              <label>Pitch difficulty</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-odis-pitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-odis-pitch-val">50</span></div>
-              <div class="tune-status" id="tune-xf-odis-pitch-status"></div>
+              <label>Batting conditions</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-odis-batPitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-odis-batPitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-batPitch-status"></div>
             </div>
             <div class="tune-slider-group">
               <label>Not-out correction</label>
@@ -190,6 +220,16 @@
               <label>Batting strike rate</label>
               <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore SR</span><input type="range" id="tune-xf-odis-srWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Heavy SR</span><span class="tune-val" id="tune-xf-odis-srWeight-val">50</span></div>
               <div class="tune-status" id="tune-xf-odis-srWeight-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowling career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-odis-bowlLongevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-odis-bowlLongevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-bowlLongevity-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowling conditions</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-odis-bowlPitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-odis-bowlPitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-bowlPitch-status"></div>
             </div>
             <div class="tune-slider-group">
               <label>Bowl SR vs economy</label>
@@ -203,14 +243,14 @@
           <h4 class="tune-section-title">T20Is</h4>
           <div class="tune-sliders">
             <div class="tune-slider-group">
-              <label>Career length</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-t20is-longevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-t20is-longevity-val">50</span></div>
-              <div class="tune-status" id="tune-xf-t20is-longevity-status"></div>
+              <label>Batting career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-t20is-batLongevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-t20is-batLongevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-batLongevity-status"></div>
             </div>
             <div class="tune-slider-group">
-              <label>Pitch difficulty</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-t20is-pitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-t20is-pitch-val">50</span></div>
-              <div class="tune-status" id="tune-xf-t20is-pitch-status"></div>
+              <label>Batting conditions</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-t20is-batPitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-t20is-batPitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-batPitch-status"></div>
             </div>
             <div class="tune-slider-group">
               <label>Not-out correction</label>
@@ -221,6 +261,16 @@
               <label>Batting strike rate</label>
               <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore SR</span><input type="range" id="tune-xf-t20is-srWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Heavy SR</span><span class="tune-val" id="tune-xf-t20is-srWeight-val">50</span></div>
               <div class="tune-status" id="tune-xf-t20is-srWeight-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowling career length</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-t20is-bowlLongevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-t20is-bowlLongevity-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-bowlLongevity-status"></div>
+            </div>
+            <div class="tune-slider-group">
+              <label>Bowling conditions</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore</span><input type="range" id="tune-xf-t20is-bowlPitch" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Full</span><span class="tune-val" id="tune-xf-t20is-bowlPitch-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-bowlPitch-status"></div>
             </div>
             <div class="tune-slider-group">
               <label>Bowl SR vs economy</label>
