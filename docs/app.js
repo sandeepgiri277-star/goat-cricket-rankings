@@ -529,6 +529,7 @@ async function switchFormat(format) {
 
   const activeTab = document.querySelector('.tab.active');
   const tabId = activeTab ? activeTab.dataset.tab : 'allrounders';
+  switchTab(tabId, false);
   history.pushState(null, '', `#${format}/${tabId}`);
 }
 
