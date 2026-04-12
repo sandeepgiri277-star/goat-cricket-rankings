@@ -571,6 +571,10 @@ async function restoreFromHash() {
         if (btn) btn.classList.add('active');
         const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
         if (plTab) plTab.style.display = 'none';
+        const regularSliders = document.getElementById('tune-regular-sliders');
+        if (regularSliders) regularSliders.classList.add('hidden');
+        document.querySelectorAll('.tune-xf-only').forEach(el => el.classList.remove('hidden'));
+        syncXfSliders();
         renderAll();
       }
     } else {
