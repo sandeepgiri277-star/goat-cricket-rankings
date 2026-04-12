@@ -1848,7 +1848,7 @@ function _tuneStatusText(key, v) {
     if (v <= 0.4) return 'Economy weighted slightly more than SR';
     if (v <= 0.6) return isDefault ? 'Balanced — SR and economy equal (default)' : 'Balanced — SR and economy roughly equal';
     if (v <= 0.8) return 'SR weighted more — reward frequent breakthroughs';
-    return 'Only SR matters — pure wicket speed';
+    return 'Only SR matters — pure wicket-taking ability';
   }
   if (key === 'bowlAvgW') {
     if (v === 0) return 'Bowling average ignored entirely';
