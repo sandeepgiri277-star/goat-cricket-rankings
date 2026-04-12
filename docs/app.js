@@ -1844,9 +1844,6 @@ function _tuneStatusText(key, v) {
     if (v <= 0.8) return 'High WPI strongly rewarded';
     return 'Wickets per innings dominates';
   }
-  if (key === 'xfTests' || key === 'xfOdis' || key === 'xfT20is') {
-    return '';
-  }
   return '';
 }
 
@@ -1862,7 +1859,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW', 'xfTests', 'xfOdis', 'xfT20is'];
+  const sliderKeys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -1871,14 +1868,10 @@ function setupTunePanel() {
       const pct = parseInt(slider.value, 10);
       const real = _sliderToReal(key, pct);
       TUNE_PARAMS[key] = real;
-      if (key === 'xfTests' || key === 'xfOdis' || key === 'xfT20is') {
-        updateXfWeightPcts();
-      } else {
-        if (valEl) valEl.textContent = pct;
-        if (statusEl) {
-          statusEl.textContent = _tuneStatusText(key, real);
-          statusEl.classList.toggle('changed', real !== TUNE_DEFAULTS[key]);
-        }
+      if (valEl) valEl.textContent = pct;
+      if (statusEl) {
+        statusEl.textContent = _tuneStatusText(key, real);
+        statusEl.classList.toggle('changed', real !== TUNE_DEFAULTS[key]);
       }
       onTuneChange();
     });
@@ -1945,22 +1938,76 @@ function syncXfSliders() {
       }
     }
   }
-  updateXfWeightPcts();
+  updateXfWeightBar();
 }
 
-function updateXfWeightPcts() {
+function updateXfWeightBar() {
+  const bar = document.getElementById('xf-weight-bar');
+  if (!bar) return;
   const t = TUNE_PARAMS.xfTests, o = TUNE_PARAMS.xfOdis, i = TUNE_PARAMS.xfT20is;
-  const sum = t + o + i || 1;
-  for (const [key, raw] of [['xfTests', t], ['xfOdis', o], ['xfT20is', i]]) {
-    const pctVal = Math.round(raw / sum * 100);
-    const valEl = document.getElementById(`tune-${key}-val`);
-    const statusEl = document.getElementById(`tune-${key}-status`);
-    if (valEl) valEl.textContent = `${pctVal}%`;
-    if (statusEl) {
-      statusEl.textContent = raw === 0 ? 'Excluded' : '';
-      statusEl.classList.toggle('changed', raw === 0);
+  const segT = document.getElementById('xf-seg-tests');
+  const segO = document.getElementById('xf-seg-odis');
+  const segI = document.getElementById('xf-seg-t20is');
+  if (segT) { segT.style.width = t + '%'; segT.querySelector('.xf-seg-label').textContent = t >= 12 ? `Tests ${t}%` : `${t}%`; }
+  if (segO) { segO.style.width = o + '%'; segO.querySelector('.xf-seg-label').textContent = o >= 12 ? `ODIs ${o}%` : `${o}%`; }
+  if (segI) { segI.style.width = i + '%'; segI.querySelector('.xf-seg-label').textContent = i >= 12 ? `T20Is ${i}%` : `${i}%`; }
+  const div0 = document.getElementById('xf-div-0');
+  const div1 = document.getElementById('xf-div-1');
+  if (div0) div0.style.left = t + '%';
+  if (div1) div1.style.left = (t + o) + '%';
+}
+
+function setupXfWeightBar() {
+  const bar = document.getElementById('xf-weight-bar');
+  if (!bar) return;
+  const MIN_PCT = 5;
+
+  function onDrag(divIdx, e) {
+    const rect = bar.getBoundingClientRect();
+    const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const pct = Math.round(Math.max(0, Math.min(100, (clientX - rect.left) / rect.width * 100)));
+    const t = TUNE_PARAMS.xfTests, o = TUNE_PARAMS.xfOdis, i = TUNE_PARAMS.xfT20is;
+
+    if (divIdx === 0) {
+      let newT = Math.max(MIN_PCT, Math.min(100 - i - MIN_PCT, pct));
+      let newO = 100 - i - newT;
+      if (newO < MIN_PCT) { newO = MIN_PCT; newT = 100 - i - MIN_PCT; }
+      TUNE_PARAMS.xfTests = newT;
+      TUNE_PARAMS.xfOdis = newO;
+    } else {
+      let boundary = pct;
+      let newO = Math.max(MIN_PCT, boundary - t);
+      let newI = 100 - t - newO;
+      if (newI < MIN_PCT) { newI = MIN_PCT; newO = 100 - t - MIN_PCT; }
+      TUNE_PARAMS.xfOdis = newO;
+      TUNE_PARAMS.xfT20is = newI;
     }
+    updateXfWeightBar();
+    onTuneChange();
   }
+
+  const dividers = [document.getElementById('xf-div-0'), document.getElementById('xf-div-1')];
+  dividers.forEach((div, idx) => {
+    if (!div) return;
+    div.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      div.classList.add('dragging');
+      const move = (ev) => onDrag(idx, ev);
+      const up = () => { div.classList.remove('dragging'); document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+    div.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      div.classList.add('dragging');
+      const move = (ev) => onDrag(idx, ev);
+      const up = () => { div.classList.remove('dragging'); document.removeEventListener('touchmove', move); document.removeEventListener('touchend', up); };
+      document.addEventListener('touchmove', move, { passive: false });
+      document.addEventListener('touchend', up);
+    });
+  });
+
+  updateXfWeightBar();
 }
 
 function onTuneChange() {
@@ -1998,21 +2045,20 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW', 'xfTests', 'xfOdis', 'xfT20is'];
+  const keys = ['longevity', 'pitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
     const valEl = document.getElementById(`tune-${key}-val`);
     const pct = _realToSlider(key, TUNE_PARAMS[key]);
     if (slider) slider.value = pct;
-    if (key === 'xfTests' || key === 'xfOdis' || key === 'xfT20is') continue;
     if (valEl) valEl.textContent = pct;
     if (statusEl) {
       statusEl.textContent = _tuneStatusText(key, TUNE_PARAMS[key]);
       statusEl.classList.toggle('changed', TUNE_PARAMS[key] !== TUNE_DEFAULTS[key]);
     }
   }
-  updateXfWeightPcts();
+  updateXfWeightBar();
   updateSrRowVisibility();
 }
 
@@ -2085,6 +2131,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupTabs();
   setupSearch();
   setupTunePanel();
+  setupXfWeightBar();
   loadData();
 
   let lastWidth = window.innerWidth;

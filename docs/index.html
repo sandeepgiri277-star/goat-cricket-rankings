@@ -122,23 +122,13 @@
       <div class="tune-xf-only hidden" id="tune-xf-sections">
 
         <div class="tune-section">
-          <h4 class="tune-section-title">Format Weights</h4>
-          <div class="tune-sliders">
-            <div class="tune-slider-group">
-              <label for="tune-xfTests">Tests</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">0%</span><input type="range" id="tune-xfTests" min="0" max="100" step="1" value="33"><span class="tune-endpoint">100%</span><span class="tune-val" id="tune-xfTests-val">33%</span></div>
-              <div class="tune-status" id="tune-xfTests-status"></div>
-            </div>
-            <div class="tune-slider-group">
-              <label for="tune-xfOdis">ODIs</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">0%</span><input type="range" id="tune-xfOdis" min="0" max="100" step="1" value="33"><span class="tune-endpoint">100%</span><span class="tune-val" id="tune-xfOdis-val">33%</span></div>
-              <div class="tune-status" id="tune-xfOdis-status"></div>
-            </div>
-            <div class="tune-slider-group">
-              <label for="tune-xfT20is">T20Is</label>
-              <div class="tune-slider-wrap"><span class="tune-endpoint">0%</span><input type="range" id="tune-xfT20is" min="0" max="100" step="1" value="34"><span class="tune-endpoint">100%</span><span class="tune-val" id="tune-xfT20is-val">34%</span></div>
-              <div class="tune-status" id="tune-xfT20is-status"></div>
-            </div>
+          <h4 class="tune-section-title">Format Weights — drag the dividers</h4>
+          <div class="xf-weight-bar" id="xf-weight-bar">
+            <div class="xf-seg" id="xf-seg-tests"><span class="xf-seg-label">Tests 33%</span></div>
+            <div class="xf-seg" id="xf-seg-odis"><span class="xf-seg-label">ODIs 33%</span></div>
+            <div class="xf-seg" id="xf-seg-t20is"><span class="xf-seg-label">T20Is 34%</span></div>
+            <div class="xf-divider" id="xf-div-0"></div>
+            <div class="xf-divider" id="xf-div-1"></div>
           </div>
         </div>
 
