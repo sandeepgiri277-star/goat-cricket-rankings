@@ -306,54 +306,45 @@ function computeCrossFormat() {
     }
   }
 
-  const all3 = { batting: [], bowling: [], allrounders: [] };
-  const testOdi = { batting: [], bowling: [], allrounders: [] };
+  const activeFmts = [];
+  if (rawT > 0) activeFmts.push('tests');
+  if (rawO > 0) activeFmts.push('odis');
+  if (rawI > 0) activeFmts.push('t20is');
+
+  const results = { batting: [], bowling: [], allrounders: [] };
+  const weights = { tests: wT, odis: wO, t20is: wI };
 
   for (const [name, fmts] of Object.entries(playerMap)) {
-    if (fmts.tests && fmts.odis && fmts.t20is) {
-      const bat = Math.round(wT * fmts.tests.bat_rating + wO * fmts.odis.bat_rating + wI * fmts.t20is.bat_rating);
-      const bowl = Math.round(wT * fmts.tests.bowl_rating + wO * fmts.odis.bowl_rating + wI * fmts.t20is.bowl_rating);
-      const entry = {
-        name, country: fmts.tests.country, bat_total: bat, bowl_total: bowl,
-        bat_tests: fmts.tests.bat_rating, bat_odis: fmts.odis.bat_rating, bat_t20is: fmts.t20is.bat_rating,
-        bowl_tests: fmts.tests.bowl_rating, bowl_odis: fmts.odis.bowl_rating, bowl_t20is: fmts.t20is.bowl_rating,
-        matches_tests: fmts.tests.matches, matches_odis: fmts.odis.matches, matches_t20is: fmts.t20is.matches,
-      };
-      if (bat > 0) all3.batting.push(entry);
-      if (bowl > 0) all3.bowling.push(entry);
-      if (bat >= XF_MIN_AR && bowl >= XF_MIN_AR) {
-        entry.ar_total = Math.round(Math.sqrt(bat * bowl));
-        all3.allrounders.push(entry);
-      }
-    }
+    const hasFmts = activeFmts.filter(f => fmts[f]);
+    if (hasFmts.length < activeFmts.length) continue;
 
-    if (fmts.tests && fmts.odis) {
-      const toSum = rawT + rawO || 1;
-      const toT = rawT / toSum, toO = rawO / toSum;
-      const bat = Math.round(toT * fmts.tests.bat_rating + toO * fmts.odis.bat_rating);
-      const bowl = Math.round(toT * fmts.tests.bowl_rating + toO * fmts.odis.bowl_rating);
-      const entry = {
-        name, country: fmts.tests.country, bat_total: bat, bowl_total: bowl,
-        bat_tests: fmts.tests.bat_rating, bat_odis: fmts.odis.bat_rating,
-        bowl_tests: fmts.tests.bowl_rating, bowl_odis: fmts.odis.bowl_rating,
-        matches_tests: fmts.tests.matches, matches_odis: fmts.odis.matches,
-      };
-      if (bat > 0) testOdi.batting.push(entry);
-      if (bowl > 0) testOdi.bowling.push(entry);
-      if (bat >= XF_MIN_AR && bowl >= XF_MIN_AR) {
-        entry.ar_total = Math.round(Math.sqrt(bat * bowl));
-        testOdi.allrounders.push(entry);
-      }
+    const wActive = hasFmts.reduce((s, f) => s + weights[f], 0) || 1;
+    let bat = 0, bowl = 0;
+    const entry = { name, country: (fmts.tests || fmts.odis || fmts.t20is).country };
+    for (const f of hasFmts) {
+      const w = weights[f] / wActive;
+      bat += w * fmts[f].bat_rating;
+      bowl += w * fmts[f].bowl_rating;
+      entry[`bat_${f}`] = fmts[f].bat_rating;
+      entry[`bowl_${f}`] = fmts[f].bowl_rating;
+      entry[`matches_${f}`] = fmts[f].matches;
+    }
+    entry.bat_total = Math.round(bat);
+    entry.bowl_total = Math.round(bowl);
+
+    if (entry.bat_total > 0) results.batting.push(entry);
+    if (entry.bowl_total > 0) results.bowling.push(entry);
+    if (entry.bat_total >= XF_MIN_AR && entry.bowl_total >= XF_MIN_AR) {
+      entry.ar_total = Math.round(Math.sqrt(entry.bat_total * entry.bowl_total));
+      results.allrounders.push(entry);
     }
   }
 
-  for (const group of [all3, testOdi]) {
-    group.batting.sort((a, b) => b.bat_total - a.bat_total);
-    group.bowling.sort((a, b) => b.bowl_total - a.bowl_total);
-    group.allrounders.sort((a, b) => b.ar_total - a.ar_total);
-  }
+  results.batting.sort((a, b) => b.bat_total - a.bat_total);
+  results.bowling.sort((a, b) => b.bowl_total - a.bowl_total);
+  results.allrounders.sort((a, b) => b.ar_total - a.ar_total);
 
-  CROSS_FORMAT_DATA = { all3, testOdi };
+  CROSS_FORMAT_DATA = { all3: results };
   return CROSS_FORMAT_DATA;
 }
 
@@ -1558,7 +1549,7 @@ function renderCrossFormatAll() {
     document.getElementById('last-updated').textContent = `Last updated: ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
   }
   document.getElementById('player-count').textContent =
-    `${CROSS_FORMAT_DATA.all3.batting.length} players in all 3 formats \u00b7 ${CROSS_FORMAT_DATA.testOdi.batting.length} in Tests + ODIs`;
+    `${CROSS_FORMAT_DATA.all3.batting.length} players`;
 
   document.getElementById('heading-allrounders').textContent = 'Cross-Format Allrounder GOATs';
   document.querySelector('#panel-allrounders .panel-desc').textContent =
@@ -1572,48 +1563,37 @@ function renderCrossFormatAll() {
   document.querySelector('#panel-bowling .panel-desc').textContent =
     'The greatest bowlers across international formats, ranked by the sum of format-specific bowling ratings.';
 
-  renderXFCategory('allrounders', 'ar_total', CROSS_FORMAT_DATA.all3.allrounders, CROSS_FORMAT_DATA.testOdi.allrounders, true);
-  renderXFCategory('batting', 'bat_total', CROSS_FORMAT_DATA.all3.batting, CROSS_FORMAT_DATA.testOdi.batting, false);
-  renderXFCategory('bowling', 'bowl_total', CROSS_FORMAT_DATA.all3.bowling, CROSS_FORMAT_DATA.testOdi.bowling, false);
+  renderXFCategory('allrounders', 'ar_total', CROSS_FORMAT_DATA.all3.allrounders, true);
+  renderXFCategory('batting', 'bat_total', CROSS_FORMAT_DATA.all3.batting, false);
+  renderXFCategory('bowling', 'bowl_total', CROSS_FORMAT_DATA.all3.bowling, false);
 
   renderCrossFormatMethodology();
 }
 
-function renderXFCategory(category, ratingKey, all3Data, testOdiData, isAR) {
+function renderXFCategory(category, ratingKey, data, isAR) {
   const tableContainer = document.getElementById(`table-${category}`);
   const chartContainer = document.getElementById(`chart-${category}`);
   const prefix = category === 'batting' ? 'bat' : 'bowl';
 
-  const all3Fmt = [
-    { key: `${prefix}_tests`, label: 'Tests' },
-    { key: `${prefix}_odis`, label: 'ODIs' },
-    { key: `${prefix}_t20is`, label: 'T20Is' },
-  ];
-  const testOdiFmt = [
-    { key: `${prefix}_tests`, label: 'Tests' },
-    { key: `${prefix}_odis`, label: 'ODIs' },
-  ];
+  const fmtLabels = { tests: 'Tests', odis: 'ODIs', t20is: 'T20Is' };
+  const activeFmts = [];
+  if (TUNE_PARAMS.xfTests > 0) activeFmts.push('tests');
+  if (TUNE_PARAMS.xfOdis > 0) activeFmts.push('odis');
+  if (TUNE_PARAMS.xfT20is > 0) activeFmts.push('t20is');
+  const fmtKeys = activeFmts.map(f => ({ key: `${prefix}_${f}`, label: fmtLabels[f] }));
+  const titleParts = activeFmts.map(f => fmtLabels[f]).join(' + ');
 
-  let tableHTML = `<h3 class="xf-section-title">All 3 Formats (Tests + ODIs + T20Is) <span class="xf-count">\u2014 ${all3Data.length} players</span></h3>`;
-  tableHTML += renderXFRows(all3Data.slice(0, 25), ratingKey, isAR ? null : all3Fmt, isAR);
-  tableHTML += `<h3 class="xf-section-title xf-section-gap">Test + ODI <span class="xf-count">\u2014 ${testOdiData.length} players</span></h3>`;
-  tableHTML += renderXFRows(testOdiData.slice(0, 25), ratingKey, isAR ? null : testOdiFmt, isAR);
+  let tableHTML = `<h3 class="xf-section-title">${titleParts} <span class="xf-count">\u2014 ${data.length} players</span></h3>`;
+  tableHTML += renderXFRows(data.slice(0, 25), ratingKey, isAR ? null : fmtKeys, isAR);
   tableContainer.innerHTML = tableHTML;
 
-  const cid1 = `xf-chart-${category}-all3`;
-  const cid2 = `xf-chart-${category}-testodi`;
-  chartContainer.innerHTML = `
-    <h3 class="xf-section-title">All 3 Formats (Tests + ODIs + T20Is)</h3>
-    <div id="${cid1}"></div>
-    <h3 class="xf-section-title xf-section-gap">Test + ODI</h3>
-    <div id="${cid2}"></div>`;
+  const cid = `xf-chart-${category}`;
+  chartContainer.innerHTML = `<div id="${cid}"></div>`;
 
   if (isAR) {
-    renderXFArChart(cid1, all3Data);
-    renderXFArChart(cid2, testOdiData);
+    renderXFArChart(cid, data);
   } else {
-    renderXFStackedChart(cid1, all3Data, prefix, true);
-    renderXFStackedChart(cid2, testOdiData, prefix, false);
+    renderXFStackedChart(cid, data, prefix);
   }
 }
 
@@ -1639,41 +1619,25 @@ function renderXFRows(players, ratingKey, fmtKeys, isAR) {
   }).join('');
 }
 
-function renderXFStackedChart(divId, players, prefix, hasT20) {
+function renderXFStackedChart(divId, players, prefix) {
   const mobile = isMobile();
   const n = mobile ? 15 : 25;
   const top = players.slice(0, n).reverse();
   const labels = top.map(p => mobile ? p.name.split(' ').pop() : `${getFlag(p.country)} ${p.name}`);
 
-  const traces = [
-    {
-      y: labels, x: top.map(p => p[prefix + '_tests']),
-      type: 'bar', orientation: 'h', name: 'Tests',
-      marker: { color: XF_COLORS.tests },
-      text: top.map(p => p[prefix + '_tests'] > 0 ? p[prefix + '_tests'] : ''),
-      textposition: 'inside', textfont: { color: '#fff', size: mobile ? 9 : 11 },
-      hovertemplate: '%{y}<br>Tests: %{x}<extra></extra>',
-    },
-    {
-      y: labels, x: top.map(p => p[prefix + '_odis']),
-      type: 'bar', orientation: 'h', name: 'ODIs',
-      marker: { color: XF_COLORS.odis },
-      text: top.map(p => p[prefix + '_odis'] > 0 ? p[prefix + '_odis'] : ''),
-      textposition: 'inside', textfont: { color: '#fff', size: mobile ? 9 : 11 },
-      hovertemplate: '%{y}<br>ODIs: %{x}<extra></extra>',
-    },
+  const fmtConfig = [
+    { key: 'tests', label: 'Tests', color: XF_COLORS.tests, weight: TUNE_PARAMS.xfTests },
+    { key: 'odis', label: 'ODIs', color: XF_COLORS.odis, weight: TUNE_PARAMS.xfOdis },
+    { key: 't20is', label: 'T20Is', color: XF_COLORS.t20is, weight: TUNE_PARAMS.xfT20is },
   ];
-
-  if (hasT20) {
-    traces.push({
-      y: labels, x: top.map(p => p[prefix + '_t20is']),
-      type: 'bar', orientation: 'h', name: 'T20Is',
-      marker: { color: XF_COLORS.t20is },
-      text: top.map(p => p[prefix + '_t20is'] > 0 ? p[prefix + '_t20is'] : ''),
-      textposition: 'inside', textfont: { color: '#fff', size: mobile ? 9 : 11 },
-      hovertemplate: '%{y}<br>T20Is: %{x}<extra></extra>',
-    });
-  }
+  const traces = fmtConfig.filter(f => f.weight > 0).map(f => ({
+    y: labels, x: top.map(p => p[`${prefix}_${f.key}`] || 0),
+    type: 'bar', orientation: 'h', name: f.label,
+    marker: { color: f.color },
+    text: top.map(p => { const v = p[`${prefix}_${f.key}`]; return v > 0 ? v : ''; }),
+    textposition: 'inside', textfont: { color: '#fff', size: mobile ? 9 : 11 },
+    hovertemplate: `%{y}<br>${f.label}: %{x}<extra></extra>`,
+  }));
 
   Plotly.newPlot(divId, traces, plotlyLayout({
     barmode: 'stack',
@@ -1960,7 +1924,7 @@ function updateXfWeightBar() {
 function setupXfWeightBar() {
   const bar = document.getElementById('xf-weight-bar');
   if (!bar) return;
-  const MIN_PCT = 5;
+  const MIN_PCT = 0;
 
   function onDrag(divIdx, e) {
     const rect = bar.getBoundingClientRect();
