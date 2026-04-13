@@ -205,6 +205,13 @@ function recomputeRankings() {
   DATA.bowling_top25 = bowlSorted.slice(0, 100);
 
   const arRes = computeIndices(allPlayers, AR_TUNE_PARAMS, m, isLOI);
+  const arBatSorted = [...arRes.results].sort((a, b) => b.bei - a.bei);
+  const arBowlSorted = [...arRes.results].filter(r => r.boei > 0).sort((a, b) => b.boei - a.boei);
+  const arBatRankMap = {};
+  arBatSorted.forEach((r, i) => { if (r.bei > 0) arBatRankMap[r.player.name] = i + 1; });
+  const arBowlRankMap = {};
+  arBowlSorted.forEach((r, i) => { arBowlRankMap[r.player.name] = i + 1; });
+
   const allrounders = [];
   for (const r of arRes.results) {
     if (r.bat_rating >= minArRating && r.bowl_rating >= minArRating) {
@@ -212,6 +219,8 @@ function recomputeRankings() {
         ...r.player,
         bat_rating: r.bat_rating,
         bowl_rating: r.bowl_rating,
+        bat_rank: arBatRankMap[r.player.name] || null,
+        bowl_rank: arBowlRankMap[r.player.name] || null,
         BEI: r.bei,
         BoEI: r.boei,
         ar_rating: Math.round(Math.sqrt(r.bat_rating * r.bowl_rating)),
