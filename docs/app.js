@@ -227,6 +227,11 @@ function recomputeRankings() {
   DATA.metadata.bei_std = Math.round(beiStd * 100) / 100;
   DATA.metadata.boei_median = Math.round(boeiMed * 100) / 100;
   DATA.metadata.boei_std = Math.round(boeiStd * 100) / 100;
+
+  DATA.metadata.ar_bei_median = Math.round(arRes.beiMed * 100) / 100;
+  DATA.metadata.ar_bei_std = Math.round(arRes.beiStd * 100) / 100;
+  DATA.metadata.ar_boei_median = Math.round(arRes.boeiMed * 100) / 100;
+  DATA.metadata.ar_boei_std = Math.round(arRes.boeiStd * 100) / 100;
 }
 
 function isCustomParams() {
@@ -1053,6 +1058,7 @@ function _barHTML(label, displayVal, pct, tierLabel, tierClass) {
 function renderScoreBreakdown(player) {
   const m = DATA.metadata;
   const isLOI = CURRENT_FORMAT !== 'tests';
+  const isAR = activeTab() === 'allrounders';
   const p = activeParams();
   const α = p.alpha;
   const batLongevity = p.batLongevity;
@@ -1113,8 +1119,8 @@ function renderScoreBreakdown(player) {
       bars += _barHTML('Conditions', `Pitch avg ${player.match_avg.toFixed(1)}${econSuffix}`, condPct, condLabel, condClass);
     }
 
-    const beiMedian = m.bei_median;
-    const beiStd = m.bei_std;
+    const beiMedian = isAR ? m.ar_bei_median : m.bei_median;
+    const beiStd = isAR ? m.ar_bei_std : m.bei_std;
     const z = beiStd > 0 ? (player.BEI - beiMedian) / beiStd : 0;
     const sdLabel = z >= 0 ? `${z.toFixed(1)} standard deviations above` : `${Math.abs(z).toFixed(1)} standard deviations below`;
 
@@ -1213,8 +1219,8 @@ function renderScoreBreakdown(player) {
       bars += _barHTML('Conditions', condValue, condPct, condLabel, condClass);
     }
 
-    const boeiMedian = m.boei_median;
-    const boeiStd = m.boei_std;
+    const boeiMedian = isAR ? m.ar_boei_median : m.boei_median;
+    const boeiStd = isAR ? m.ar_boei_std : m.boei_std;
     const z = boeiStd > 0 ? (player.BoEI - boeiMedian) / boeiStd : 0;
     const sdLabel = z >= 0 ? `${z.toFixed(1)} standard deviations above` : `${Math.abs(z).toFixed(1)} standard deviations below`;
 
@@ -1278,7 +1284,9 @@ function renderScoreBreakdown(player) {
 }
 
 function showPlayer(name, updateHash = true) {
-  const player = DATA.all_players.find(p => p.name === name);
+  const isAR = activeTab() === 'allrounders';
+  const source = isAR ? DATA.allrounder_top25 : DATA.all_players;
+  const player = source.find(p => p.name === name) || DATA.all_players.find(p => p.name === name);
   if (!player) return;
 
   if (updateHash) {
