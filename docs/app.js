@@ -859,9 +859,10 @@ function addRowClickHandlers(container) {
   container.querySelectorAll('.lb-row').forEach(row => {
     row.addEventListener('click', () => {
       const name = row.dataset.player;
+      const fromAR = activeTab() === 'allrounders';
       switchTab('player-lookup');
       document.getElementById('player-search').value = name;
-      showPlayer(name);
+      showPlayer(name, true, fromAR);
     });
   });
 }
@@ -1067,8 +1068,8 @@ function _barHTML(label, displayVal, pct, tierLabel, tierClass) {
 function renderScoreBreakdown(player) {
   const m = DATA.metadata;
   const isLOI = CURRENT_FORMAT !== 'tests';
-  const isAR = activeTab() === 'allrounders';
-  const p = activeParams();
+  const isAR = _showPlayerFromAR;
+  const p = isAR ? AR_TUNE_PARAMS : TUNE_PARAMS;
   const α = p.alpha;
   const batLongevity = p.batLongevity;
   const bowlLongevity = p.bowlLongevity;
@@ -1292,8 +1293,10 @@ function renderScoreBreakdown(player) {
   `;
 }
 
-function showPlayer(name, updateHash = true) {
-  const isAR = activeTab() === 'allrounders';
+let _showPlayerFromAR = false;
+function showPlayer(name, updateHash = true, fromAllrounders = false) {
+  const isAR = fromAllrounders || activeTab() === 'allrounders';
+  _showPlayerFromAR = isAR;
   const source = isAR ? DATA.allrounder_top25 : DATA.all_players;
   const player = source.find(p => p.name === name) || DATA.all_players.find(p => p.name === name);
   if (!player) return;
@@ -1335,9 +1338,9 @@ function showPlayer(name, updateHash = true) {
   let pitchInfo = '';
   if (player.match_avg && player.bat_pitch_factor) {
     const matchAvg = player.match_avg.toFixed(1);
-    const ap = activeParams();
-    const batF = Math.pow(player.bat_pitch_factor, ap.batPitch).toFixed(2);
-    const bowlF = Math.pow(player.bowl_pitch_factor, ap.bowlPitch).toFixed(2);
+    const sp = isAR ? AR_TUNE_PARAMS : TUNE_PARAMS;
+    const batF = Math.pow(player.bat_pitch_factor, sp.batPitch).toFixed(2);
+    const bowlF = Math.pow(player.bowl_pitch_factor, sp.bowlPitch).toFixed(2);
     const rpoLabel = player.match_rpo ? ` · Match RPO: ${player.match_rpo.toFixed(2)}` : '';
     pitchInfo = `<div class="ph-era">Match avg: ${matchAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
   }
