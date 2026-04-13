@@ -1053,13 +1053,14 @@ function _barHTML(label, displayVal, pct, tierLabel, tierClass) {
 function renderScoreBreakdown(player) {
   const m = DATA.metadata;
   const isLOI = CURRENT_FORMAT !== 'tests';
-  const α = TUNE_PARAMS.alpha;
-  const batLongevity = TUNE_PARAMS.batLongevity;
-  const bowlLongevity = TUNE_PARAMS.bowlLongevity;
+  const p = activeParams();
+  const α = p.alpha;
+  const batLongevity = p.batLongevity;
+  const bowlLongevity = p.bowlLongevity;
   const rBase = m.rating_base || 500;
-  const rK = TUNE_PARAMS.ratingK;
-  const batPitchExp = TUNE_PARAMS.batPitch;
-  const bowlPitchExp = TUNE_PARAMS.bowlPitch;
+  const rK = p.ratingK;
+  const batPitchExp = p.batPitch;
+  const bowlPitchExp = p.bowlPitch;
   const all = DATA.all_players;
 
   const sections = [];
@@ -1120,7 +1121,7 @@ function renderScoreBreakdown(player) {
     const formulaParts = [];
     formulaParts.push(`avg<sup>${(1-α).toFixed(1)}</sup> × rpi<sup>${α.toFixed(1)}</sup> = ${avg}^${(1-α).toFixed(1)} × ${rpi.toFixed(1)}^${α.toFixed(1)} = ${qualityMetric.toFixed(2)}`);
     if (isLOI && sr) {
-      const srW = TUNE_PARAMS.srWeight;
+      const srW = p.srWeight;
       formulaParts.push(`× (SR/100)<sup>${srW.toFixed(1)}</sup> = × ${Math.pow(sr/100, srW).toFixed(2)}`);
     }
     formulaParts.push(`× innings<sup>${batLongevity.toFixed(2)}</sup> = × ${inns}^${batLongevity.toFixed(2)} = × ${longevityFactor.toFixed(2)}`);
@@ -1149,7 +1150,7 @@ function renderScoreBreakdown(player) {
     const bowlInns = player.bowl_inns;
     const ballsBowled = player.balls_bowled || 0;
     const pitchAdj = player.bowl_pitch_factor || 1;
-    const bowlK = TUNE_PARAMS.bowlK;
+    const bowlK = p.bowlK;
     const longevityBase = isLOI && ballsBowled > 0 ? ballsBowled : bowlInns;
     const longevityFactor = Math.pow(longevityBase, bowlLongevity);
 
@@ -1223,12 +1224,12 @@ function renderScoreBreakdown(player) {
       const econ = player.career_bowl_econ || 6;
       formulaParts.push(`${bowlK} / (SR × econ/6) = ${bowlK} / (${bowlSr.toFixed(1)} × ${(econ/6).toFixed(2)}) = ${(bowlK / (bowlSr * econ / 6)).toFixed(2)}`);
     } else {
-      const baw = TUNE_PARAMS.bowlAvgW;
+      const baw = p.bowlAvgW;
       const avgTerm = bowlK / Math.pow(bowlAvg, baw);
       formulaParts.push(`${bowlK} / avg<sup>${baw.toFixed(1)}</sup> = ${bowlK} / ${bowlAvg.toFixed(1)}^${baw.toFixed(1)} = ${avgTerm.toFixed(2)}`);
       if (player.career_wpi != null) {
         const baseWpi = m.baseline_wpi || 1.46;
-        const wpiW = TUNE_PARAMS.wpiWeight;
+        const wpiW = p.wpiWeight;
         const wpiVal = Math.pow(player.career_wpi / baseWpi, wpiW);
         formulaParts.push(`× (wpi/baseline)<sup>${wpiW.toFixed(2)}</sup> = (${player.career_wpi.toFixed(3)}/${baseWpi})^${wpiW.toFixed(2)} = ${wpiVal.toFixed(2)}`);
       }
@@ -1317,8 +1318,9 @@ function showPlayer(name, updateHash = true) {
   let pitchInfo = '';
   if (player.match_avg && player.bat_pitch_factor) {
     const matchAvg = player.match_avg.toFixed(1);
-    const batF = Math.pow(player.bat_pitch_factor, TUNE_PARAMS.batPitch).toFixed(2);
-    const bowlF = Math.pow(player.bowl_pitch_factor, TUNE_PARAMS.bowlPitch).toFixed(2);
+    const ap = activeParams();
+    const batF = Math.pow(player.bat_pitch_factor, ap.batPitch).toFixed(2);
+    const bowlF = Math.pow(player.bowl_pitch_factor, ap.bowlPitch).toFixed(2);
     const rpoLabel = player.match_rpo ? ` · Match RPO: ${player.match_rpo.toFixed(2)}` : '';
     pitchInfo = `<div class="ph-era">Match avg: ${matchAvg}${rpoLabel} · Bat adj: ${batF}× · Bowl adj: ${bowlF}×</div>`;
   }
