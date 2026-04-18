@@ -81,8 +81,7 @@ IPL_BAT_CUM_CACHE_PATH = CACHE_DIR / "ipl_bat_cum_cache.pkl"
 IPL_BOWL_CUM_CACHE_PATH = CACHE_DIR / "ipl_bowl_cum_cache.pkl"
 IPL_ERA_CACHE_PATH = CACHE_DIR / "ipl_era_cache.pkl"
 IPL_TEAM_MAP_PATH = CACHE_DIR / "ipl_team_map.pkl"
-
-
+PLAYER_ROLES_CACHE_PATH = CACHE_DIR / "player_roles.pkl"
 
 # Global match-level stats caches (keyed by start_date)
 TEST_GLOBAL_MATCH_CACHE = CACHE_DIR / "test_global_match_stats.pkl"
@@ -334,6 +333,77 @@ def load_era_cache() -> dict:
 def save_era_cache(cache: dict):
     with open(ERA_CACHE_PATH, "wb") as f:
         pickle.dump(cache, f)
+
+
+ROLE_MAP = {
+    "opening batter": "opener",
+    "top order batter": "opener",
+    "middle order batter": "middle",
+    "wicketkeeper batter": "keeper",
+    "batting allrounder": "allrounder",
+    "bowling allrounder": "allrounder",
+    "allrounder": "allrounder",
+    "spin bowler": "spinner",
+    "fast bowler": "fast",
+    "pace bowler": "fast",
+}
+
+
+def scrape_player_role(player_id: int) -> str | None:
+    """Fetch a player's playing role from their ESPN Cricinfo profile."""
+    url = f"https://www.espncricinfo.com/cricketers/x-{player_id}"
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15, allow_redirects=True)
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.text, "lxml")
+        for label in soup.find_all(string=re.compile(r"Playing Role", re.I)):
+            parent = label.find_parent()
+            if parent:
+                sibling = parent.find_next_sibling()
+                if sibling:
+                    return sibling.get_text(strip=True)
+                val = parent.get_text(strip=True).replace("Playing Role", "").strip()
+                if val:
+                    return val
+        for div in soup.select("div"):
+            text = div.get_text(strip=True)
+            if text.startswith("Playing Role"):
+                role_text = text.replace("Playing Role", "").strip()
+                if role_text:
+                    return role_text
+    except Exception:
+        pass
+    return None
+
+
+def normalize_role(raw_role: str | None) -> str | None:
+    if not raw_role:
+        return None
+    return ROLE_MAP.get(raw_role.strip().lower())
+
+
+def scrape_all_roles(player_ids: list[int], delay: float = 0.3) -> dict[int, str]:
+    """Scrape and cache playing roles for all player IDs."""
+    cache: dict[int, str | None] = {}
+    if PLAYER_ROLES_CACHE_PATH.exists():
+        cache = pickle.load(open(PLAYER_ROLES_CACHE_PATH, "rb"))
+
+    to_scrape = [pid for pid in player_ids if pid not in cache]
+    if to_scrape:
+        print(f"  Scraping roles for {len(to_scrape)} players...")
+        for i, pid in enumerate(to_scrape):
+            raw = scrape_player_role(pid)
+            cache[pid] = raw
+            if (i + 1) % 50 == 0:
+                print(f"    {i + 1}/{len(to_scrape)} done...", flush=True)
+                with open(PLAYER_ROLES_CACHE_PATH, "wb") as f:
+                    pickle.dump(cache, f)
+            time.sleep(delay)
+        with open(PLAYER_ROLES_CACHE_PATH, "wb") as f:
+            pickle.dump(cache, f)
+        print(f"  Done. Cached {len(cache)} roles total.")
+    return {pid: normalize_role(cache.get(pid)) for pid in player_ids if cache.get(pid)}
 
 
 def _scrape_era_aggregate(start_year: int, end_year: int) -> dict | None:

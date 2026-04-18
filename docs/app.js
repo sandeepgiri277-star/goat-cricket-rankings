@@ -552,14 +552,18 @@ async function switchFormat(format) {
   document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.format-btn[data-format="${format}"]`).classList.add('active');
 
+  CURRENT_XI = new Array(11).fill(null);
   renderAll();
 
   const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
+  const xiTab = document.querySelector('.tab[data-tab="greatest-xi"]');
   const tunePanel = document.getElementById('tune-panel');
   const isXf = format === 'crossformat';
+  if (xiTab) xiTab.style.display = isXf ? 'none' : '';
   if (isXf) {
     plTab.style.display = 'none';
-    if (document.querySelector('.tab.active')?.dataset.tab === 'player-lookup') {
+    const curTab = document.querySelector('.tab.active')?.dataset.tab;
+    if (curTab === 'player-lookup' || curTab === 'greatest-xi') {
       switchTab('allrounders', false);
     }
   } else {
@@ -657,12 +661,23 @@ async function restoreFromHash() {
       setTimeout(() => showPlayer(name, false), 120);
     }
   } else {
-    const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'methodology'];
-    if (validTabs.includes(rest)) {
-      if (rest === 'player-lookup' && CURRENT_FORMAT === 'crossformat') {
-        switchTab('allrounders', false);
+    if (rest.startsWith('greatest-xi')) {
+      switchTab('greatest-xi', false);
+      const xiPart = rest.split('/').slice(1).join('/');
+      if (xiPart) {
+        decodeXiFromHash(xiPart);
       } else {
-        switchTab(rest, false);
+        CURRENT_XI = generateDefaultXI();
+      }
+      renderGreatestXI();
+    } else {
+      const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'greatest-xi', 'methodology'];
+      if (validTabs.includes(rest)) {
+        if (rest === 'player-lookup' && CURRENT_FORMAT === 'crossformat') {
+          switchTab('allrounders', false);
+        } else {
+          switchTab(rest, false);
+        }
       }
     }
   }
@@ -692,6 +707,10 @@ function renderAll() {
   renderBowlingChart();
   renderBowlingTable();
   renderMethodology();
+  if (CURRENT_XI.every(p => !p)) {
+    CURRENT_XI = generateDefaultXI();
+  }
+  renderGreatestXI();
 }
 
 function renderMeta() {
@@ -812,6 +831,7 @@ function renderAllrounderTable() {
         <div class="lb-primary-val">${p.ar_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
+      <button class="lb-xi-add" data-player="${p.name}" title="Add to XI">+</button>
     </div>
   `).join('');
   addRowClickHandlers(container);
@@ -831,6 +851,7 @@ function renderBattingTable() {
         <div class="lb-primary-val">${p.bat_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
+      <button class="lb-xi-add" data-player="${p.name}" title="Add to XI">+</button>
     </div>
   `).join('');
   addRowClickHandlers(container);
@@ -850,6 +871,7 @@ function renderBowlingTable() {
         <div class="lb-primary-val">${p.bowl_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
+      <button class="lb-xi-add" data-player="${p.name}" title="Add to XI">+</button>
     </div>
   `).join('');
   addRowClickHandlers(container);
@@ -857,12 +879,21 @@ function renderBowlingTable() {
 
 function addRowClickHandlers(container) {
   container.querySelectorAll('.lb-row').forEach(row => {
-    row.addEventListener('click', () => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.lb-xi-add')) return;
       const name = row.dataset.player;
       const fromAR = activeTab() === 'allrounders';
       switchTab('player-lookup');
       document.getElementById('player-search').value = name;
       showPlayer(name, true, fromAR);
+    });
+  });
+  container.querySelectorAll('.lb-xi-add').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      addToXI(btn.dataset.player);
+      btn.textContent = '✓';
+      setTimeout(() => { btn.textContent = '+'; }, 800);
     });
   });
 }
@@ -1831,9 +1862,12 @@ function switchTab(tabId, updateHash = true) {
   const showBat = tabId !== 'bowling';
   const showBowl = tabId !== 'batting';
   const isAR = tabId === 'allrounders';
+  const hideTune = tabId === 'greatest-xi' || tabId === 'methodology';
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
   document.querySelectorAll('.tune-ar-header').forEach(el => el.classList.toggle('hidden', !isAR));
+  const tunePanel = document.getElementById('tune-panel');
+  if (tunePanel) tunePanel.style.display = hideTune ? 'none' : '';
   syncSlidersToParams();
   updateSrRowVisibility();
 
@@ -2226,6 +2260,302 @@ function decodeTuneParams(qs) {
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
+// ─── Greatest XI ─────────────────────────────────────────────────────────────
+
+const XI_TEMPLATE = [
+  { role: 'opener', label: 'Opener' },
+  { role: 'opener', label: 'Opener' },
+  { role: 'middle', label: 'Middle Order' },
+  { role: 'middle', label: 'Middle Order' },
+  { role: 'middle', label: 'Middle Order' },
+  { role: 'allrounder', label: 'Allrounder' },
+  { role: 'keeper', label: 'Keeper' },
+  { role: 'spinner', label: 'Spinner' },
+  { role: 'spinner', label: 'Spinner' },
+  { role: 'fast', label: 'Fast Bowler' },
+  { role: 'fast', label: 'Fast Bowler' },
+];
+
+let CURRENT_XI = new Array(11).fill(null);
+let _xiEditingSlot = -1;
+
+function generateDefaultXI() {
+  const players = DATA.all_players;
+  const used = new Set();
+  const xi = new Array(11).fill(null);
+
+  for (let i = 0; i < XI_TEMPLATE.length; i++) {
+    const { role } = XI_TEMPLATE[i];
+    let candidates;
+    if (role === 'opener' || role === 'middle' || role === 'keeper') {
+      candidates = [...players]
+        .filter(p => p.playing_role === role && !used.has(p.name) && p.bat_rating > 0)
+        .sort((a, b) => b.bat_rating - a.bat_rating);
+    } else if (role === 'allrounder') {
+      candidates = [...players]
+        .filter(p => p.playing_role === role && !used.has(p.name) && p.ar_rating > 0)
+        .sort((a, b) => (b.ar_rating || 0) - (a.ar_rating || 0));
+    } else {
+      candidates = [...players]
+        .filter(p => p.playing_role === role && !used.has(p.name) && p.bowl_rating > 0)
+        .sort((a, b) => b.bowl_rating - a.bowl_rating);
+    }
+    if (candidates.length > 0) {
+      xi[i] = candidates[0];
+      used.add(candidates[0].name);
+    }
+  }
+  return xi;
+}
+
+function addToXI(playerName, targetSlot) {
+  const player = DATA.all_players.find(p => p.name === playerName);
+  if (!player) return;
+  removeFromXI(playerName);
+
+  if (targetSlot != null && targetSlot >= 0 && targetSlot < 11) {
+    CURRENT_XI[targetSlot] = player;
+  } else {
+    const role = player.playing_role;
+    let idx = -1;
+    if (role) {
+      idx = CURRENT_XI.findIndex((p, i) => !p && XI_TEMPLATE[i].role === role);
+    }
+    if (idx < 0) {
+      idx = CURRENT_XI.findIndex(p => !p);
+    }
+    if (idx >= 0) CURRENT_XI[idx] = player;
+  }
+  renderGreatestXI();
+}
+
+function removeFromXI(playerName) {
+  const idx = CURRENT_XI.findIndex(p => p && p.name === playerName);
+  if (idx >= 0) {
+    CURRENT_XI[idx] = null;
+    return true;
+  }
+  return false;
+}
+
+function xiPlayerStats(p) {
+  const parts = [];
+  if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
+  if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
+  if (p.career_bat_avg != null) parts.push(`Avg ${p.career_bat_avg.toFixed(1)}`);
+  return parts.join(' · ');
+}
+
+function renderGreatestXI() {
+  const container = document.getElementById('xi-slots');
+  if (!container) return;
+
+  const formatLabel = { tests: 'Test', odis: 'ODI', t20is: 'T20I', ipl: 'IPL' }[CURRENT_FORMAT] || 'Test';
+  const heading = document.getElementById('heading-xi');
+  if (heading) heading.textContent = `Greatest ${formatLabel} XI`;
+
+  container.innerHTML = CURRENT_XI.map((player, i) => {
+    const tmpl = XI_TEMPLATE[i];
+    const num = String(i + 1).padStart(2, '\u2007');
+    if (player) {
+      return `
+        <div class="xi-slot" data-slot="${i}">
+          <span class="xi-slot-num">${num}</span>
+          <span class="xi-slot-role">${tmpl.label}</span>
+          <div class="xi-slot-player">
+            <span class="xi-slot-flag">${getFlag(player.country)}</span>
+            <span>${player.name}</span>
+          </div>
+          <span class="xi-slot-stats">${xiPlayerStats(player)}</span>
+          <button class="xi-slot-remove" data-slot="${i}" title="Remove">&times;</button>
+        </div>`;
+    } else {
+      return `
+        <div class="xi-slot xi-slot-empty" data-slot="${i}">
+          <span class="xi-slot-num">${num}</span>
+          <span class="xi-slot-role">${tmpl.label}</span>
+          <span class="xi-slot-empty-text">Click to add a ${tmpl.label.toLowerCase()}</span>
+        </div>`;
+    }
+  }).join('');
+
+  container.querySelectorAll('.xi-slot-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const slot = parseInt(btn.dataset.slot);
+      CURRENT_XI[slot] = null;
+      renderGreatestXI();
+    });
+  });
+
+  container.querySelectorAll('.xi-slot').forEach(el => {
+    el.addEventListener('click', () => {
+      const slot = parseInt(el.dataset.slot);
+      if (CURRENT_XI[slot]) return;
+      startXiSlotSearch(slot);
+    });
+  });
+
+  renderXiSummary();
+}
+
+function startXiSlotSearch(slot) {
+  _xiEditingSlot = slot;
+  const container = document.getElementById('xi-slots');
+  const slotEl = container.querySelector(`.xi-slot[data-slot="${slot}"]`);
+  if (!slotEl) return;
+
+  slotEl.classList.add('xi-slot-editing');
+  const tmpl = XI_TEMPLATE[slot];
+  slotEl.innerHTML = `
+    <span class="xi-slot-num">${String(slot + 1).padStart(2, '\u2007')}</span>
+    <span class="xi-slot-role">${tmpl.label}</span>
+    <input class="xi-slot-inline-search" type="text" placeholder="Type a player name..." autofocus autocomplete="off">
+  `;
+
+  const input = slotEl.querySelector('.xi-slot-inline-search');
+  const resultsEl = document.getElementById('xi-search-results');
+  input.focus();
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    if (q.length < 2) { resultsEl.classList.remove('open'); return; }
+    showXiSearchResults(q, resultsEl, slot);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      resultsEl.classList.remove('open');
+      _xiEditingSlot = -1;
+      renderGreatestXI();
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      resultsEl.classList.remove('open');
+      if (_xiEditingSlot === slot) {
+        _xiEditingSlot = -1;
+        renderGreatestXI();
+      }
+    }, 200);
+  });
+}
+
+function showXiSearchResults(query, resultsEl, targetSlot) {
+  const matches = searchPlayers(query);
+  const usedNames = new Set(CURRENT_XI.filter(Boolean).map(p => p.name));
+  const filtered = matches.filter(m => !usedNames.has(m.name));
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<div class="xi-sr-item" style="color:var(--muted)">No players found</div>';
+    resultsEl.classList.add('open');
+    return;
+  }
+
+  resultsEl.innerHTML = filtered.slice(0, 10).map(p => `
+    <div class="xi-sr-item" data-name="${p.name}">
+      <span>${getFlag(p.country)}</span>
+      <span>${p.name}</span>
+      ${p.playing_role ? `<span class="xi-sr-role">${p.playing_role}</span>` : ''}
+      <span class="xi-sr-stats">${xiPlayerStats(p)}</span>
+    </div>
+  `).join('');
+
+  resultsEl.classList.add('open');
+  resultsEl.querySelectorAll('.xi-sr-item[data-name]').forEach(el => {
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const name = el.dataset.name;
+      _xiEditingSlot = -1;
+      resultsEl.classList.remove('open');
+      addToXI(name, targetSlot);
+    });
+  });
+}
+
+function renderXiSummary() {
+  const el = document.getElementById('xi-summary');
+  if (!el) return;
+  const filled = CURRENT_XI.filter(Boolean);
+  if (filled.length === 0) { el.innerHTML = ''; return; }
+
+  const avgBat = filled.filter(p => p.bat_rating > 0).reduce((s, p) => s + p.bat_rating, 0) / Math.max(1, filled.filter(p => p.bat_rating > 0).length);
+  const avgBowl = filled.filter(p => p.bowl_rating > 0).reduce((s, p) => s + p.bowl_rating, 0) / Math.max(1, filled.filter(p => p.bowl_rating > 0).length);
+  const countries = [...new Set(filled.map(p => p.country))];
+
+  el.innerHTML = `
+    <strong>${filled.length}/11</strong> players selected · 
+    Avg batting rating: <strong>${Math.round(avgBat)}</strong> · 
+    Avg bowling rating: <strong>${Math.round(avgBowl)}</strong> · 
+    ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
+  `;
+}
+
+function setupGreatestXI() {
+  const mainSearch = document.getElementById('xi-search');
+  const mainResults = document.getElementById('xi-search-results');
+  if (!mainSearch || !mainResults) return;
+
+  mainSearch.addEventListener('input', () => {
+    const q = mainSearch.value.trim();
+    if (q.length < 2) { mainResults.classList.remove('open'); return; }
+    showXiSearchResults(q, mainResults, undefined);
+  });
+
+  mainSearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      mainResults.classList.remove('open');
+      mainSearch.value = '';
+    }
+    if (e.key === 'Enter') {
+      const matches = searchPlayers(mainSearch.value.trim());
+      const usedNames = new Set(CURRENT_XI.filter(Boolean).map(p => p.name));
+      const pick = matches.find(m => !usedNames.has(m.name));
+      if (pick) {
+        addToXI(pick.name);
+        mainSearch.value = '';
+        mainResults.classList.remove('open');
+      }
+    }
+  });
+
+  document.getElementById('xi-reset').addEventListener('click', () => {
+    CURRENT_XI = generateDefaultXI();
+    renderGreatestXI();
+  });
+
+  document.getElementById('xi-copy-link').addEventListener('click', () => {
+    const names = CURRENT_XI.map(p => p ? encodeURIComponent(p.name) : '').join(',');
+    const url = `${location.origin}${location.pathname}#${CURRENT_FORMAT}/greatest-xi/p=${names}`;
+    navigator.clipboard.writeText(url).then(() => {
+      const toast = document.createElement('div');
+      toast.className = 'xi-copied-toast';
+      toast.textContent = 'Link copied!';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2200);
+    });
+  });
+}
+
+function encodeXiInHash() {
+  const names = CURRENT_XI.map(p => p ? encodeURIComponent(p.name) : '').join(',');
+  return `p=${names}`;
+}
+
+function decodeXiFromHash(str) {
+  if (!str.startsWith('p=')) return;
+  const names = str.slice(2).split(',').map(s => decodeURIComponent(s));
+  for (let i = 0; i < 11 && i < names.length; i++) {
+    if (names[i]) {
+      const player = DATA.all_players.find(p => p.name === names[i]);
+      CURRENT_XI[i] = player || null;
+    } else {
+      CURRENT_XI[i] = null;
+    }
+  }
+}
+
 function setupFormatBar() {
   document.querySelectorAll('.format-btn').forEach(btn => {
     btn.addEventListener('click', () => switchFormat(btn.dataset.format));
@@ -2239,6 +2569,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSearch();
   setupTunePanel();
   setupXfWeightBar();
+  setupGreatestXI();
   loadData();
 
   let lastWidth = window.innerWidth;

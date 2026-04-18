@@ -938,6 +938,126 @@ footer {
   .xf-breakdown { font-size: 0.7rem; }
 }
 
+/* ─── Greatest XI ──────────────────────────────────────────────────────── */
+
+.xi-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;
+}
+.xi-header h2 { margin: 0; }
+.xi-actions { display: flex; gap: 0.5rem; }
+.xi-btn {
+  padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border);
+  background: var(--card-bg); color: var(--text);
+  transition: background 0.15s, border-color 0.15s;
+}
+.xi-btn:hover { border-color: var(--accent); }
+.xi-btn-share { background: var(--accent); color: #fff; border-color: var(--accent); }
+.xi-btn-share:hover { opacity: 0.85; }
+
+.xi-slots {
+  display: flex; flex-direction: column; gap: 0.4rem; margin: 1rem 0;
+}
+
+.xi-slot {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0.9rem; border-radius: 8px;
+  background: var(--card-bg); border: 1px solid var(--border);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  min-height: 3rem;
+}
+.xi-slot:hover { border-color: var(--accent); }
+.xi-slot.xi-slot-empty {
+  border-style: dashed; opacity: 0.7; cursor: pointer;
+}
+.xi-slot.xi-slot-empty:hover { opacity: 1; border-color: var(--accent); }
+.xi-slot.xi-slot-editing { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+
+.xi-slot-num {
+  font-size: 0.75rem; font-weight: 700; color: var(--muted);
+  min-width: 1.5rem; text-align: center;
+}
+.xi-slot-role {
+  font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--accent);
+  min-width: 5.5rem;
+}
+.xi-slot-player {
+  flex: 1; display: flex; align-items: center; gap: 0.5rem;
+  font-weight: 600; font-size: 0.9rem;
+}
+.xi-slot-flag { font-size: 1.1rem; }
+.xi-slot-stats {
+  font-size: 0.75rem; color: var(--muted); font-weight: 400;
+  margin-left: auto; white-space: nowrap;
+}
+.xi-slot-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 1.1rem; padding: 0 0.3rem;
+  transition: color 0.15s;
+}
+.xi-slot-remove:hover { color: #ef4444; }
+
+.xi-slot-empty-text {
+  flex: 1; color: var(--muted); font-size: 0.85rem; font-style: italic;
+}
+
+.xi-slot-inline-search {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-size: 0.85rem; font-family: inherit;
+}
+.xi-slot-inline-search::placeholder { color: var(--muted); }
+
+.xi-search-wrap {
+  position: relative; max-width: 500px; margin: 0.5rem 0 1rem;
+}
+.xi-search-wrap input {
+  width: 100%; padding: 0.6rem 0.9rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--card-bg);
+  color: var(--text); font-size: 0.9rem; font-family: inherit;
+}
+.xi-search-wrap input:focus { border-color: var(--accent); outline: none; }
+
+.xi-search-results {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 0 0 8px 8px; max-height: 280px; overflow-y: auto;
+  display: none;
+}
+.xi-search-results.open { display: block; }
+.xi-sr-item {
+  padding: 0.5rem 0.9rem; cursor: pointer; display: flex;
+  align-items: center; gap: 0.5rem; font-size: 0.85rem;
+  transition: background 0.1s;
+}
+.xi-sr-item:hover { background: var(--hover-bg, rgba(99,102,241,0.08)); }
+.xi-sr-role { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; }
+.xi-sr-stats { margin-left: auto; font-size: 0.75rem; color: var(--muted); }
+
+.xi-summary {
+  padding: 0.8rem 1rem; border-radius: 8px; font-size: 0.85rem;
+  background: var(--card-bg); border: 1px solid var(--border);
+  color: var(--muted); line-height: 1.5;
+}
+.xi-summary strong { color: var(--text); }
+
+.xi-copied-toast {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff; padding: 0.5rem 1.2rem;
+  border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+  z-index: 9999; animation: xiFadeOut 2s forwards;
+}
+@keyframes xiFadeOut { 0%,70%{opacity:1} 100%{opacity:0} }
+
+.lb-row .lb-xi-add {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--muted); font-size: 0.85rem; cursor: pointer;
+  padding: 0.15rem 0.45rem; margin-left: 0.3rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.lb-row .lb-xi-add:hover { color: var(--accent); border-color: var(--accent); }
+
 @media (max-width: 480px) {
   .hero h1 { font-size: 1.3rem; }
   .subtitle { font-size: 0.85rem; }
