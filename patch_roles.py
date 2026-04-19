@@ -6,12 +6,13 @@ from pathlib import Path
 ROLE_MAP = {
     # ── Openers ──
     "SM Gavaskar": "opener", "G Boycott": "opener", "L Hutton": "opener",
-    "GR Viswanath": "opener", "CG Greenidge": "opener", "DL Haynes": "opener",
+    "JB Hobbs": "opener", "H Sutcliffe": "opener",
+    "CG Greenidge": "opener", "DL Haynes": "opener",
     "MA Taylor": "opener", "ML Hayden": "opener", "JL Langer": "opener",
     "V Sehwag": "opener", "HM Amla": "opener", "DA Warner": "opener",
     "AN Cook": "opener", "ME Trescothick": "opener", "AJ Strauss": "opener",
     "WM Lawry": "opener", "RB Simpson": "opener", "GM Turner": "opener",
-    "MP Vaughan": "opener", "WR Hammond": "opener",
+    "MP Vaughan": "opener",
     "Saeed Anwar": "opener", "ST Jayasuriya": "opener",
     "TM Dilshan": "opener", "Tamim Iqbal": "opener",
     "RG Sharma": "opener", "S Dhawan": "opener", "MJ Guptill": "opener",
@@ -46,6 +47,7 @@ ROLE_MAP = {
     "Mushfiqur Rahim": "middle", "KD Karthik": "middle",
     "ED Weekes": "middle", "CL Walcott": "middle", "FMM Worrell": "middle",
     "KF Barrington": "middle", "DG Bradman": "middle",
+    "WR Hammond": "middle", "GR Viswanath": "middle",
 
     # ── Wicketkeeper-Batsmen ──
     "AC Gilchrist": "keeper", "MS Dhoni": "keeper", "A Flower": "keeper",
