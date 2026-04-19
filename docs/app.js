@@ -809,12 +809,24 @@ function medalClass(i) {
   return i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
 }
 
+const ROLE_LABELS = {
+  opener: 'Opener', middle: 'Middle Order', keeper: 'Keeper',
+  allrounder: 'Allrounder', spinner: 'Spinner', fast: 'Fast Bowler',
+};
+
+function roleTag(p) {
+  const r = p.playing_role;
+  if (!r || !ROLE_LABELS[r]) return '';
+  return `<span class="lb-role">${ROLE_LABELS[r]}</span>`;
+}
+
 function playerSubtitle(p) {
   const isIPL = CURRENT_FORMAT === 'ipl';
+  const role = roleTag(p);
   if (isIPL && p.franchises && p.franchises.length) {
-    return `${franchiseBadges(p.franchises)} · ${p.matches} matches`;
+    return `${franchiseBadges(p.franchises)} · ${p.matches} matches${role ? ' · ' + role : ''}`;
   }
-  return `${p.country} · ${p.matches} matches`;
+  return `${p.country} · ${p.matches} matches${role ? ' · ' + role : ''}`;
 }
 
 function renderAllrounderTable() {
@@ -892,8 +904,7 @@ function addRowClickHandlers(container) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       addToXI(btn.dataset.player);
-      btn.textContent = '✓';
-      setTimeout(() => { btn.textContent = '+'; }, 800);
+      switchTab('greatest-xi');
     });
   });
 }
