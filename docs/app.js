@@ -814,15 +814,15 @@ const ROLE_LABELS = {
   allrounder: 'Allrounder', spinner: 'Spinner', fast: 'Fast Bowler',
 };
 
-function roleTag(p) {
-  const r = p.playing_role;
+function roleTag(p, override) {
+  const r = override || p.playing_role;
   if (!r || !ROLE_LABELS[r]) return '';
   return `<span class="lb-role">${ROLE_LABELS[r]}</span>`;
 }
 
-function playerSubtitle(p) {
+function playerSubtitle(p, roleOverride) {
   const isIPL = CURRENT_FORMAT === 'ipl';
-  const role = roleTag(p);
+  const role = roleTag(p, roleOverride);
   if (isIPL && p.franchises && p.franchises.length) {
     return `${franchiseBadges(p.franchises)} · ${p.matches} matches${role ? ' · ' + role : ''}`;
   }
@@ -837,7 +837,7 @@ function renderAllrounderTable() {
       <div class="lb-flag">${getFlag(p.country)}</div>
       <div class="lb-info">
         <div class="lb-name">${p.name}</div>
-        <div class="lb-country">${playerSubtitle(p)}</div>
+        <div class="lb-country">${playerSubtitle(p, 'allrounder')}</div>
       </div>
       <div class="lb-primary">
         <div class="lb-primary-val">${p.ar_rating}</div>
