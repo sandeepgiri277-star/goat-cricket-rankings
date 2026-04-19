@@ -2308,10 +2308,16 @@ function generateDefaultXI() {
   return xi;
 }
 
+function _ratingForRole(player, role) {
+  if (role === 'allrounder') return player.ar_rating || 0;
+  if (role === 'spinner' || role === 'fast') return player.bowl_rating || 0;
+  return player.bat_rating || 0;
+}
+
 function addToXI(playerName, targetSlot) {
   const player = DATA.all_players.find(p => p.name === playerName);
   if (!player) return;
-  removeFromXI(playerName);
+  if (CURRENT_XI.some(p => p && p.name === playerName)) return;
 
   if (targetSlot != null && targetSlot >= 0 && targetSlot < 11) {
     CURRENT_XI[targetSlot] = player;
@@ -2323,6 +2329,28 @@ function addToXI(playerName, targetSlot) {
     }
     if (idx < 0) {
       idx = CURRENT_XI.findIndex(p => !p);
+    }
+    if (idx < 0 && role) {
+      let worstIdx = -1, worstRating = Infinity;
+      CURRENT_XI.forEach((p, i) => {
+        if (p && XI_TEMPLATE[i].role === role) {
+          const r = _ratingForRole(p, role);
+          if (r < worstRating) { worstRating = r; worstIdx = i; }
+        }
+      });
+      if (worstIdx >= 0 && _ratingForRole(player, role) > worstRating) {
+        idx = worstIdx;
+      }
+    }
+    if (idx < 0) {
+      let worstIdx = -1, worstRating = Infinity;
+      CURRENT_XI.forEach((p, i) => {
+        if (p) {
+          const r = _ratingForRole(p, XI_TEMPLATE[i].role);
+          if (r < worstRating) { worstRating = r; worstIdx = i; }
+        }
+      });
+      idx = worstIdx;
     }
     if (idx >= 0) CURRENT_XI[idx] = player;
   }

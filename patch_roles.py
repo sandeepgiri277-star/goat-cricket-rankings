@@ -87,6 +87,16 @@ ROLE_MAP = {
     "Imad Wasim": "spinner", "Abdur Razzak": "spinner",
     "S Venkataraghavan": "spinner",
 
+    # ── Fast Bowlers (Tests / historic) ──
+    "SF Barnes": "fast", "Sir RJ Hadlee": "fast", "RJ Hadlee": "fast",
+    "FS Trueman": "fast", "JB Statham": "fast", "AV Bedser": "fast",
+    "RR Lindwall": "fast", "KR Miller": "fast",
+    "AK Davidson": "fast", "WJ O'Reilly": "fast",
+    "CEL Stuart": "fast", "ITE Bailey": "fast",
+    "EAS Prasanna": "spinner", "BS Bedi": "spinner",
+    "CV Grimmett": "spinner", "WJ O'Reilly": "spinner",
+    "SF Barnes": "fast",
+
     # ── Fast Bowlers ──
     "GD McGrath": "fast", "Wasim Akram": "fast", "Waqar Younis": "fast",
     "CEL Ambrose": "fast", "CA Walsh": "fast", "DK Lillee": "fast",
@@ -113,13 +123,12 @@ def heuristic_role(player):
     """Fallback role assignment based on available stats."""
     bat_r = player.get("bat_rating", 0) or 0
     bowl_r = player.get("bowl_rating", 0) or 0
-    bowl_inns = player.get("bowl_inns", 0) or 0
 
     is_genuine_allrounder = (bat_r >= 500 and bowl_r >= 500 and
                              abs(bat_r - bowl_r) < 300)
     if is_genuine_allrounder:
         return "allrounder"
-    if bowl_r > bat_r and bowl_inns > 20:
+    if bowl_r > bat_r:
         return "fast"
     if bat_r > 0:
         return "middle"
@@ -130,13 +139,18 @@ def patch_json(json_path):
     with open(json_path) as f:
         data = json.load(f)
 
+    name_role = {}
+    for pl in data.get("all_players", []):
+        name = pl.get("name", "")
+        role = ROLE_MAP.get(name) or heuristic_role(pl)
+        if role:
+            name_role[name] = role
+
     patched = 0
     for list_key in ["all_players", "batting_top25", "bowling_top25", "allrounder_top25"]:
         for pl in data.get(list_key, []):
             name = pl.get("name") or pl.get("player_name", "")
-            role = ROLE_MAP.get(name)
-            if not role:
-                role = heuristic_role(pl)
+            role = ROLE_MAP.get(name) or name_role.get(name) or heuristic_role(pl)
             if role:
                 pl["playing_role"] = role
                 patched += 1
