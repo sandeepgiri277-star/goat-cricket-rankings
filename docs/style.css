@@ -381,7 +381,7 @@ a:hover { text-decoration: underline; }
   border-radius: 0 0 var(--radius) var(--radius);
   max-height: 300px;
   overflow-y: auto;
-  z-index: 100;
+  z-index: 500;
   display: none;
 }
 
@@ -1023,7 +1023,7 @@ footer {
 .xi-search-wrap input:focus { border-color: var(--accent); outline: none; }
 
 .xi-search-results {
-  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 500;
   background: var(--card-bg); border: 1px solid var(--border);
   border-radius: 0 0 8px 8px; max-height: 280px; overflow-y: auto;
   display: none;
