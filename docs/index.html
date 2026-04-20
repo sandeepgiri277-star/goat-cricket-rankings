@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GOAT Cricket Rankings</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=7">
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8" async></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -36,6 +36,7 @@
     <button class="tab" data-tab="bowling">Bowling</button>
     <button class="tab" data-tab="player-lookup">Player Lookup</button>
     <button class="tab" data-tab="greatest-xi">Greatest XI</button>
+    <button class="tab" data-tab="saved-xis">Saved XIs</button>
     <button class="tab" data-tab="methodology">Methodology</button>
   </nav>
 
@@ -371,8 +372,14 @@
         <div class="xi-actions">
           <button class="xi-btn" id="xi-start-template">Start from Professor's XI</button>
           <button class="xi-btn" id="xi-clear">Clear All</button>
+          <button class="xi-btn xi-btn-save" id="xi-save">Save XI</button>
           <button class="xi-btn xi-btn-share" id="xi-copy-link">Copy Link</button>
         </div>
+      </div>
+      <div class="xi-save-form hidden" id="xi-save-form">
+        <input type="text" id="xi-save-name" placeholder="Name your XI (e.g. 1990s Legends)" autocomplete="off" maxlength="40">
+        <button class="xi-btn xi-btn-save" id="xi-save-confirm">Save</button>
+        <button class="xi-btn" id="xi-save-cancel">Cancel</button>
       </div>
       <p class="panel-desc">Add players from the ranking lists (via the + button) or search here. Drag to reorder your batting lineup.</p>
       <div class="xi-search-wrap">
@@ -382,6 +389,17 @@
       <div class="xi-slots" id="xi-custom-slots"></div>
       <div class="xi-constraints" id="xi-constraints"></div>
       <div class="xi-summary" id="xi-summary"></div>
+    </section>
+
+    <!-- Saved XIs Tab -->
+    <section class="tab-panel" id="panel-saved-xis">
+      <h2 id="heading-saved-xis">Saved Test XIs</h2>
+      <p class="panel-desc">Save your custom XIs and compare them side by side.</p>
+      <div class="saved-xi-list" id="saved-xi-list"></div>
+      <div class="xi-compare hidden" id="xi-compare">
+        <h3>Comparison</h3>
+        <div class="xi-compare-cols" id="xi-compare-cols"></div>
+      </div>
     </section>
 
     <!-- Methodology Tab -->
@@ -406,6 +424,6 @@
         '<pre style="color:#e74c3c;padding:2rem;white-space:pre-wrap">JS Error: ' + msg + '\nSource: ' + src + '\nLine: ' + line + ':' + col + '</pre>';
     };
   </script>
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

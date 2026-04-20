@@ -624,13 +624,15 @@ async function switchFormat(format) {
 
   const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
   const xiTab = document.querySelector('.tab[data-tab="greatest-xi"]');
+  const savedTab = document.querySelector('.tab[data-tab="saved-xis"]');
   const tunePanel = document.getElementById('tune-panel');
   const isXf = format === 'crossformat';
   if (xiTab) xiTab.style.display = isXf ? 'none' : '';
+  if (savedTab) savedTab.style.display = isXf ? 'none' : '';
   if (isXf) {
     plTab.style.display = 'none';
     const curTab = document.querySelector('.tab.active')?.dataset.tab;
-    if (curTab === 'player-lookup' || curTab === 'greatest-xi') {
+    if (curTab === 'player-lookup' || curTab === 'greatest-xi' || curTab === 'saved-xis') {
       switchTab('allrounders', false);
     }
   } else {
@@ -1981,7 +1983,8 @@ function switchTab(tabId, updateHash = true) {
   const showBat = tabId !== 'bowling';
   const showBowl = tabId !== 'batting';
   const isAR = tabId === 'allrounders';
-  const hideTune = tabId === 'greatest-xi' || tabId === 'methodology';
+  const hideTune = tabId === 'greatest-xi' || tabId === 'saved-xis' || tabId === 'methodology';
+  if (tabId === 'saved-xis') renderSavedXIs();
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
   document.querySelectorAll('.tune-ar-header').forEach(el => el.classList.toggle('hidden', !isAR));
@@ -2784,9 +2787,8 @@ function xiPlayerRole(p) {
     }
     return 'allrounder';
   }
+  if (p.bat_pos === 'opener' || p.bat_pos === 'middle') return p.bat_pos;
   if (r && r !== 'unknown') return r;
-  if (p.bat_pos === 'opener') return 'opener';
-  if (p.bat_pos === 'middle') return 'middle';
   return 'middle';
 }
 
@@ -2968,6 +2970,248 @@ function decodeXiFromHash(str) {
   }
 }
 
+// ─── Saved XIs ──────────────────────────────────────────────────────────────
+
+const SAVED_XI_KEY = 'goat-xi-saved';
+let _compareSelection = [];
+
+function getSavedXIs(format) {
+  try {
+    const raw = localStorage.getItem(SAVED_XI_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    return all[format] || [];
+  } catch { return []; }
+}
+
+function setSavedXIs(format, list) {
+  try {
+    const raw = localStorage.getItem(SAVED_XI_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    all[format] = list.slice(0, 20);
+    localStorage.setItem(SAVED_XI_KEY, JSON.stringify(all));
+  } catch {}
+}
+
+function saveCurrentXI(name) {
+  if (CUSTOM_XI.length === 0) return;
+  const list = getSavedXIs(CURRENT_FORMAT);
+  list.unshift({
+    name: name.trim() || 'Untitled XI',
+    players: CUSTOM_XI.map(p => p.name),
+    created: Date.now(),
+  });
+  setSavedXIs(CURRENT_FORMAT, list);
+}
+
+function deleteSavedXI(idx) {
+  const list = getSavedXIs(CURRENT_FORMAT);
+  list.splice(idx, 1);
+  setSavedXIs(CURRENT_FORMAT, list);
+}
+
+function resolvePlayerNames(names) {
+  if (!DATA) return [];
+  return names.map(n => DATA.all_players.find(p => p.name === n)).filter(Boolean);
+}
+
+function renderSavedXIs() {
+  const container = document.getElementById('saved-xi-list');
+  if (!container) return;
+
+  const formatLabel = { tests: 'Test', odis: 'ODI', t20is: 'T20I', ipl: 'IPL' }[CURRENT_FORMAT] || 'Test';
+  const heading = document.getElementById('heading-saved-xis');
+  if (heading) heading.textContent = `Saved ${formatLabel} XIs`;
+
+  const list = getSavedXIs(CURRENT_FORMAT);
+  if (list.length === 0) {
+    container.innerHTML = '<p class="saved-xi-empty">No saved XIs yet. Build a team and click "Save XI" to save it here.</p>';
+    document.getElementById('xi-compare').classList.add('hidden');
+    return;
+  }
+
+  _compareSelection = _compareSelection.filter(i => i < list.length);
+
+  container.innerHTML = list.map((xi, i) => {
+    const players = resolvePlayerNames(xi.players);
+    const sumBat = players.reduce((s, p) => s + (p.bat_rating || 0), 0);
+    const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
+    const countries = [...new Set(players.map(p => p.country))];
+    const date = new Date(xi.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const checked = _compareSelection.includes(i) ? 'checked' : '';
+    const playerList = players.slice(0, 11).map((p, j) =>
+      `<span class="sxi-player">${j + 1}. ${getFlag(p.country)} ${p.name}</span>`
+    ).join('');
+
+    return `
+      <div class="saved-xi-card" data-idx="${i}">
+        <div class="sxi-top">
+          <div class="sxi-meta">
+            <strong class="sxi-name">${xi.name}</strong>
+            <span class="sxi-date">${date} \u00b7 ${players.length} players</span>
+          </div>
+          <div class="sxi-actions">
+            <label class="sxi-compare-label" title="Select for comparison">
+              <input type="checkbox" class="sxi-compare-cb" data-idx="${i}" ${checked}> Compare
+            </label>
+            <button class="xi-btn sxi-load" data-idx="${i}" title="Load into builder">Load</button>
+            <button class="xi-btn sxi-delete" data-idx="${i}" title="Delete">Delete</button>
+          </div>
+        </div>
+        <div class="sxi-players">${playerList}</div>
+        <div class="sxi-stats">
+          Bat: <strong>${sumBat}</strong> \u00b7
+          Bowl: <strong>${sumBowl}</strong> \u00b7
+          ${countries.map(c => getFlag(c)).join(' ')}
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.sxi-load').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const xi = list[parseInt(btn.dataset.idx)];
+      CUSTOM_XI.length = 0;
+      CUSTOM_XI.push(...resolvePlayerNames(xi.players));
+      switchTab('greatest-xi');
+      renderCustomXI();
+      updateXiBucket();
+    });
+  });
+
+  container.querySelectorAll('.sxi-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      deleteSavedXI(parseInt(btn.dataset.idx));
+      renderSavedXIs();
+    });
+  });
+
+  container.querySelectorAll('.sxi-compare-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const idx = parseInt(cb.dataset.idx);
+      if (cb.checked) {
+        if (_compareSelection.length >= 2) {
+          const oldest = _compareSelection.shift();
+          const oldCb = container.querySelector(`.sxi-compare-cb[data-idx="${oldest}"]`);
+          if (oldCb) oldCb.checked = false;
+        }
+        _compareSelection.push(idx);
+      } else {
+        _compareSelection = _compareSelection.filter(i => i !== idx);
+      }
+      renderComparison();
+    });
+  });
+
+  renderComparison();
+}
+
+function renderComparison() {
+  const panel = document.getElementById('xi-compare');
+  const cols = document.getElementById('xi-compare-cols');
+  if (!panel || !cols) return;
+
+  if (_compareSelection.length < 2) {
+    panel.classList.add('hidden');
+    return;
+  }
+
+  const list = getSavedXIs(CURRENT_FORMAT);
+  const xis = _compareSelection.map(i => ({
+    meta: list[i],
+    players: resolvePlayerNames(list[i].players),
+  }));
+
+  panel.classList.remove('hidden');
+
+  const colHTML = xis.map(({ meta, players }) => {
+    const sumBat = players.reduce((s, p) => s + (p.bat_rating || 0), 0);
+    const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
+    const countries = [...new Set(players.map(p => p.country))];
+
+    const rows = [];
+    for (let i = 0; i < 11; i++) {
+      const p = players[i];
+      if (p) {
+        rows.push(`<div class="xic-row">
+          <span class="xic-num">${i + 1}</span>
+          <span class="xic-flag">${getFlag(p.country)}</span>
+          <span class="xic-name">${p.name}</span>
+          <span class="xic-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
+        </div>`);
+      } else {
+        rows.push(`<div class="xic-row xic-empty"><span class="xic-num">${i + 1}</span> \u2014</div>`);
+      }
+    }
+
+    return `
+      <div class="xi-compare-col">
+        <div class="xic-title">${meta.name}</div>
+        ${rows.join('')}
+        <div class="xic-summary">
+          <span class="xic-fp" data-type="bat">Bat: <strong>${sumBat}</strong></span>
+          <span class="xic-fp" data-type="bowl">Bowl: <strong>${sumBowl}</strong></span>
+          <span>${countries.map(c => getFlag(c)).join(' ')}</span>
+        </div>
+      </div>`;
+  });
+
+  const bat0 = xis[0].players.reduce((s, p) => s + (p.bat_rating || 0), 0);
+  const bat1 = xis[1].players.reduce((s, p) => s + (p.bat_rating || 0), 0);
+  const bowl0 = xis[0].players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
+  const bowl1 = xis[1].players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
+
+  cols.innerHTML = colHTML.join('<div class="xic-vs">VS</div>');
+
+  const fpEls = cols.querySelectorAll('.xic-fp');
+  fpEls.forEach(el => el.classList.remove('xic-winner'));
+  const allCols = cols.querySelectorAll('.xi-compare-col');
+  if (bat0 !== bat1) {
+    const winIdx = bat0 > bat1 ? 0 : 1;
+    allCols[winIdx].querySelector('.xic-fp[data-type="bat"]').classList.add('xic-winner');
+  }
+  if (bowl0 !== bowl1) {
+    const winIdx = bowl0 > bowl1 ? 0 : 1;
+    allCols[winIdx].querySelector('.xic-fp[data-type="bowl"]').classList.add('xic-winner');
+  }
+}
+
+function setupSavedXIs() {
+  const saveBtn = document.getElementById('xi-save');
+  const saveForm = document.getElementById('xi-save-form');
+  const saveNameInput = document.getElementById('xi-save-name');
+  const saveConfirm = document.getElementById('xi-save-confirm');
+  const saveCancel = document.getElementById('xi-save-cancel');
+  if (!saveBtn || !saveForm) return;
+
+  saveBtn.addEventListener('click', () => {
+    if (CUSTOM_XI.length === 0) return;
+    saveForm.classList.remove('hidden');
+    saveNameInput.value = '';
+    saveNameInput.focus();
+  });
+
+  saveCancel.addEventListener('click', () => {
+    saveForm.classList.add('hidden');
+  });
+
+  saveConfirm.addEventListener('click', () => {
+    const name = saveNameInput.value.trim();
+    if (!name) { saveNameInput.focus(); return; }
+    saveCurrentXI(name);
+    saveForm.classList.add('hidden');
+
+    const toast = document.createElement('div');
+    toast.className = 'xi-copied-toast';
+    toast.textContent = `"${name}" saved!`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2200);
+  });
+
+  saveNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveConfirm.click();
+    if (e.key === 'Escape') saveCancel.click();
+  });
+}
+
 function setupFormatBar() {
   document.querySelectorAll('.format-btn').forEach(btn => {
     btn.addEventListener('click', () => switchFormat(btn.dataset.format));
@@ -2983,6 +3227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTunePanel();
     setupXfWeightBar();
     setupGreatestXI();
+    setupSavedXIs();
   } catch (e) {
     console.error('Setup crash:', e);
     document.title = 'SETUP ERROR: ' + e.message;
