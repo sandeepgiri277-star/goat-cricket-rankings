@@ -2560,8 +2560,8 @@ function renderDefaultXI(xi) {
     const avgBowl = players.filter(p => p.bowl_rating > 0).reduce((s, p) => s + p.bowl_rating, 0) / Math.max(1, players.filter(p => p.bowl_rating > 0).length);
     const countries = [...new Set(players.map(p => p.country))];
     summaryEl.innerHTML = `
-      Avg batting rating: <strong>${Math.round(avgBat)}</strong> \u00b7
-      Avg bowling rating: <strong>${Math.round(avgBowl)}</strong> \u00b7
+      Batting firepower: <strong>${Math.round(avgBat)}</strong> \u00b7
+      Bowling firepower: <strong>${Math.round(avgBowl)}</strong> \u00b7
       ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
     `;
   }
@@ -2719,8 +2719,8 @@ function renderXiSummary() {
 
   el.innerHTML = `
     <strong>${CUSTOM_XI.length}/11</strong> players selected \u00b7 
-    Avg batting rating: <strong>${Math.round(avgBat)}</strong> \u00b7 
-    Avg bowling rating: <strong>${Math.round(avgBowl)}</strong> \u00b7 
+    Batting firepower: <strong>${Math.round(avgBat)}</strong> \u00b7 
+    Bowling firepower: <strong>${Math.round(avgBowl)}</strong> \u00b7 
     ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
   `;
 }
