@@ -814,6 +814,25 @@ const ROLE_LABELS = {
   allrounder: 'Allrounder', spinner: 'Spinner', fast: 'Fast Bowler',
 };
 
+function battingRole(p) {
+  const r = p.playing_role;
+  if (!r) return null;
+  if (r === 'opener') return 'opener';
+  return 'middle';
+}
+
+function bowlingRole(p) {
+  const r = p.playing_role;
+  if (r === 'spinner') return 'spinner';
+  if (r === 'fast') return 'fast';
+  if (p.bowl_rating > 0) {
+    const sr = p.career_bowl_sr;
+    if (sr && sr > 55) return 'spinner';
+    return 'fast';
+  }
+  return r;
+}
+
 function roleTag(p, override) {
   const r = override || p.playing_role;
   if (!r || !ROLE_LABELS[r]) return '';
@@ -857,7 +876,7 @@ function renderBattingTable() {
       <div class="lb-flag">${getFlag(p.country)}</div>
       <div class="lb-info">
         <div class="lb-name">${p.name}</div>
-        <div class="lb-country">${playerSubtitle(p)}</div>
+        <div class="lb-country">${playerSubtitle(p, battingRole(p))}</div>
       </div>
       <div class="lb-primary">
         <div class="lb-primary-val">${p.bat_rating}</div>
@@ -877,7 +896,7 @@ function renderBowlingTable() {
       <div class="lb-flag">${getFlag(p.country)}</div>
       <div class="lb-info">
         <div class="lb-name">${p.name}</div>
-        <div class="lb-country">${playerSubtitle(p)}</div>
+        <div class="lb-country">${playerSubtitle(p, bowlingRole(p))}</div>
       </div>
       <div class="lb-primary">
         <div class="lb-primary-val">${p.bowl_rating}</div>
