@@ -230,6 +230,7 @@ function recomputeRankings() {
   const allrounders = [];
   for (const r of arRes.results) {
     if (r.bat_rating >= minArRating && r.bowl_rating >= minArRating) {
+      if (isFmOnly && !isFullMember(r.player.country)) continue;
       const arEntry = {
         ...r.player,
         bat_rating: r.bat_rating,
