@@ -2495,12 +2495,14 @@ function xiSlotRoleDisplay(player, tmplRole) {
   const r = player.playing_role;
   const isWk = r === 'keeper';
   let base;
-  if (r === 'allrounder') base = 'Allrounder';
-  else if (r === 'spinner' || player.bowl_type === 'spinner') base = 'Spinner';
-  else if (r === 'fast' || player.bowl_type === 'fast') base = 'Fast Bowler';
-  else if (r === 'opener' || player.bat_pos === 'opener') base = 'Opener';
-  else if (r === 'middle' || player.bat_pos === 'middle') base = 'Middle Order';
+  if (r === 'opener') base = 'Opener';
+  else if (r === 'middle') base = 'Middle Order';
   else if (isWk) base = player.bat_pos === 'opener' ? 'Opener' : 'Middle Order';
+  else if (r === 'allrounder') base = 'Allrounder';
+  else if (r === 'spinner') base = 'Spinner';
+  else if (r === 'fast') base = 'Fast Bowler';
+  else if (player.bat_pos === 'opener') base = 'Opener';
+  else if (player.bat_pos === 'middle') base = 'Middle Order';
   else base = xiSlotLabel(tmplRole);
   return isWk ? `${base} · WK` : base;
 }
