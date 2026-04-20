@@ -1047,6 +1047,7 @@ footer {
   color: var(--muted); line-height: 1.5;
 }
 .xi-summary strong { color: var(--text); }
+.xi-violations { color: #e74c3c; font-weight: 600; font-size: 0.82rem; }
 
 .xi-copied-toast {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);

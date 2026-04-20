@@ -2708,20 +2708,74 @@ function showXiSearchResults(query, resultsEl) {
   });
 }
 
+const XI_ROLE_TEMPLATES = {
+  tests: { opener: 2, middle: 3, keeper: 1, allrounder: 1, spinner: 1, fast: 3 },
+  odis:  { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 3 },
+  t20is: { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 3 },
+  ipl:   { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 3 },
+};
+
+const ROLE_LABELS = {
+  opener: 'opener', middle: 'middle-order batter', keeper: 'keeper',
+  allrounder: 'allrounder', spinner: 'spinner', fast: 'fast bowler',
+};
+
+function xiPlayerRole(p) {
+  const r = p.playing_role;
+  if (r && r !== 'unknown') return r;
+  if (p.bat_pos === 'opener') return 'opener';
+  if (p.bat_pos === 'middle') return 'middle';
+  return 'middle';
+}
+
+function validateXI(players) {
+  const tmpl = XI_ROLE_TEMPLATES[CURRENT_FORMAT] || XI_ROLE_TEMPLATES.tests;
+  const counts = {};
+  for (const p of players) {
+    const role = xiPlayerRole(p);
+    counts[role] = (counts[role] || 0) + 1;
+  }
+  const violations = [];
+  for (const [role, min] of Object.entries(tmpl)) {
+    const have = counts[role] || 0;
+    if (have < min) {
+      const need = min - have;
+      const label = ROLE_LABELS[role] || role;
+      violations.push(`Need ${need} more ${label}${need > 1 ? 's' : ''}`);
+    }
+  }
+  return violations;
+}
+
 function renderXiSummary() {
   const el = document.getElementById('xi-summary');
   if (!el) return;
   if (CUSTOM_XI.length === 0) { el.innerHTML = ''; return; }
 
+  const countries = [...new Set(CUSTOM_XI.map(p => p.country))];
+  const countryLine = `${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}`;
+
+  if (CUSTOM_XI.length < 11) {
+    el.innerHTML = `<strong>${CUSTOM_XI.length}/11</strong> players selected \u00b7 ${countryLine}`;
+    return;
+  }
+
+  const violations = validateXI(CUSTOM_XI);
+  if (violations.length > 0) {
+    el.innerHTML = `
+      <strong>11/11</strong> players selected \u00b7 ${countryLine}<br>
+      <span class="xi-violations">${violations.join(' \u00b7 ')}</span>
+    `;
+    return;
+  }
+
   const sumBat = CUSTOM_XI.reduce((s, p) => s + (p.bat_rating || 0), 0);
   const sumBowl = CUSTOM_XI.reduce((s, p) => s + (p.bowl_rating || 0), 0);
-  const countries = [...new Set(CUSTOM_XI.map(p => p.country))];
-
   el.innerHTML = `
-    <strong>${CUSTOM_XI.length}/11</strong> players selected \u00b7 
+    <strong>11/11</strong> players selected \u00b7 
     Batting firepower: <strong>${sumBat}</strong> \u00b7 
     Bowling firepower: <strong>${sumBowl}</strong> \u00b7 
-    ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
+    ${countryLine}
   `;
 }
 
