@@ -2635,6 +2635,8 @@ function renderCustomXI() {
     const num = String(i + 1).padStart(2, '\u2007');
     if (i < CUSTOM_XI.length) {
       const player = CUSTOM_XI[i];
+      const role = xiPlayerRole(player);
+      const roleLabel = ROLE_LABELS[role] || role;
       slots.push(`
         <div class="xi-slot xi-slot-custom" data-idx="${i}" draggable="true">
           <span class="xi-slot-num xi-drag-handle" title="Drag to reorder">\u2261</span>
@@ -2642,6 +2644,7 @@ function renderCustomXI() {
           <div class="xi-slot-player">
             <span class="xi-slot-flag">${getFlag(player.country)}</span>
             <span>${player.name}</span>
+            <span class="xi-slot-role">${roleLabel}</span>
           </div>
           <span class="xi-slot-stats">${xiPlayerStats(player)}</span>
           <button class="xi-slot-remove" data-idx="${i}" title="Remove">&times;</button>

@@ -992,6 +992,12 @@ footer {
   font-weight: 600; font-size: 0.9rem;
 }
 .xi-slot-flag { font-size: 1.1rem; }
+.xi-slot-role {
+  font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--muted);
+  background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem;
+  border-radius: 4px; white-space: nowrap;
+}
 .xi-slot-stats {
   font-size: 0.75rem; color: var(--muted); font-weight: 400;
   margin-left: auto; white-space: nowrap;
