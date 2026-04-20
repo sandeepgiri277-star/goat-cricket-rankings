@@ -12,6 +12,10 @@ const FORMAT_FILES = {
   ipl: 'ipl_rankings.json',
 };
 
+const FULL_MEMBER_COUNTRIES = new Set([
+  'IND','AUS','ENG','PAK','SA','NZ','WI','SL','BAN','ZIM','AFG','IRE','NED','SCOT','USA',
+]);
+
 const FORMAT_LABELS = {
   tests: 'Test',
   odis: 'ODI',
@@ -468,6 +472,20 @@ function plotlyLayout(overrides = {}) {
 
 // ─── Data Loading ───────────────────────────────────────────────────────────
 
+function isFullMember(country) {
+  if (!country) return false;
+  return country.split('/').some(c => FULL_MEMBER_COUNTRIES.has(c.trim()));
+}
+
+function filterTop25(data) {
+  for (const key of ['batting_top25', 'bowling_top25', 'allrounder_top25']) {
+    if (data[key]) {
+      data[key] = data[key].filter(p => isFullMember(p.country));
+    }
+  }
+  return data;
+}
+
 async function loadFormatData(format) {
   const file = FORMAT_FILES[format];
   if (!file) return null;
@@ -475,7 +493,7 @@ async function loadFormatData(format) {
   try {
     const resp = await fetch(file);
     if (!resp.ok) return null;
-    ALL_DATA[format] = await resp.json();
+    ALL_DATA[format] = filterTop25(await resp.json());
     return ALL_DATA[format];
   } catch (e) {
     return null;
