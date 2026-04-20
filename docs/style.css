@@ -401,6 +401,7 @@ a:hover { text-decoration: underline; }
 
 .search-result .sr-name { font-weight: 500; }
 .search-result .sr-meta { color: var(--text-muted); font-size: 0.82rem; }
+.sr-fullname { color: var(--muted); font-size: 0.8rem; font-weight: 400; }
 
 /* ─── Player Card ────────────────────────────────────────────────────────── */
 

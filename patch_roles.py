@@ -9,6 +9,7 @@ from pathlib import Path
 CACHE_DIR = Path("cricket_cache")
 ROLES_CACHE = CACHE_DIR / "player_roles_api.pkl"
 BATPOS_CACHE = CACHE_DIR / "batting_positions.pkl"
+NAMES_CACHE = CACHE_DIR / "player_names.pkl"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
 def request_with_retry(url, max_retries=3, backoff=(5, 15, 60), **kwargs):
@@ -79,7 +80,7 @@ def fetch_player_role(pid):
     try:
         resp = request_with_retry(url, timeout=10)
         if resp.status_code != 200:
-            return None, None, None
+            return None, None, None, None
         data = resp.json().get("athlete", {})
         pos_name = (data.get("position", {}).get("name") or "").strip().lower()
         bowl_style = data.get("bowlStyle")
@@ -87,9 +88,10 @@ def fetch_player_role(pid):
         if raw_role is None and pos_name in ("bowler", "unknown", ""):
             raw_role = classify_bowl_style(bowl_style)
         bowl_type = classify_bowl_style(bowl_style)
-        return pos_name, raw_role, bowl_type
+        full_name = data.get("fullName") or data.get("displayName") or None
+        return pos_name, raw_role, bowl_type, full_name
     except Exception:
-        return None, None, None
+        return None, None, None, None
 
 
 def scrape_batting_position(pid, cricket_class=1):
@@ -270,15 +272,51 @@ def main():
         print(f"  Retrying {len(failed_pids)} previously failed entries", flush=True)
     print(f"=== Fetching roles from ESPN API for {len(to_fetch)} players (cached: {len(cache)}) ===", flush=True)
 
+    names_cache = {}
+    if NAMES_CACHE.exists():
+        try:
+            names_cache = pickle.load(open(NAMES_CACHE, "rb"))
+        except Exception:
+            names_cache = {}
+
     for i, pid in enumerate(to_fetch):
-        pos, role, bowl_type = fetch_player_role(pid)
+        pos, role, bowl_type, full_name = fetch_player_role(pid)
         cache[pid] = {"pos": pos, "role": role, "bowl_type": bowl_type}
+        if full_name:
+            names_cache[pid] = full_name
         if (i + 1) % 50 == 0:
             print(f"  {i+1}/{len(to_fetch)} fetched...", flush=True)
             save_cache(cache)
+            with open(NAMES_CACHE, "wb") as fp:
+                pickle.dump(names_cache, fp)
         time.sleep(0.25)
 
     save_cache(cache)
+
+    # Backfill full names for cached players that don't have a name yet
+    missing_names = [pid for pid in unique_pids if pid not in names_cache]
+    if missing_names:
+        print(f"=== Fetching full names for {len(missing_names)} players ===", flush=True)
+        for i, pid in enumerate(missing_names):
+            url = ESPN_API.format(pid=pid)
+            try:
+                resp = request_with_retry(url, timeout=10)
+                if resp.status_code == 200:
+                    ath = resp.json().get("athlete", {})
+                    fn = ath.get("fullName") or ath.get("displayName")
+                    if fn:
+                        names_cache[pid] = fn
+            except Exception:
+                pass
+            if (i + 1) % 50 == 0:
+                print(f"  {i+1}/{len(missing_names)} fetched...", flush=True)
+                with open(NAMES_CACHE, "wb") as fp:
+                    pickle.dump(names_cache, fp)
+            time.sleep(0.25)
+
+    with open(NAMES_CACHE, "wb") as fp:
+        pickle.dump(names_cache, fp)
+    print(f"  Full names cached: {len(names_cache)}\n", flush=True)
     print(f"  Done. Total cached: {len(cache)}\n", flush=True)
 
     # Rebuild roles from cache
@@ -455,6 +493,9 @@ def main():
                     pl["bat_pos"] = bp
                 elif has_pid:
                     pl.pop("bat_pos", None)
+                pid = pids_to_fetch.get(name)
+                if pid and pid in names_cache:
+                    pl["full_name"] = names_cache[pid]
 
         with open(jpath, "w") as f:
             json.dump(data, f, separators=(",", ":"))
