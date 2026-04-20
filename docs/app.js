@@ -4,7 +4,8 @@ const ALL_DATA = {};
 let DATA = null;
 let CURRENT_FORMAT = 'tests';
 let CROSS_FORMAT_DATA = null;
-let CUSTOM_XI = [];
+const CUSTOM_XIS = { tests: [], odis: [], t20is: [], ipl: [] };
+let CUSTOM_XI = CUSTOM_XIS.tests;
 let _xiEditingSlot = -1;
 let _xiDragFrom = -1;
 let _plotlyReady = typeof Plotly !== 'undefined';
@@ -618,7 +619,7 @@ async function switchFormat(format) {
   document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.format-btn[data-format="${format}"]`).classList.add('active');
 
-  CUSTOM_XI = [];
+  CUSTOM_XI = CUSTOM_XIS[format] || [];
   renderAll();
 
   const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
@@ -2907,14 +2908,15 @@ function setupGreatestXI() {
 
   document.getElementById('xi-start-template').addEventListener('click', () => {
     const defaultXI = generateDefaultXI().filter(Boolean);
-    CUSTOM_XI = [...defaultXI];
+    CUSTOM_XI.length = 0;
+    CUSTOM_XI.push(...defaultXI);
     renderCustomXI();
     renderXiSummary();
     updateXiBucket();
   });
 
   document.getElementById('xi-clear').addEventListener('click', () => {
-    CUSTOM_XI = [];
+    CUSTOM_XI.length = 0;
     renderCustomXI();
     updateXiBucket();
     document.querySelectorAll('.lb-xi-add.in-xi').forEach(b => {
@@ -2949,7 +2951,7 @@ function encodeXiInHash() {
 function decodeXiFromHash(str) {
   if (!str.startsWith('p=')) return;
   const names = str.slice(2).split(',').map(s => decodeURIComponent(s)).filter(Boolean);
-  CUSTOM_XI = [];
+  CUSTOM_XI.length = 0;
   for (const name of names) {
     const player = DATA.all_players.find(p => p.name === name);
     if (player) CUSTOM_XI.push(player);
