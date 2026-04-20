@@ -2495,13 +2495,11 @@ function generateDefaultXI() {
 
 function xiPlayerStats(p) {
   const r = p.playing_role;
-  const isAllrounder = r === 'allrounder';
-  const isBowler = r === 'spinner' || r === 'fast' || p.bowl_type === 'spinner' || p.bowl_type === 'fast';
   const parts = [];
-  if (isAllrounder) {
+  if (r === 'allrounder') {
     if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
     if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
-  } else if (isBowler && !isAllrounder) {
+  } else if (r === 'spinner' || r === 'fast') {
     if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
   } else {
     if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
