@@ -2878,6 +2878,38 @@ function renderXiSummary() {
   `;
 }
 
+function renderSavedXiPicker() {
+  const el = document.getElementById('xi-saved-picker');
+  if (!el) return;
+
+  const list = getSavedXIs(CURRENT_FORMAT);
+  if (list.length === 0) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `
+    <div class="sxp-header">
+      <span class="sxp-label">Your saved XIs</span>
+    </div>
+    <div class="sxp-items">${list.map((xi, i) => {
+      const players = resolvePlayerNames(xi.players);
+      const sumBat = players.reduce((s, p) => s + (p.bat_rating || 0), 0);
+      const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
+      return `<button class="sxp-item" data-idx="${i}">
+        <strong>${xi.name}</strong>
+        <span class="sxp-stats">Bat ${sumBat} \u00b7 Bowl ${sumBowl}</span>
+      </button>`;
+    }).join('')}</div>`;
+
+  el.querySelectorAll('.sxp-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const xi = list[parseInt(btn.dataset.idx)];
+      CUSTOM_XI.length = 0;
+      CUSTOM_XI.push(...resolvePlayerNames(xi.players));
+      renderCustomXI();
+      updateXiBucket();
+    });
+  });
+}
+
 function renderGreatestXI() {
   const formatLabel = { tests: 'Test', odis: 'ODI', t20is: 'T20I', ipl: 'IPL' }[CURRENT_FORMAT] || 'Test';
   const heading = document.getElementById('heading-xi');
@@ -2888,6 +2920,7 @@ function renderGreatestXI() {
   const defaultXI = generateDefaultXI();
   renderDefaultXI(defaultXI);
   renderCustomXI();
+  renderSavedXiPicker();
 }
 
 function setupGreatestXI() {
@@ -3198,10 +3231,11 @@ function setupSavedXIs() {
     if (!name) { saveNameInput.focus(); return; }
     saveCurrentXI(name);
     saveForm.classList.add('hidden');
+    renderSavedXiPicker();
 
     const toast = document.createElement('div');
     toast.className = 'xi-copied-toast';
-    toast.textContent = `"${name}" saved!`;
+    toast.textContent = `"${name.trim() || 'Untitled XI'}" saved!`;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 2200);
   });

@@ -1169,6 +1169,23 @@ footer {
 }
 .xi-btn-save:hover { background: #219a52; border-color: #219a52; }
 
+/* ─── Saved XI Picker (inline in Greatest XI tab) ────────────────────────── */
+
+.xi-saved-picker { margin-bottom: 0.8rem; }
+.sxp-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.45rem; }
+.sxp-label { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.sxp-items { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.sxp-item {
+  display: inline-flex; flex-direction: column; align-items: flex-start;
+  padding: 0.4rem 0.75rem; border-radius: 8px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  cursor: pointer; font-family: inherit; font-size: 0.82rem;
+  color: var(--text); transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sxp-item:hover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(52,152,219,.18); }
+.sxp-item strong { font-size: 0.84rem; }
+.sxp-stats { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.1rem; }
+
 /* ─── Saved XI Cards ─────────────────────────────────────────────────────── */
 
 .saved-xi-list {
