@@ -216,8 +216,8 @@ function computeIndices(allPlayers, p, m, isLOI) {
   }
 
   for (const r of results) {
-    r.bat_rating = r.bei > 0 ? toRating(r.bei, beiMed, beiStd) : 0;
-    r.bowl_rating = r.boei > 0 ? toRating(r.boei, boeiMed, boeiStd) : 0;
+    r.bat_rating = r.bei > 0 ? Math.max(0, toRating(r.bei, beiMed, beiStd)) : 0;
+    r.bowl_rating = r.boei > 0 ? Math.max(0, toRating(r.boei, boeiMed, boeiStd)) : 0;
   }
 
   return { results, beiMed, beiStd, boeiMed, boeiStd };
