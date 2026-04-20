@@ -482,8 +482,11 @@ async function loadFormatData(format) {
   }
 }
 
+let CURATED_XIS = {};
+
 async function loadData() {
   try {
+    fetch('default_xis.json').then(r => r.ok ? r.json() : {}).then(d => { CURATED_XIS = d || {}; }).catch(() => {});
     ALL_DATA.tests = await loadFormatData('tests');
     DATA = ALL_DATA.tests;
     if (!DATA) throw new Error('No data');
@@ -2334,6 +2337,12 @@ let _xiEditingSlot = -1;
 let _xiDragFrom = -1;
 
 function generateDefaultXI() {
+  const curated = CURATED_XIS[CURRENT_FORMAT];
+  if (curated && curated.length === 11) {
+    const xi = curated.map(name => DATA.all_players.find(p => p.name === name) || null);
+    if (xi.filter(Boolean).length >= 9) return xi;
+  }
+
   const batPool = new Set(DATA.batting_top25.map(p => p.name));
   const bowlPool = new Set(DATA.bowling_top25.map(p => p.name));
   const arPool = new Set(DATA.allrounder_top25.map(p => p.name));
