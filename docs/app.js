@@ -2743,15 +2743,38 @@ function showXiSearchResults(query, resultsEl) {
 }
 
 const XI_ROLE_TEMPLATES = {
-  tests: { opener: 2, middle: 3, keeper: 1, allrounder: 1, spinner: 1, fast: 3 },
-  odis:  { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 2 },
-  t20is: { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 2 },
-  ipl:   { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 2 },
-};
-
-const XI_ROLE_LABELS = {
-  opener: 'opener', middle: 'middle-order batter', keeper: 'keeper',
-  allrounder: 'allrounder', spinner: 'spinner', fast: 'fast bowler',
+  tests: [
+    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
+    { role: 'middle',     min: 3, max: 4, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 1, max: 2, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
+    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+  ],
+  odis: [
+    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
+    { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
+    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+  ],
+  t20is: [
+    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
+    { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
+    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+  ],
+  ipl: [
+    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
+    { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
+    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+  ],
 };
 
 function xiPlayerRole(p) {
@@ -2762,28 +2785,63 @@ function xiPlayerRole(p) {
   return 'middle';
 }
 
-function validateXI(players) {
-  const tmpl = XI_ROLE_TEMPLATES[CURRENT_FORMAT] || XI_ROLE_TEMPLATES.tests;
+function xiRoleCounts(players) {
   const counts = {};
   for (const p of players) {
     const role = xiPlayerRole(p);
     counts[role] = (counts[role] || 0) + 1;
   }
+  return counts;
+}
+
+function validateXI(players) {
+  const tmpl = XI_ROLE_TEMPLATES[CURRENT_FORMAT] || XI_ROLE_TEMPLATES.tests;
+  const counts = xiRoleCounts(players);
   const violations = [];
-  for (const [role, min] of Object.entries(tmpl)) {
+  for (const { role, min, label } of tmpl) {
     const have = counts[role] || 0;
     if (have < min) {
       const need = min - have;
-      const label = XI_ROLE_LABELS[role] || role;
-      violations.push(`Need ${need} more ${label}${need > 1 ? 's' : ''}`);
+      violations.push(`Need ${need} more ${label.toLowerCase()}`);
     }
   }
   return violations;
 }
 
+function renderConstraintBars() {
+  const el = document.getElementById('xi-constraints');
+  if (!el) return;
+
+  const tmpl = XI_ROLE_TEMPLATES[CURRENT_FORMAT] || XI_ROLE_TEMPLATES.tests;
+  const counts = xiRoleCounts(CUSTOM_XI);
+
+  el.innerHTML = tmpl.map(({ role, min, max, label }) => {
+    const have = counts[role] || 0;
+    const pct = Math.min(100, (have / max) * 100);
+    let status = 'under';
+    if (have >= min && have <= max) status = 'ok';
+    else if (have > max) status = 'over';
+
+    return `
+      <div class="xi-cb" data-status="${status}">
+        <div class="xi-cb-header">
+          <span class="xi-cb-label">${label}</span>
+          <span class="xi-cb-count">${have}<span class="xi-cb-range"> / ${min}–${max}</span></span>
+        </div>
+        <div class="xi-cb-track">
+          <div class="xi-cb-fill" style="width:${pct}%"></div>
+          <div class="xi-cb-min" style="left:${(min / max) * 100}%"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 function renderXiSummary() {
   const el = document.getElementById('xi-summary');
   if (!el) return;
+
+  renderConstraintBars();
+
   if (CUSTOM_XI.length === 0) { el.innerHTML = ''; return; }
 
   const countries = [...new Set(CUSTOM_XI.map(p => p.country))];
@@ -2806,9 +2864,9 @@ function renderXiSummary() {
   const sumBat = CUSTOM_XI.reduce((s, p) => s + (p.bat_rating || 0), 0);
   const sumBowl = CUSTOM_XI.reduce((s, p) => s + (p.bowl_rating || 0), 0);
   el.innerHTML = `
-    <strong>11/11</strong> players selected \u00b7 
-    Batting firepower: <strong>${sumBat}</strong> \u00b7 
-    Bowling firepower: <strong>${sumBowl}</strong> \u00b7 
+    <strong>11/11</strong> players selected \u00b7
+    Batting firepower: <strong>${sumBat}</strong> \u00b7
+    Bowling firepower: <strong>${sumBowl}</strong> \u00b7
     ${countryLine}
   `;
 }

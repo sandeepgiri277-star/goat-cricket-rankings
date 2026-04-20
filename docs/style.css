@@ -1099,6 +1099,51 @@ footer {
   border: 2px solid var(--bg);
 }
 
+/* ─── XI Constraint Bars ──────────────────────────────────────────────── */
+
+.xi-constraints {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem;
+  margin: 1.2rem 0; padding: 1rem; border-radius: 8px;
+  background: var(--bg-card); border: 1px solid var(--border);
+}
+
+.xi-cb {
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.xi-cb-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 0.78rem; font-weight: 600; color: var(--text);
+}
+.xi-cb-count { font-variant-numeric: tabular-nums; }
+.xi-cb-range { color: var(--muted); font-weight: 400; font-size: 0.72rem; }
+
+.xi-cb-track {
+  position: relative; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.08);
+  overflow: visible;
+}
+.xi-cb-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.xi-cb-min {
+  position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: rgba(255,255,255,0.25); border-radius: 1px;
+  pointer-events: none;
+}
+
+.xi-cb[data-status="under"] .xi-cb-fill { background: #e67e22; }
+.xi-cb[data-status="ok"] .xi-cb-fill { background: #2ecc71; }
+.xi-cb[data-status="over"] .xi-cb-fill { background: #e74c3c; }
+
+.xi-cb[data-status="under"] .xi-cb-count { color: #e67e22; }
+.xi-cb[data-status="ok"] .xi-cb-count { color: #2ecc71; }
+.xi-cb[data-status="over"] .xi-cb-count { color: #e74c3c; }
+
+@media (max-width: 600px) {
+  .xi-constraints { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 480px) {
   .hero h1 { font-size: 1.3rem; }
   .subtitle { font-size: 0.85rem; }
