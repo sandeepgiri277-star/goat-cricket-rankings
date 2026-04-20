@@ -2744,7 +2744,7 @@ const XI_ROLE_TEMPLATES = {
   tests: [
     { role: 'opener',     min: 2, max: 3, label: 'Openers' },
     { role: 'middle',     min: 3, max: 4, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
     { role: 'allrounder', min: 1, max: 2, label: 'Allrounders' },
     { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
     { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
@@ -2752,7 +2752,7 @@ const XI_ROLE_TEMPLATES = {
   odis: [
     { role: 'opener',     min: 2, max: 3, label: 'Openers' },
     { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
     { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
     { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
     { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
@@ -2760,7 +2760,7 @@ const XI_ROLE_TEMPLATES = {
   t20is: [
     { role: 'opener',     min: 2, max: 3, label: 'Openers' },
     { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
     { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
     { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
     { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
@@ -2768,7 +2768,7 @@ const XI_ROLE_TEMPLATES = {
   ipl: [
     { role: 'opener',     min: 2, max: 3, label: 'Openers' },
     { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 1, label: 'Keeper' },
+    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
     { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
     { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
     { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
