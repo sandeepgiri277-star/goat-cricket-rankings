@@ -4,6 +4,9 @@ const ALL_DATA = {};
 let DATA = null;
 let CURRENT_FORMAT = 'tests';
 let CROSS_FORMAT_DATA = null;
+let CUSTOM_XI = [];
+let _xiEditingSlot = -1;
+let _xiDragFrom = -1;
 
 const FORMAT_FILES = {
   tests: 'rankings.json',
@@ -2408,10 +2411,6 @@ function xiBatPos(p) {
   if (r === 'middle') return 'middle';
   return null;
 }
-
-let CUSTOM_XI = [];
-let _xiEditingSlot = -1;
-let _xiDragFrom = -1;
 
 function generateDefaultXI() {
   const curated = CURATED_XIS[CURRENT_FORMAT];
