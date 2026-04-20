@@ -2284,9 +2284,9 @@ function decodeTuneParams(qs) {
 const XI_TEMPLATES = {
   tests:  [
     { role: 'opener' }, { role: 'opener' },
-    { role: 'middle' }, { role: 'middle' }, { role: 'middle' },
+    { role: 'middle' }, { role: 'middle' }, { role: 'middle' }, { role: 'middle' },
     { role: 'allrounder' },
-    { role: 'spinner' }, { role: 'spinner' },
+    { role: 'spinner' },
     { role: 'fast' }, { role: 'fast' }, { role: 'fast' },
   ],
   odis: [
