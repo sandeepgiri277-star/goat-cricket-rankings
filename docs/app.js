@@ -2803,12 +2803,10 @@ const XI_ROLE_TEMPLATES = {
 function xiPlayerRole(p) {
   const r = p.playing_role;
   if (r === 'keeper') return 'keeper';
+  const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
+  if (bat >= 500 && bowl >= 500) return 'allrounder';
   if (r === 'allrounder') {
-    const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
-    if (bat < 500 || bowl < 500) {
-      return bat >= bowl ? (p.bat_pos || 'middle') : (p.bowl_type || 'fast');
-    }
-    return 'allrounder';
+    return bat >= bowl ? (p.bat_pos || 'middle') : (p.bowl_type || 'fast');
   }
   if (p.bat_pos === 'opener' || p.bat_pos === 'middle') return p.bat_pos;
   if (r && r !== 'unknown') return r;
