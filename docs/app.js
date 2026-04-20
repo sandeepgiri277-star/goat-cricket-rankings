@@ -2514,12 +2514,10 @@ function renderDefaultXI(xi) {
 
   container.innerHTML = xi.map((player, i) => {
     const num = String(i + 1).padStart(2, '\u2007');
-    const role = tmpl[i] ? xiSlotRoleDisplay(player, tmpl[i].role) : '';
     if (player) {
       return `
         <div class="xi-slot xi-slot-readonly">
           <span class="xi-slot-num">${num}</span>
-          <span class="xi-slot-role">${role}</span>
           <div class="xi-slot-player">
             <span class="xi-slot-flag">${getFlag(player.country)}</span>
             <span>${player.name}</span>
@@ -2530,7 +2528,6 @@ function renderDefaultXI(xi) {
       return `
         <div class="xi-slot xi-slot-empty xi-slot-readonly">
           <span class="xi-slot-num">${num}</span>
-          <span class="xi-slot-role">${role}</span>
           <span class="xi-slot-empty-text">\u2014</span>
         </div>`;
     }
