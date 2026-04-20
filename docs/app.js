@@ -2285,28 +2285,28 @@ const XI_TEMPLATES = {
   tests:  [
     { role: 'opener' }, { role: 'opener' },
     { role: 'middle' }, { role: 'middle' }, { role: 'middle' },
-    { role: 'keeper' }, { role: 'allrounder' },
+    { role: 'allrounder' },
     { role: 'spinner' }, { role: 'spinner' },
-    { role: 'fast' }, { role: 'fast' },
+    { role: 'fast' }, { role: 'fast' }, { role: 'fast' },
   ],
   odis: [
     { role: 'opener' }, { role: 'opener' },
     { role: 'middle' }, { role: 'middle' }, { role: 'middle' },
-    { role: 'keeper' }, { role: 'allrounder' },
+    { role: 'allrounder' }, { role: 'allrounder' },
     { role: 'spinner' },
     { role: 'fast' }, { role: 'fast' }, { role: 'fast' },
   ],
   t20is: [
     { role: 'opener' }, { role: 'opener' },
     { role: 'middle' }, { role: 'middle' }, { role: 'middle' },
-    { role: 'keeper' }, { role: 'allrounder' },
+    { role: 'allrounder' }, { role: 'allrounder' },
     { role: 'spinner' },
     { role: 'fast' }, { role: 'fast' }, { role: 'fast' },
   ],
   ipl: [
     { role: 'opener' }, { role: 'opener' },
     { role: 'middle' }, { role: 'middle' }, { role: 'middle' },
-    { role: 'keeper' }, { role: 'allrounder' },
+    { role: 'allrounder' }, { role: 'allrounder' },
     { role: 'spinner' },
     { role: 'fast' }, { role: 'fast' }, { role: 'fast' },
   ],
@@ -2315,20 +2315,18 @@ const XI_TEMPLATES = {
 function xiTemplate() { return XI_TEMPLATES[CURRENT_FORMAT] || XI_TEMPLATES.tests; }
 
 function xiSlotLabel(role) {
-  return { opener: 'Opener', middle: 'Middle Order', keeper: 'Keeper',
+  return { opener: 'Opener', middle: 'Middle Order', keeper: 'WK',
            allrounder: 'Allrounder', spinner: 'Spinner', fast: 'Fast Bowler' }[role] || role;
 }
 
-function xiPositionRole(p) {
+function xiBatPos(p) {
   if (p.bat_pos === 'opener') return 'opener';
   if (p.bat_pos === 'middle') return 'middle';
   const r = p.playing_role;
-  if (r === 'opener' || r === 'middle' || r === 'keeper') return r;
-  if (r === 'allrounder') {
-    if (p.bat_pos) return p.bat_pos;
-    return 'allrounder';
-  }
-  return r;
+  if (r === 'opener') return 'opener';
+  if (r === 'keeper') return p.bat_pos || 'middle';
+  if (r === 'middle') return 'middle';
+  return null;
 }
 
 let CUSTOM_XI = [];
@@ -2349,12 +2347,12 @@ function generateDefaultXI() {
   for (let i = 0; i < tmpl.length; i++) {
     const { role } = tmpl[i];
     let candidates;
-    if (role === 'opener' || role === 'middle' || role === 'keeper') {
+    if (role === 'opener' || role === 'middle') {
       candidates = qualified
         .filter(p => {
           if (used.has(p.name) || !(p.bat_rating > 0)) return false;
-          if (role === 'keeper') return p.playing_role === 'keeper';
-          return xiPositionRole(p) === role;
+          const pos = xiBatPos(p);
+          return pos === role;
         })
         .sort((a, b) => b.bat_rating - a.bat_rating);
     } else if (role === 'allrounder') {
@@ -2375,6 +2373,38 @@ function generateDefaultXI() {
       used.add(candidates[0].name);
     }
   }
+
+  // Ensure at least one keeper: if no keeper was naturally selected,
+  // replace the weakest batter in the XI with the best available keeper
+  // slotted into the keeper's actual batting position
+  const hasKeeper = xi.some(p => p && p.playing_role === 'keeper');
+  if (!hasKeeper) {
+    const bestKeeper = qualified
+      .filter(p => p.playing_role === 'keeper' && !used.has(p.name) && p.bat_rating > 0)
+      .sort((a, b) => b.bat_rating - a.bat_rating)[0];
+    if (bestKeeper) {
+      const keeperPos = xiBatPos(bestKeeper);
+      let worstIdx = -1, worstRating = Infinity;
+      xi.forEach((p, i) => {
+        if (!p) return;
+        const slotRole = tmpl[i].role;
+        if (slotRole !== 'opener' && slotRole !== 'middle') return;
+        if (keeperPos && slotRole !== keeperPos) return;
+        if (p.bat_rating < worstRating) { worstRating = p.bat_rating; worstIdx = i; }
+      });
+      if (worstIdx < 0) {
+        xi.forEach((p, i) => {
+          if (!p) return;
+          if (tmpl[i].role !== 'opener' && tmpl[i].role !== 'middle') return;
+          if (p.bat_rating < worstRating) { worstRating = p.bat_rating; worstIdx = i; }
+        });
+      }
+      if (worstIdx >= 0) {
+        xi[worstIdx] = bestKeeper;
+      }
+    }
+  }
+
   return xi;
 }
 
@@ -2396,6 +2426,13 @@ function xiRoleLabel(p) {
   return 'Batter';
 }
 
+function xiSlotRoleDisplay(player, tmplRole) {
+  if (!player) return xiSlotLabel(tmplRole);
+  const isWk = player.playing_role === 'keeper';
+  const base = xiSlotLabel(tmplRole);
+  return isWk ? `${base} · WK` : base;
+}
+
 function renderDefaultXI(xi) {
   const container = document.getElementById('xi-default-slots');
   if (!container) return;
@@ -2403,7 +2440,7 @@ function renderDefaultXI(xi) {
 
   container.innerHTML = xi.map((player, i) => {
     const num = String(i + 1).padStart(2, '\u2007');
-    const role = tmpl[i] ? xiSlotLabel(tmpl[i].role) : '';
+    const role = tmpl[i] ? xiSlotRoleDisplay(player, tmpl[i].role) : '';
     if (player) {
       return `
         <div class="xi-slot xi-slot-readonly">
