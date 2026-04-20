@@ -879,6 +879,12 @@ function playerSubtitle(p, roleOverride) {
   return `${p.country} · ${p.matches} matches${role ? ' · ' + role : ''}`;
 }
 
+function xiAddBtn(name) {
+  const inXI = CUSTOM_XI.some(p => p.name === name);
+  if (inXI) return `<button class="lb-xi-add in-xi" data-player="${name}" title="Remove from XI">\u2212</button>`;
+  return `<button class="lb-xi-add" data-player="${name}" title="Add to XI">+</button>`;
+}
+
 function renderAllrounderTable() {
   const container = document.getElementById('table-allrounders');
   container.innerHTML = DATA.allrounder_top25.map((p, i) => `
@@ -893,7 +899,7 @@ function renderAllrounderTable() {
         <div class="lb-primary-val">${p.ar_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
-      <button class="lb-xi-add" data-player="${p.name}" title="Add to XI">+</button>
+      ${xiAddBtn(p.name)}
     </div>
   `).join('');
   addRowClickHandlers(container);
@@ -913,7 +919,7 @@ function renderBattingTable() {
         <div class="lb-primary-val">${p.bat_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
-      <button class="lb-xi-add" data-player="${p.name}" title="Add to XI">+</button>
+      ${xiAddBtn(p.name)}
     </div>
   `).join('');
   addRowClickHandlers(container);
@@ -933,7 +939,7 @@ function renderBowlingTable() {
         <div class="lb-primary-val">${p.bowl_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
-      <button class="lb-xi-add" data-player="${p.name}" title="Add to XI">+</button>
+      ${xiAddBtn(p.name)}
     </div>
   `).join('');
   addRowClickHandlers(container);
@@ -953,13 +959,21 @@ function addRowClickHandlers(container) {
   container.querySelectorAll('.lb-xi-add').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const before = CUSTOM_XI.length;
-      addToXI(btn.dataset.player);
-      if (CUSTOM_XI.length > before) {
-        btn.textContent = '\u2713';
-        btn.style.color = 'var(--accent)';
-        btn.style.borderColor = 'var(--accent)';
-        setTimeout(() => { btn.textContent = '+'; btn.style.color = ''; btn.style.borderColor = ''; }, 1200);
+      const name = btn.dataset.player;
+      if (btn.classList.contains('in-xi')) {
+        const idx = CUSTOM_XI.findIndex(p => p.name === name);
+        if (idx >= 0) removeFromCustomXI(idx);
+        btn.classList.remove('in-xi');
+        btn.textContent = '+';
+        btn.title = 'Add to XI';
+      } else {
+        const before = CUSTOM_XI.length;
+        addToXI(name);
+        if (CUSTOM_XI.length > before) {
+          btn.classList.add('in-xi');
+          btn.textContent = '\u2212';
+          btn.title = 'Remove from XI';
+        }
       }
     });
   });
@@ -2755,6 +2769,11 @@ function setupGreatestXI() {
     CUSTOM_XI = [];
     renderCustomXI();
     updateXiBucket();
+    document.querySelectorAll('.lb-xi-add.in-xi').forEach(b => {
+      b.classList.remove('in-xi');
+      b.textContent = '+';
+      b.title = 'Add to XI';
+    });
   });
 
   document.getElementById('xi-bucket-view').addEventListener('click', () => {

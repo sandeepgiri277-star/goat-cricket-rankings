@@ -1071,6 +1071,8 @@ footer {
   transition: color 0.15s, border-color 0.15s;
 }
 .lb-row .lb-xi-add:hover { color: var(--accent); border-color: var(--accent); }
+.lb-row .lb-xi-add.in-xi { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.lb-row .lb-xi-add.in-xi:hover { color: #e74c3c; border-color: #e74c3c; }
 
 .xi-bucket {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
