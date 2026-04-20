@@ -2517,7 +2517,6 @@ function xiSlotRoleDisplay(player, tmplRole) {
 function renderDefaultXI(xi) {
   const container = document.getElementById('xi-default-slots');
   if (!container) return;
-  const tmpl = xiTemplate();
 
   container.innerHTML = xi.map((player, i) => {
     const num = String(i + 1).padStart(2, '\u2007');
@@ -2539,6 +2538,19 @@ function renderDefaultXI(xi) {
         </div>`;
     }
   }).join('');
+
+  const summaryEl = document.getElementById('xi-default-summary');
+  if (summaryEl) {
+    const players = xi.filter(Boolean);
+    const avgBat = players.filter(p => p.bat_rating > 0).reduce((s, p) => s + p.bat_rating, 0) / Math.max(1, players.filter(p => p.bat_rating > 0).length);
+    const avgBowl = players.filter(p => p.bowl_rating > 0).reduce((s, p) => s + p.bowl_rating, 0) / Math.max(1, players.filter(p => p.bowl_rating > 0).length);
+    const countries = [...new Set(players.map(p => p.country))];
+    summaryEl.innerHTML = `
+      Avg batting rating: <strong>${Math.round(avgBat)}</strong> \u00b7
+      Avg bowling rating: <strong>${Math.round(avgBowl)}</strong> \u00b7
+      ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
+    `;
+  }
 }
 
 function addToXI(playerName) {
