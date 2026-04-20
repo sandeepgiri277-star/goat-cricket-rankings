@@ -2336,7 +2336,12 @@ let _xiEditingSlot = -1;
 let _xiDragFrom = -1;
 
 function generateDefaultXI() {
-  const players = DATA.all_players;
+  const batPool = new Set(DATA.batting_top25.map(p => p.name));
+  const bowlPool = new Set(DATA.bowling_top25.map(p => p.name));
+  const arPool = new Set(DATA.allrounder_top25.map(p => p.name));
+  const qualified = DATA.all_players.filter(p =>
+    batPool.has(p.name) || bowlPool.has(p.name) || arPool.has(p.name));
+
   const used = new Set();
   const tmpl = xiTemplate();
   const xi = new Array(tmpl.length).fill(null);
@@ -2345,7 +2350,7 @@ function generateDefaultXI() {
     const { role } = tmpl[i];
     let candidates;
     if (role === 'opener' || role === 'middle' || role === 'keeper') {
-      candidates = [...players]
+      candidates = qualified
         .filter(p => {
           if (used.has(p.name) || !(p.bat_rating > 0)) return false;
           if (role === 'keeper') return p.playing_role === 'keeper';
@@ -2353,11 +2358,11 @@ function generateDefaultXI() {
         })
         .sort((a, b) => b.bat_rating - a.bat_rating);
     } else if (role === 'allrounder') {
-      candidates = [...players]
+      candidates = qualified
         .filter(p => p.playing_role === 'allrounder' && !used.has(p.name) && p.ar_rating > 0)
         .sort((a, b) => (b.ar_rating || 0) - (a.ar_rating || 0));
     } else {
-      candidates = [...players]
+      candidates = qualified
         .filter(p => {
           if (used.has(p.name) || !(p.bowl_rating > 0)) return false;
           if (role === 'spinner') return p.playing_role === 'spinner' || p.bowl_type === 'spinner';
