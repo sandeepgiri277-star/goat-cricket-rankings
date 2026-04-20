@@ -44,12 +44,22 @@ function isFullMember(country) {
   return country.split('/').some(c => FULL_MEMBERS.has(c));
 }
 
-const TUNE_DEFAULTS = {
+const TUNE_DEFAULTS_BASE = {
   batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50,
   alpha: 0.30, batAvgW: 1.0, srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5, bowlAvgW: 1.0,
   bowlK: 1000, ratingK: 250,
   xfTests: 33, xfOdis: 33, xfT20is: 34,
 };
+const FORMAT_DEFAULTS = {
+  tests: { ...TUNE_DEFAULTS_BASE },
+  odis:  { ...TUNE_DEFAULTS_BASE },
+  t20is: { ...TUNE_DEFAULTS_BASE, batLongevity: 0.15, srWeight: 1.5 },
+  ipl:   { ...TUNE_DEFAULTS_BASE, batLongevity: 0.15, srWeight: 1.5 },
+};
+function currentDefaults() {
+  return FORMAT_DEFAULTS[CURRENT_FORMAT] || TUNE_DEFAULTS_BASE;
+}
+const TUNE_DEFAULTS = TUNE_DEFAULTS_BASE;
 const TUNE_RANGES = {
   batLongevity:  { min: 0, max: 0.6, step: 0.05 },
   bowlLongevity: { min: 0, max: 0.6, step: 0.05 },
@@ -77,8 +87,8 @@ function _realToSlider(key, val) {
   const r = TUNE_RANGES[key];
   return Math.round((val - r.min) / (r.max - r.min) * 100);
 }
-let TUNE_PARAMS = { ...TUNE_DEFAULTS };
-let AR_TUNE_PARAMS = { ...TUNE_DEFAULTS };
+let TUNE_PARAMS = { ...TUNE_DEFAULTS_BASE };
+let AR_TUNE_PARAMS = { ...TUNE_DEFAULTS_BASE };
 let ORIGINAL_DATA = {};
 
 function activeTab() {
@@ -249,8 +259,9 @@ function recomputeRankings() {
 }
 
 function isCustomParams() {
-  if (Object.keys(TUNE_DEFAULTS).some(k => TUNE_PARAMS[k] !== TUNE_DEFAULTS[k])) return true;
-  if (Object.keys(TUNE_DEFAULTS).some(k => AR_TUNE_PARAMS[k] !== TUNE_DEFAULTS[k])) return true;
+  const d = currentDefaults();
+  if (Object.keys(d).some(k => TUNE_PARAMS[k] !== d[k])) return true;
+  if (Object.keys(d).some(k => AR_TUNE_PARAMS[k] !== d[k])) return true;
   for (const [fmt, keys] of Object.entries(XF_PARAM_KEYS)) {
     for (const key of keys) {
       if (XF_TUNE_PARAMS[fmt][key] !== XF_TUNE_DEFAULTS[fmt][key]) return true;
@@ -263,16 +274,18 @@ const BAT_PARAM_KEYS = ['batLongevity', 'batPitch', 'alpha', 'batAvgW', 'srWeigh
 const BOWL_PARAM_KEYS = ['bowlLongevity', 'bowlPitch', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'];
 
 function resetParams() {
-  TUNE_PARAMS = { ...TUNE_DEFAULTS };
-  AR_TUNE_PARAMS = { ...TUNE_DEFAULTS };
+  const d = currentDefaults();
+  TUNE_PARAMS = { ...d };
+  AR_TUNE_PARAMS = { ...d };
   XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
   resetToOriginalDataAll();
 }
 
 function resetParamsSection(keys) {
   const p = activeParams();
+  const d = currentDefaults();
   for (const k of keys) {
-    if (k in TUNE_DEFAULTS) p[k] = TUNE_DEFAULTS[k];
+    if (k in d) p[k] = d[k];
   }
   if (CURRENT_FORMAT === 'crossformat') {
     for (const [fmt, fmtKeys] of Object.entries(XF_PARAM_KEYS)) {
@@ -560,14 +573,15 @@ async function switchFormat(format) {
     }
     CURRENT_FORMAT = format;
     DATA = data;
+    const d = currentDefaults();
+    TUNE_PARAMS = { ...d };
+    AR_TUNE_PARAMS = { ...d };
     storeOriginalData(format);
     buildNameIndex();
     updateFormatLabels();
     updateSrRowVisibility();
-    if (isCustomParams()) {
-      resetToOriginalData();
-      recomputeRankings();
-    }
+    syncSlidersToParams();
+    recomputeRankings();
     updateTuneBadge();
   }
 
@@ -656,6 +670,9 @@ async function restoreFromHash() {
       if (data) {
         CURRENT_FORMAT = format;
         DATA = data;
+        const d = currentDefaults();
+        TUNE_PARAMS = { ...d };
+        AR_TUNE_PARAMS = { ...d };
         storeOriginalData(format);
         document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector(`.format-btn[data-format="${format}"]`);
@@ -665,10 +682,8 @@ async function restoreFromHash() {
         buildNameIndex();
         updateFormatLabels();
         updateSrRowVisibility();
-        if (isCustomParams()) {
-          resetToOriginalData();
-          recomputeRankings();
-        }
+        syncSlidersToParams();
+        recomputeRankings();
         updateTuneBadge();
         renderAll();
       }
@@ -1958,7 +1973,7 @@ function setupTheme() {
 // ─── Tune Panel ─────────────────────────────────────────────────────────────
 
 function _tuneStatusText(key, v) {
-  const d = TUNE_DEFAULTS[key];
+  const d = currentDefaults()[key];
   const isDefault = v === d;
   if (key === 'batLongevity' || key === 'bowlLongevity') {
     if (v === 0) return 'Career length ignored — pure peak performance';
@@ -2047,7 +2062,7 @@ function setupTunePanel() {
       if (valEl) valEl.textContent = pct;
       if (statusEl) {
         statusEl.textContent = _tuneStatusText(key, real);
-        statusEl.classList.toggle('changed', real !== TUNE_DEFAULTS[key]);
+        statusEl.classList.toggle('changed', real !== currentDefaults()[key]);
       }
       onTuneChange();
     });
@@ -2206,7 +2221,7 @@ function onTuneChange() {
       DATA = ALL_DATA[fmt];
       CURRENT_FORMAT = fmt;
       const xfP = XF_TUNE_PARAMS[fmt];
-      TUNE_PARAMS = { ...TUNE_DEFAULTS, ...xfP };
+      TUNE_PARAMS = { ...(FORMAT_DEFAULTS[fmt] || TUNE_DEFAULTS_BASE), ...xfP };
       resetToOriginalData();
       recomputeRankings();
     }
@@ -2235,6 +2250,7 @@ function resetToOriginalData() {
 function syncSlidersToParams() {
   const keys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'batAvgW', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   const p = activeParams();
+  const d = currentDefaults();
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -2244,7 +2260,7 @@ function syncSlidersToParams() {
     if (valEl) valEl.textContent = pct;
     if (statusEl) {
       statusEl.textContent = _tuneStatusText(key, p[key]);
-      statusEl.classList.toggle('changed', p[key] !== TUNE_DEFAULTS[key]);
+      statusEl.classList.toggle('changed', p[key] !== d[key]);
     }
   }
   updateXfWeightBar();
@@ -2273,12 +2289,13 @@ function updateTuneBadge() {
 
 function encodeTuneParams() {
   const parts = [];
-  for (const [k, def] of Object.entries(TUNE_DEFAULTS)) {
+  const d = currentDefaults();
+  for (const [k, def] of Object.entries(d)) {
     if (TUNE_PARAMS[k] !== def) {
       parts.push(`${k}=${TUNE_PARAMS[k]}`);
     }
   }
-  for (const [k, def] of Object.entries(TUNE_DEFAULTS)) {
+  for (const [k, def] of Object.entries(d)) {
     if (AR_TUNE_PARAMS[k] !== def) {
       parts.push(`ar_${k}=${AR_TUNE_PARAMS[k]}`);
     }
@@ -2308,10 +2325,10 @@ function decodeTuneParams(qs) {
       }
     } else if (arMatch) {
       const param = arMatch[1];
-      if (param in TUNE_DEFAULTS) {
+      if (param in TUNE_DEFAULTS_BASE) {
         AR_TUNE_PARAMS[param] = parseFloat(v);
       }
-    } else if (k in TUNE_DEFAULTS) {
+    } else if (k in TUNE_DEFAULTS_BASE) {
       TUNE_PARAMS[k] = parseFloat(v);
     }
   }
