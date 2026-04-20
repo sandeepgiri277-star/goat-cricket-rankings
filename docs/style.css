@@ -1279,6 +1279,12 @@ footer {
   color: var(--muted); background: rgba(255,255,255,0.06);
   padding: 0.1rem 0.35rem; border-radius: 3px; white-space: nowrap;
 }
+.xic-rating {
+  font-size: 0.7rem; font-weight: 600; min-width: 2rem; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.xic-bat-r { color: var(--accent, #3498db); }
+.xic-bowl-r { color: #e67e22; }
 
 .xic-summary {
   display: flex; gap: 0.8rem; align-items: center;

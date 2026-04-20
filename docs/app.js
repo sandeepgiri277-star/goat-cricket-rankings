@@ -774,6 +774,9 @@ function renderAll() {
   renderBowlingTable();
   renderMethodology();
   renderGreatestXI();
+  if (activeTab() === 'saved-xis') {
+    renderSavedXIs();
+  }
 }
 
 function renderMeta() {
@@ -1980,11 +1983,12 @@ function switchTab(tabId, updateHash = true) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
-  const showBat = tabId !== 'bowling';
-  const showBowl = tabId !== 'batting';
-  const isAR = tabId === 'allrounders';
-  const hideTune = tabId === 'greatest-xi' || tabId === 'saved-xis' || tabId === 'methodology';
-  if (tabId === 'saved-xis') renderSavedXIs();
+  const isSaved = tabId === 'saved-xis';
+  const showBat = tabId !== 'bowling' || isSaved;
+  const showBowl = tabId !== 'batting' || isSaved;
+  const isAR = tabId === 'allrounders' || isSaved;
+  const hideTune = tabId === 'greatest-xi' || tabId === 'methodology';
+  if (isSaved) renderSavedXIs();
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
   document.querySelectorAll('.tune-ar-header').forEach(el => el.classList.toggle('hidden', !isAR));
@@ -3169,6 +3173,8 @@ function renderComparison() {
           <span class="xic-flag">${getFlag(p.country)}</span>
           <span class="xic-name">${p.name}</span>
           <span class="xic-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
+          <span class="xic-rating xic-bat-r">${p.bat_rating || 0}</span>
+          <span class="xic-rating xic-bowl-r">${p.bowl_rating || 0}</span>
         </div>`);
       } else {
         rows.push(`<div class="xic-row xic-empty"><span class="xic-num">${i + 1}</span> \u2014</div>`);
@@ -3178,6 +3184,13 @@ function renderComparison() {
     return `
       <div class="xi-compare-col">
         <div class="xic-title">${meta.name}</div>
+        <div class="xic-row xic-header-row">
+          <span class="xic-num"></span><span class="xic-flag"></span>
+          <span class="xic-name" style="font-weight:600;font-size:0.68rem;text-transform:uppercase;color:var(--muted)">Player</span>
+          <span class="xic-role"></span>
+          <span class="xic-rating xic-bat-r" style="font-size:0.65rem">Bat</span>
+          <span class="xic-rating xic-bowl-r" style="font-size:0.65rem">Bowl</span>
+        </div>
         ${rows.join('')}
         <div class="xic-summary">
           <span class="xic-fp" data-type="bat">Bat: <strong>${sumBat}</strong></span>
