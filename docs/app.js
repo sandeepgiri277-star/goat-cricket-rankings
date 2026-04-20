@@ -846,7 +846,11 @@ function bowlingRole(p) {
 function roleTag(p, override) {
   const r = override || p.playing_role;
   if (!r || !ROLE_LABELS[r]) return '';
-  return `<span class="lb-role">${ROLE_LABELS[r]}</span>`;
+  let tag = `<span class="lb-role">${ROLE_LABELS[r]}</span>`;
+  if (p.playing_role === 'keeper' && r !== 'keeper') {
+    tag += `<span class="lb-role lb-role-wk">WK</span>`;
+  }
+  return tag;
 }
 
 function playerSubtitle(p, roleOverride) {
