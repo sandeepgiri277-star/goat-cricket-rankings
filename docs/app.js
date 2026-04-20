@@ -2613,9 +2613,10 @@ function renderDefaultXI(xi) {
     const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
     const countries = [...new Set(players.map(p => p.country))];
     summaryEl.innerHTML = `
-      Batting firepower: <strong>${sumBat}</strong> \u00b7
-      Bowling firepower: <strong>${sumBowl}</strong> \u00b7
-      ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
+      Bat: <strong>${sumBat}</strong> \u00b7
+      Bowl: <strong>${sumBowl}</strong> \u00b7
+      Total: <strong>${sumBat + sumBowl}</strong> \u00b7
+      ${countries.length} ${countries.length === 1 ? 'country' : 'countries'}: ${countries.map(c => getFlag(c)).join(' ')}
     `;
   }
 }
@@ -2894,8 +2895,9 @@ function renderXiSummary() {
   const sumBowl = CUSTOM_XI.reduce((s, p) => s + (p.bowl_rating || 0), 0);
   el.innerHTML = `
     <strong>11/11</strong> players selected \u00b7
-    Batting firepower: <strong>${sumBat}</strong> \u00b7
-    Bowling firepower: <strong>${sumBowl}</strong> \u00b7
+    Bat: <strong>${sumBat}</strong> \u00b7
+    Bowl: <strong>${sumBowl}</strong> \u00b7
+    Total: <strong>${sumBat + sumBowl}</strong> \u00b7
     ${countryLine}
   `;
 }
@@ -2936,11 +2938,13 @@ function _buildCompareCol(title, players) {
       <div class="xic-summary">
         <span class="xic-fp" data-type="bat">Bat: <strong>${sumBat}</strong></span>
         <span class="xic-fp" data-type="bowl">Bowl: <strong>${sumBowl}</strong></span>
+        <span class="xic-fp xic-fp-total" data-type="total">Total: <strong>${sumBat + sumBowl}</strong></span>
         <span>${countries.map(c => getFlag(c)).join(' ')}</span>
       </div>
     </div>`,
     sumBat,
     sumBowl,
+    sumTotal: sumBat + sumBowl,
   };
 }
 
@@ -2973,6 +2977,10 @@ function renderXiVsComparison() {
     const winIdx = left.sumBowl > right.sumBowl ? 0 : 1;
     allCols[winIdx].querySelector('.xic-fp[data-type="bowl"]').classList.add('xic-winner');
   }
+  if (left.sumTotal !== right.sumTotal) {
+    const winIdx = left.sumTotal > right.sumTotal ? 0 : 1;
+    allCols[winIdx].querySelector('.xic-fp[data-type="total"]').classList.add('xic-winner');
+  }
 }
 
 function renderSavedXiPicker() {
@@ -2992,7 +3000,7 @@ function renderSavedXiPicker() {
       const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
       return `<button class="sxp-item" data-idx="${i}">
         <strong>${xi.name}</strong>
-        <span class="sxp-stats">Bat ${sumBat} \u00b7 Bowl ${sumBowl}</span>
+        <span class="sxp-stats">Bat ${sumBat} \u00b7 Bowl ${sumBowl} \u00b7 Total ${sumBat + sumBowl}</span>
       </button>`;
     }).join('')}</div>`;
 
@@ -3200,6 +3208,7 @@ function renderSavedXIs() {
         <div class="sxi-stats">
           Bat: <strong>${sumBat}</strong> \u00b7
           Bowl: <strong>${sumBowl}</strong> \u00b7
+          Total: <strong>${sumBat + sumBowl}</strong> \u00b7
           ${countries.map(c => getFlag(c)).join(' ')}
         </div>
       </div>`;
@@ -3274,6 +3283,10 @@ function renderComparison() {
   if (left.sumBowl !== right.sumBowl) {
     const winIdx = left.sumBowl > right.sumBowl ? 0 : 1;
     allCols[winIdx].querySelector('.xic-fp[data-type="bowl"]').classList.add('xic-winner');
+  }
+  if (left.sumTotal !== right.sumTotal) {
+    const winIdx = left.sumTotal > right.sumTotal ? 0 : 1;
+    allCols[winIdx].querySelector('.xic-fp[data-type="total"]').classList.add('xic-winner');
   }
 }
 

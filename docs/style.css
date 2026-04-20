@@ -1293,6 +1293,7 @@ footer {
   font-size: 0.82rem; color: var(--muted);
 }
 .xic-summary strong { color: var(--text); }
+.xic-fp-total strong { color: var(--text); font-size: 0.95em; }
 .xic-fp.xic-winner { color: #2ecc71; }
 .xic-fp.xic-winner strong { color: #2ecc71; }
 
