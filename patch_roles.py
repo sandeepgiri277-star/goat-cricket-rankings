@@ -11,6 +11,27 @@ ROLES_CACHE = CACHE_DIR / "player_roles_api.pkl"
 BATPOS_CACHE = CACHE_DIR / "batting_positions.pkl"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
+def request_with_retry(url, max_retries=3, backoff=(5, 15, 60), **kwargs):
+    kwargs.setdefault("headers", HEADERS)
+    kwargs.setdefault("timeout", 30)
+    for attempt in range(max_retries + 1):
+        try:
+            resp = requests.get(url, **kwargs)
+            if resp.status_code in (429, 503) and attempt < max_retries:
+                wait = backoff[min(attempt, len(backoff) - 1)]
+                print(f"    HTTP {resp.status_code}, retrying in {wait}s...", flush=True)
+                time.sleep(wait)
+                continue
+            return resp
+        except (requests.ConnectionError, requests.Timeout) as e:
+            if attempt < max_retries:
+                wait = backoff[min(attempt, len(backoff) - 1)]
+                print(f"    {type(e).__name__}, retrying in {wait}s...", flush=True)
+                time.sleep(wait)
+            else:
+                raise
+    return resp
+
 ESPN_API = "https://site.api.espn.com/apis/common/v3/sports/cricket/athletes/{pid}"
 
 JSON_CONFIGS = [
@@ -56,7 +77,7 @@ def classify_bowl_style(bowl_style_list):
 def fetch_player_role(pid):
     url = ESPN_API.format(pid=pid)
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = request_with_retry(url, timeout=10)
         if resp.status_code != 200:
             return None, None, None
         data = resp.json().get("athlete", {})
@@ -76,7 +97,7 @@ def scrape_batting_position(pid, cricket_class=1):
     from bs4 import BeautifulSoup
     url = f"https://stats.espncricinfo.com/ci/engine/player/{pid}.html?class={cricket_class};template=results;type=batting"
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = request_with_retry(url, timeout=15)
         if resp.status_code != 200:
             return None
         soup = BeautifulSoup(resp.text, "lxml")
@@ -144,7 +165,7 @@ def scrape_stats_agg(cricket_class, stat_type="batting", min_matches=15, extra_p
     while True:
         url = f"{base};page={page}"
         print(f"    Fetching page {page}...", flush=True)
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = request_with_retry(url, timeout=30)
         soup = BeautifulSoup(resp.text, "lxml")
         tables = soup.select("table.engineTable")
         if not tables:

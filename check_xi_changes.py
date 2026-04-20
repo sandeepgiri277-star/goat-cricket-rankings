@@ -140,6 +140,9 @@ def main():
 
     if "--create-issue" in sys.argv:
         try:
+            subprocess.run(["gh", "label", "create", "xi-change", "--color", "FBCA04",
+                            "--description", "Proposed Greatest XI change"], check=False,
+                           capture_output=True)
             subprocess.run(
                 ["gh", "issue", "create", "--title", title, "--body", body, "--label", "xi-change"],
                 check=True,

@@ -56,6 +56,27 @@ SITE_DIR.mkdir(exist_ok=True)
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
+def request_with_retry(url, max_retries=3, backoff=(5, 15, 60), **kwargs):
+    kwargs.setdefault("headers", HEADERS)
+    kwargs.setdefault("timeout", 30)
+    for attempt in range(max_retries + 1):
+        try:
+            resp = requests.get(url, **kwargs)
+            if resp.status_code in (429, 503) and attempt < max_retries:
+                wait = backoff[min(attempt, len(backoff) - 1)]
+                print(f"    HTTP {resp.status_code}, retrying in {wait}s...", flush=True)
+                time.sleep(wait)
+                continue
+            return resp
+        except (requests.ConnectionError, requests.Timeout) as e:
+            if attempt < max_retries:
+                wait = backoff[min(attempt, len(backoff) - 1)]
+                print(f"    {type(e).__name__}, retrying in {wait}s...", flush=True)
+                time.sleep(wait)
+            else:
+                raise
+    return resp
+
 BAT_AGG_PATH = CACHE_DIR / "batting_aggregate.pkl"
 BOWL_AGG_PATH = CACHE_DIR / "bowling_aggregate.pkl"
 ALLROUND_CACHE_PATH = CACHE_DIR / "allround_cache.pkl"
@@ -121,7 +142,7 @@ def scrape_statsguru_aggregate(
     while True:
         url = f"{base};page={page}"
         print(f"  Fetching {stat_type} page {page}...")
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = request_with_retry(url, timeout=30)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
 
@@ -192,7 +213,7 @@ def scrape_player_allround(player_id: int) -> pd.DataFrame | None:
         f"class=1;template=results;type=allround;view=cumulative"
     )
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = request_with_retry(url, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
 
@@ -254,7 +275,7 @@ def _scrape_cumulative_innings(player_id: int, stat_type: str) -> dict[int, int]
         f"class=1;template=results;type={stat_type};view=cumulative"
     )
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = request_with_retry(url, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
         tables = soup.select("table.engineTable")
@@ -353,7 +374,7 @@ def scrape_player_role(player_id: int) -> str | None:
     """Fetch a player's playing role from their ESPN Cricinfo profile."""
     url = f"https://www.espncricinfo.com/cricketers/x-{player_id}"
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15, allow_redirects=True)
+        resp = request_with_retry(url, timeout=15, allow_redirects=True)
         if resp.status_code != 200:
             return None
         soup = BeautifulSoup(resp.text, "lxml")
@@ -414,7 +435,7 @@ def _scrape_era_aggregate(start_year: int, end_year: int) -> dict | None:
         f"spanval1=span;template=results;type=aggregate"
     )
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = request_with_retry(url, timeout=30)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
         tables = soup.select("table.engineTable")
@@ -537,7 +558,7 @@ def scrape_global_match_stats(
             f"view=match;size=200;page={page}"
         )
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=30)
+            resp = request_with_retry(url, timeout=30)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "lxml")
         except Exception as e:
@@ -595,7 +616,7 @@ def _scrape_all_time_aggregate(cricket_class: int = 1, extra_params: str = "") -
         f"class={cricket_class}{extra_params};template=results;type=aggregate"
     )
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = request_with_retry(url, timeout=30)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
         for table in soup.select("table.engineTable"):
@@ -1101,7 +1122,7 @@ def _scrape_cumulative_full(
         f"class={cricket_class}{extra_params};template=results;type={stat_type};view=cumulative"
     )
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = request_with_retry(url, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
 
@@ -1463,7 +1484,7 @@ def _scrape_loi_era_aggregate(
         f"spanval1=span;template=results;type=aggregate"
     )
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = request_with_retry(url, timeout=30)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
         tables = soup.select("table.engineTable")
