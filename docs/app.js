@@ -545,11 +545,14 @@ async function loadFormatData(format) {
 let CURATED_XIS = {};
 
 async function loadData() {
+  const _dbg = (msg) => { document.title = msg; console.log(msg); };
   try {
+    _dbg('Fetching data...');
     fetch('default_xis.json').then(r => r.ok ? r.json() : {}).then(d => { CURATED_XIS = d || {}; }).catch(() => {});
     ALL_DATA.tests = await loadFormatData('tests');
     DATA = ALL_DATA.tests;
-    if (!DATA) throw new Error('No data');
+    if (!DATA) throw new Error('No data returned from rankings.json');
+    _dbg('Data loaded, building index...');
     storeOriginalData('tests');
     buildNameIndex();
 
@@ -563,19 +566,24 @@ async function loadData() {
         updateTuneBadge();
       }
     }
+    _dbg('Syncing sliders...');
     syncSlidersToParams();
     syncXfSliders();
     updateSrRowVisibility();
 
+    _dbg('Rendering...');
     renderAll();
     restoreFromHash();
+    _dbg('GOAT Cricket Rankings');
     document.body.classList.add('loaded');
     loadFormatData('odis').then(() => storeOriginalData('odis'));
     loadFormatData('t20is').then(() => storeOriginalData('t20is'));
     loadFormatData('ipl').then(() => storeOriginalData('ipl'));
   } catch (e) {
+    console.error('loadData crash:', e);
+    document.body.classList.add('loaded');
     document.querySelector('.content').innerHTML =
-      '<p style="text-align:center;padding:3rem;color:var(--accent3)">Failed to load rankings data. Make sure rankings.json is available.</p>';
+      `<p style="text-align:center;padding:3rem;color:#e74c3c">Error: ${e.message}<br><small>${e.stack}</small></p>`;
   }
 }
 
@@ -2903,13 +2911,18 @@ function setupFormatBar() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  setupTheme();
-  setupFormatBar();
-  setupTabs();
-  setupSearch();
-  setupTunePanel();
-  setupXfWeightBar();
-  setupGreatestXI();
+  try {
+    setupTheme();
+    setupFormatBar();
+    setupTabs();
+    setupSearch();
+    setupTunePanel();
+    setupXfWeightBar();
+    setupGreatestXI();
+  } catch (e) {
+    console.error('Setup crash:', e);
+    document.title = 'SETUP ERROR: ' + e.message;
+  }
   loadData();
 
   let lastWidth = window.innerWidth;
