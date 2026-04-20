@@ -125,12 +125,12 @@ def get_name_to_pid():
     return name_pid
 
 
-def scrape_bat_agg(cricket_class, min_matches=15, extra_params=""):
-    """Scrape batting aggregate for name->pid mapping."""
+def scrape_stats_agg(cricket_class, stat_type="batting", min_matches=15, extra_params=""):
+    """Scrape batting/bowling aggregate for name->pid mapping."""
     from bs4 import BeautifulSoup
     base = (
         f"https://stats.espncricinfo.com/ci/engine/stats/index.html?"
-        f"class={cricket_class}{extra_params};template=results;type=batting;"
+        f"class={cricket_class}{extra_params};template=results;type={stat_type};"
         f"qualmin1={min_matches};qualval1=matches;size=200"
     )
     all_rows = []
@@ -184,12 +184,20 @@ def main():
     print("=== Building name -> player_id map ===", flush=True)
     name_pid = get_name_to_pid()
 
-    # Fill gaps from stats scraping for formats missing pickles
-    for label, cfg in [("T20I bat", {"cc": 3, "mm": 15}),
-                       ("IPL bat", {"cc": 6, "mm": 15, "ep": ";trophy=117"})]:
-        # Check if we already have enough IDs
+    # Fill gaps from stats scraping for formats missing or incompatible pickles
+    scrape_configs = [
+        ("Test bat",  {"cc": 1, "st": "batting",  "mm": 15}),
+        ("Test bowl", {"cc": 1, "st": "bowling",  "mm": 15}),
+        ("ODI bat",   {"cc": 2, "st": "batting",  "mm": 15}),
+        ("ODI bowl",  {"cc": 2, "st": "bowling",  "mm": 15}),
+        ("T20I bat",  {"cc": 3, "st": "batting",  "mm": 15}),
+        ("T20I bowl", {"cc": 3, "st": "bowling",  "mm": 15}),
+        ("IPL bat",   {"cc": 6, "st": "batting",  "mm": 15, "ep": ";trophy=117"}),
+        ("IPL bowl",  {"cc": 6, "st": "bowling",  "mm": 15, "ep": ";trophy=117"}),
+    ]
+    for label, cfg in scrape_configs:
         print(f"  Scraping {label} aggregate for more IDs...", flush=True)
-        extra = scrape_bat_agg(cfg["cc"], cfg.get("mm", 15), cfg.get("ep", ""))
+        extra = scrape_stats_agg(cfg["cc"], cfg.get("st", "batting"), cfg.get("mm", 15), cfg.get("ep", ""))
         name_pid.update(extra)
         print(f"    Got {len(extra)} names", flush=True)
         time.sleep(1)
@@ -317,6 +325,20 @@ def main():
         if role:
             name_role[name] = role
 
+    # Build name -> bowl_type map (spinner/fast) from ESPN cache
+    name_bowl_type = {}
+    for name, pid in pids_to_fetch.items():
+        entry = cache.get(pid, {})
+        if isinstance(entry, dict) and entry.get("bowl_type"):
+            name_bowl_type[name] = entry["bowl_type"]
+
+    # Build name -> bat_pos map (opener/middle) from batting positions
+    name_bat_pos = {}
+    for name, pid in pids_to_fetch.items():
+        bp = batpos_cache.get(pid)
+        if bp:
+            name_bat_pos[name] = "opener" if bp <= 2 else "middle"
+
     from collections import Counter
     dist = Counter(name_role.values())
     print(f"  Role distribution: {dict(dist.most_common())}")
@@ -330,7 +352,6 @@ def main():
         with open(jpath) as f:
             data = json.load(f)
 
-        # Build role map from all_players first (most complete data)
         ap_roles = {}
         for p in data.get("all_players", []):
             name = p.get("name", "")
@@ -345,6 +366,12 @@ def main():
                 if role:
                     pl["playing_role"] = role
                     patched += 1
+                bt = name_bowl_type.get(name)
+                if bt:
+                    pl["bowl_type"] = bt
+                bp = name_bat_pos.get(name)
+                if bp:
+                    pl["bat_pos"] = bp
 
         with open(jpath, "w") as f:
             json.dump(data, f, separators=(",", ":"))

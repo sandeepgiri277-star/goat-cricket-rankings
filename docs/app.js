@@ -815,21 +815,17 @@ const ROLE_LABELS = {
 };
 
 function battingRole(p) {
+  if (p.bat_pos) return p.bat_pos;
   const r = p.playing_role;
-  if (!r) return null;
   if (r === 'opener') return 'opener';
   return 'middle';
 }
 
 function bowlingRole(p) {
+  if (p.bowl_type) return p.bowl_type;
   const r = p.playing_role;
   if (r === 'spinner') return 'spinner';
   if (r === 'fast') return 'fast';
-  if (p.bowl_rating > 0) {
-    const sr = p.career_bowl_sr;
-    if (sr && sr > 55) return 'spinner';
-    return 'fast';
-  }
   return r;
 }
 
