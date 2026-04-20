@@ -1,6 +1,54 @@
 {
-  "tests": [],
-  "odis": [],
-  "t20is": [],
-  "ipl": []
+  "tests": [
+    "SM Gavaskar",
+    "L Hutton",
+    "DG Bradman",
+    "SR Tendulkar",
+    "KC Sangakkara",
+    "JH Kallis",
+    "Imran Khan",
+    "SK Warne",
+    "M Muralidaran",
+    "SF Barnes",
+    "GD McGrath"
+  ],
+  "odis": [
+    "SR Tendulkar",
+    "RG Sharma",
+    "V Kohli",
+    "JH Kallis",
+    "IVA Richards",
+    "AB de Villiers",
+    "MS Dhoni",
+    "SM Pollock",
+    "Wasim Akram",
+    "M Muralidaran",
+    "GD McGrath"
+  ],
+  "t20is": [
+    "Abhishek Sharma",
+    "FH Allen",
+    "V Kohli",
+    "SA Yadav",
+    "JC Buttler",
+    "TH David",
+    "HH Pandya",
+    "Shakib Al Hasan",
+    "Rashid Khan",
+    "JJ Bumrah",
+    "Arshdeep Singh"
+  ],
+  "ipl": [
+    "CH Gayle",
+    "DA Warner",
+    "JC Buttler",
+    "AB de Villiers",
+    "N Pooran",
+    "AD Russell",
+    "SP Narine",
+    "RA Jadeja",
+    "SL Malinga",
+    "JJ Bumrah",
+    "YS Chahal"
+  ]
 }
