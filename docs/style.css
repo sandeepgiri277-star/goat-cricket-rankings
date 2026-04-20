@@ -1040,6 +1040,7 @@ footer {
 .xi-sr-stats { margin-left: auto; font-size: 0.75rem; color: var(--muted); }
 
 .xi-summary {
+  position: relative; z-index: 1;
   padding: 0.8rem 1rem; border-radius: 8px; font-size: 0.85rem;
   background: var(--card-bg); border: 1px solid var(--border);
   color: var(--muted); line-height: 1.5;
