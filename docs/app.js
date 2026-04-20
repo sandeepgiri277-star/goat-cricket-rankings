@@ -2801,6 +2801,7 @@ const XI_ROLE_TEMPLATES = {
 
 function xiPlayerRole(p) {
   const r = p.playing_role;
+  if (r === 'keeper') return 'keeper';
   if (r === 'allrounder') {
     const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
     if (bat < 500 || bowl < 500) {
