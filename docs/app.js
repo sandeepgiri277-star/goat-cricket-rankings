@@ -118,6 +118,7 @@ function _realToSlider(key, val) {
 }
 let TUNE_PARAMS = { ...TUNE_DEFAULTS_BASE };
 let AR_TUNE_PARAMS = { ...TUNE_DEFAULTS_BASE };
+const SAVED_TUNE = {};
 let ORIGINAL_DATA = {};
 
 function activeTab() {
@@ -308,6 +309,7 @@ function resetParams() {
   TUNE_PARAMS = { ...d };
   AR_TUNE_PARAMS = { ...d };
   XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
+  delete SAVED_TUNE[CURRENT_FORMAT];
   resetToOriginalDataAll();
 }
 
@@ -582,8 +584,26 @@ async function loadData() {
   }
 }
 
+function saveTuneForFormat() {
+  if (CURRENT_FORMAT && CURRENT_FORMAT !== 'crossformat') {
+    SAVED_TUNE[CURRENT_FORMAT] = {
+      tune: { ...TUNE_PARAMS },
+      arTune: { ...AR_TUNE_PARAMS },
+    };
+  }
+}
+
+function restoreTuneForFormat(format) {
+  const saved = SAVED_TUNE[format];
+  const d = FORMAT_DEFAULTS[format] || TUNE_DEFAULTS_BASE;
+  TUNE_PARAMS = saved ? { ...saved.tune } : { ...d };
+  AR_TUNE_PARAMS = saved ? { ...saved.arTune } : { ...d };
+}
+
 async function switchFormat(format) {
   if (format === CURRENT_FORMAT) return;
+
+  saveTuneForFormat();
 
   if (format === 'crossformat') {
     const [tests, odis, t20is] = await Promise.all([
@@ -604,9 +624,7 @@ async function switchFormat(format) {
     }
     CURRENT_FORMAT = format;
     DATA = data;
-    const d = currentDefaults();
-    TUNE_PARAMS = { ...d };
-    AR_TUNE_PARAMS = { ...d };
+    restoreTuneForFormat(format);
     storeOriginalData(format);
     buildNameIndex();
     updateFormatLabels();
@@ -703,9 +721,7 @@ async function restoreFromHash() {
       if (data) {
         CURRENT_FORMAT = format;
         DATA = data;
-        const d = currentDefaults();
-        TUNE_PARAMS = { ...d };
-        AR_TUNE_PARAMS = { ...d };
+        restoreTuneForFormat(format);
         storeOriginalData(format);
         document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector(`.format-btn[data-format="${format}"]`);
