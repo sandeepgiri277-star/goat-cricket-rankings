@@ -2494,10 +2494,18 @@ function generateDefaultXI() {
 }
 
 function xiPlayerStats(p) {
+  const r = p.playing_role;
+  const isAllrounder = r === 'allrounder';
+  const isBowler = r === 'spinner' || r === 'fast' || p.bowl_type === 'spinner' || p.bowl_type === 'fast';
   const parts = [];
-  if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
-  if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
-  if (p.career_bat_avg != null) parts.push(`Avg ${p.career_bat_avg.toFixed(1)}`);
+  if (isAllrounder) {
+    if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
+    if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
+  } else if (isBowler && !isAllrounder) {
+    if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
+  } else {
+    if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
+  }
   return parts.join(' \u00b7 ');
 }
 
