@@ -13,7 +13,7 @@ const FORMAT_FILES = {
 };
 
 const FULL_MEMBER_COUNTRIES = new Set([
-  'IND','AUS','ENG','PAK','SA','NZ','WI','SL','BAN','ZIM','AFG','IRE','NED','SCOT','USA',
+  'IND','AUS','ENG','PAK','SA','NZ','WI','SL','BAN','AFG',
 ]);
 
 const FORMAT_LABELS = {
