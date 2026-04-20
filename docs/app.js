@@ -7,6 +7,31 @@ let CROSS_FORMAT_DATA = null;
 let CUSTOM_XI = [];
 let _xiEditingSlot = -1;
 let _xiDragFrom = -1;
+let _plotlyReady = typeof Plotly !== 'undefined';
+let _pendingCharts = false;
+
+function safePlot(id, traces, layout, config) {
+  if (typeof Plotly !== 'undefined') {
+    Plotly.newPlot(id, traces, layout, config);
+  } else {
+    _pendingCharts = true;
+  }
+}
+
+function onPlotlyLoad() {
+  _plotlyReady = true;
+  if (_pendingCharts && DATA) {
+    _pendingCharts = false;
+    renderAllrounderChart();
+    renderBattingChart();
+    renderBowlingChart();
+  }
+}
+
+if (typeof Plotly === 'undefined') {
+  const _origScript = document.querySelector('script[src*="plotly"]');
+  if (_origScript) _origScript.addEventListener('load', onPlotlyLoad);
+}
 
 const FORMAT_FILES = {
   tests: 'rankings.json',
@@ -777,7 +802,7 @@ function renderAllrounderChart() {
     showlegend: false,
   });
 
-  Plotly.newPlot('chart-allrounders', traces, layout, plotlyConfig);
+  safePlot('chart-allrounders', traces, layout, plotlyConfig);
 }
 
 // ─── Batting Chart ──────────────────────────────────────────────────────────
@@ -805,7 +830,7 @@ function renderBattingChart() {
     showlegend: false,
   });
 
-  Plotly.newPlot('chart-batting', traces, layout, plotlyConfig);
+  safePlot('chart-batting', traces, layout, plotlyConfig);
 }
 
 // ─── Bowling Chart ──────────────────────────────────────────────────────────
@@ -833,7 +858,7 @@ function renderBowlingChart() {
     showlegend: false,
   });
 
-  Plotly.newPlot('chart-bowling', traces, layout, plotlyConfig);
+  safePlot('chart-bowling', traces, layout, plotlyConfig);
 }
 
 // ─── Tables (ICC-style) ─────────────────────────────────────────────────────
@@ -1717,7 +1742,7 @@ function renderPlayerCareer(player) {
     }
   }
 
-  Plotly.newPlot('chart-player-career', traces, layout, plotlyConfig);
+  safePlot('chart-player-career', traces, layout, plotlyConfig);
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -1856,7 +1881,7 @@ function renderXFStackedChart(divId, players, prefix) {
     hovertemplate: `%{y}<br>${f.label}: %{x}<extra></extra>`,
   }));
 
-  Plotly.newPlot(divId, traces, plotlyLayout({
+  safePlot(divId, traces, plotlyLayout({
     barmode: 'stack',
     height: Math.max(mobile ? 400 : 550, top.length * (mobile ? 26 : 30) + 80),
     margin: { l: mobile ? 100 : 220, r: mobile ? 10 : 60, t: 10, b: 30 },
@@ -1872,7 +1897,7 @@ function renderXFArChart(divId, players) {
   const top = players.slice(0, n).reverse();
   const labels = top.map(p => mobile ? p.name.split(' ').pop() : `${getFlag(p.country)} ${p.name}`);
 
-  Plotly.newPlot(divId, [{
+  safePlot(divId, [{
     y: labels, x: top.map(p => p.ar_total), type: 'bar', orientation: 'h',
     marker: { color: top.map(p => p.ar_total >= 2000 ? COLORS.aei : COLORS.bat) },
     text: top.map(p => p.ar_total), textposition: 'inside',
@@ -1969,9 +1994,11 @@ function switchTab(tabId, updateHash = true) {
 
   setTimeout(() => {
     const panel = document.getElementById(`panel-${tabId}`);
-    panel.querySelectorAll('.chart-container > .js-plotly-plot').forEach(el => {
-      Plotly.Plots.resize(el);
-    });
+    if (typeof Plotly !== 'undefined') {
+      panel.querySelectorAll('.chart-container > .js-plotly-plot').forEach(el => {
+        Plotly.Plots.resize(el);
+      });
+    }
   }, 80);
 }
 
