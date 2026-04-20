@@ -951,7 +951,7 @@ footer {
 .xi-btn {
   padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
   cursor: pointer; border: 1px solid var(--border);
-  background: var(--card-bg); color: var(--text);
+  background: var(--bg-card); color: var(--text);
   transition: background 0.15s, border-color 0.15s;
 }
 .xi-btn:hover { border-color: var(--accent); }
@@ -966,7 +966,7 @@ footer {
 .xi-slot {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.6rem 0.9rem; border-radius: 8px;
-  background: var(--card-bg); border: 1px solid var(--border);
+  background: var(--bg-card); border: 1px solid var(--border);
   transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
   min-height: 3rem;
 }
@@ -1019,14 +1019,14 @@ footer {
 }
 .xi-search-wrap input {
   width: 100%; padding: 0.6rem 0.9rem; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--card-bg);
+  border: 1px solid var(--border); background: var(--bg-card);
   color: var(--text); font-size: 0.9rem; font-family: inherit;
 }
 .xi-search-wrap input:focus { border-color: var(--accent); outline: none; }
 
 .xi-search-results {
   position: absolute; top: 100%; left: 0; right: 0; z-index: 500;
-  background: var(--card-bg); border: 1px solid var(--border);
+  background: var(--bg-card); border: 1px solid var(--border);
   border-radius: 0 0 8px 8px; max-height: 280px; overflow-y: auto;
   display: none;
 }
@@ -1043,7 +1043,7 @@ footer {
 .xi-summary {
   position: relative; z-index: 1;
   padding: 0.8rem 1rem; border-radius: 8px; font-size: 0.85rem;
-  background: var(--card-bg); border: 1px solid var(--border);
+  background: var(--bg-card); border: 1px solid var(--border);
   color: var(--muted); line-height: 1.5;
 }
 .xi-summary strong { color: var(--text); }
