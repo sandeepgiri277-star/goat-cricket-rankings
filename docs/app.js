@@ -2492,8 +2492,16 @@ function xiRoleLabel(p) {
 
 function xiSlotRoleDisplay(player, tmplRole) {
   if (!player) return xiSlotLabel(tmplRole);
-  const isWk = player.playing_role === 'keeper';
-  const base = xiSlotLabel(tmplRole);
+  const r = player.playing_role;
+  const isWk = r === 'keeper';
+  let base;
+  if (r === 'allrounder') base = 'Allrounder';
+  else if (r === 'spinner' || player.bowl_type === 'spinner') base = 'Spinner';
+  else if (r === 'fast' || player.bowl_type === 'fast') base = 'Fast Bowler';
+  else if (r === 'opener' || player.bat_pos === 'opener') base = 'Opener';
+  else if (r === 'middle' || player.bat_pos === 'middle') base = 'Middle Order';
+  else if (isWk) base = player.bat_pos === 'opener' ? 'Opener' : 'Middle Order';
+  else base = xiSlotLabel(tmplRole);
   return isWk ? `${base} · WK` : base;
 }
 
