@@ -2496,15 +2496,17 @@ function generateDefaultXI() {
 }
 
 function xiPlayerStats(p) {
-  const r = p.playing_role;
+  const hasBat = p.bat_rating > 0;
+  const hasBowl = p.bowl_rating > 0;
+  const bothSignificant = hasBat && hasBowl && p.bat_rating >= 300 && p.bowl_rating >= 300;
   const parts = [];
-  if (r === 'allrounder') {
-    if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
-    if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
-  } else if (r === 'spinner' || r === 'fast') {
-    if (p.bowl_rating > 0) parts.push(`Bowl ${p.bowl_rating}`);
+  if (bothSignificant || p.playing_role === 'allrounder') {
+    if (hasBat) parts.push(`Bat ${p.bat_rating}`);
+    if (hasBowl) parts.push(`Bowl ${p.bowl_rating}`);
+  } else if (p.playing_role === 'spinner' || p.playing_role === 'fast') {
+    if (hasBowl) parts.push(`Bowl ${p.bowl_rating}`);
   } else {
-    if (p.bat_rating > 0) parts.push(`Bat ${p.bat_rating}`);
+    if (hasBat) parts.push(`Bat ${p.bat_rating}`);
   }
   return parts.join(' \u00b7 ');
 }
