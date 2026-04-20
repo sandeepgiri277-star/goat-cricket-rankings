@@ -2749,7 +2749,7 @@ const XI_ROLE_TEMPLATES = {
   ipl:   { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 2 },
 };
 
-const ROLE_LABELS = {
+const XI_ROLE_LABELS = {
   opener: 'opener', middle: 'middle-order batter', keeper: 'keeper',
   allrounder: 'allrounder', spinner: 'spinner', fast: 'fast bowler',
 };
@@ -2774,7 +2774,7 @@ function validateXI(players) {
     const have = counts[role] || 0;
     if (have < min) {
       const need = min - have;
-      const label = ROLE_LABELS[role] || role;
+      const label = XI_ROLE_LABELS[role] || role;
       violations.push(`Need ${need} more ${label}${need > 1 ? 's' : ''}`);
     }
   }
