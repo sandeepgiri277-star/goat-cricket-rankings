@@ -2495,18 +2495,9 @@ function generateDefaultXI() {
 }
 
 function xiPlayerStats(p) {
-  const hasBat = p.bat_rating > 0;
-  const hasBowl = p.bowl_rating > 0;
-  const bothSignificant = hasBat && hasBowl && p.bat_rating >= 300 && p.bowl_rating >= 300;
   const parts = [];
-  if (bothSignificant || p.playing_role === 'allrounder') {
-    if (hasBat) parts.push(`Bat ${p.bat_rating}`);
-    if (hasBowl) parts.push(`Bowl ${p.bowl_rating}`);
-  } else if (p.playing_role === 'spinner' || p.playing_role === 'fast') {
-    if (hasBowl) parts.push(`Bowl ${p.bowl_rating}`);
-  } else {
-    if (hasBat) parts.push(`Bat ${p.bat_rating}`);
-  }
+  parts.push(`Bat ${p.bat_rating || 0}`);
+  parts.push(`Bowl ${p.bowl_rating || 0}`);
   return parts.join(' \u00b7 ');
 }
 
@@ -2619,7 +2610,6 @@ function renderCustomXI() {
         <div class="xi-slot xi-slot-custom" data-idx="${i}" draggable="true">
           <span class="xi-slot-num xi-drag-handle" title="Drag to reorder">\u2261</span>
           <span class="xi-slot-num">${num}</span>
-          <span class="xi-slot-role">${xiRoleLabel(player)}</span>
           <div class="xi-slot-player">
             <span class="xi-slot-flag">${getFlag(player.country)}</span>
             <span>${player.name}</span>
