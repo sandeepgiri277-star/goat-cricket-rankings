@@ -2710,7 +2710,7 @@ function showXiSearchResults(query, resultsEl) {
 
 const XI_ROLE_TEMPLATES = {
   tests: { opener: 2, middle: 3, keeper: 1, allrounder: 1, spinner: 1, fast: 3 },
-  odis:  { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 3 },
+  odis:  { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 2 },
   t20is: { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 3 },
   ipl:   { opener: 2, middle: 2, keeper: 1, allrounder: 2, spinner: 1, fast: 3 },
 };
