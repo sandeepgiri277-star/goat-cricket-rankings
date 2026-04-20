@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""Patch all JSON data files with playing_role from ESPN API."""
+"""Patch all JSON data files with playing_role, bowl_type, bat_pos from ESPN data.
+
+bat_pos is scraped per format — Tendulkar opened in ODIs but batted middle in Tests.
+"""
 import json, pickle, time, re, requests
 from pathlib import Path
 
 CACHE_DIR = Path("cricket_cache")
 ROLES_CACHE = CACHE_DIR / "player_roles_api.pkl"
+BATPOS_CACHE = CACHE_DIR / "batting_positions.pkl"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
 ESPN_API = "https://site.api.espn.com/apis/common/v3/sports/cricket/athletes/{pid}"
-BATPOS_CACHE = CACHE_DIR / "batting_positions.pkl"
+
+JSON_CONFIGS = [
+    {"jpath": "docs/rankings.json",      "cricket_class": 1, "label": "Test"},
+    {"jpath": "docs/odi_rankings.json",   "cricket_class": 2, "label": "ODI"},
+    {"jpath": "docs/t20i_rankings.json",  "cricket_class": 3, "label": "T20I"},
+    {"jpath": "docs/ipl_rankings.json",   "cricket_class": 6, "label": "IPL"},
+]
 
 POSITION_MAP = {
     "opening batter": "opener",
@@ -20,8 +30,8 @@ POSITION_MAP = {
     "batting allrounder": "allrounder",
     "bowling allrounder": "allrounder",
     "batter": "middle",
-    "bowler": None,       # resolved via bowl style
-    "unknown": None,      # resolved via bowl style if available
+    "bowler": None,
+    "unknown": None,
 }
 
 SPIN_KEYWORDS = {"slow", "spin", "legbreak", "offbreak", "orthodox", "left-arm unorthodox",
@@ -30,7 +40,6 @@ FAST_KEYWORDS = {"fast", "medium", "pace", "seam", "swing", "rfm", "rmf", "rf", 
 
 
 def classify_bowl_style(bowl_style_list):
-    """Determine spinner vs fast from ESPN bowlStyle data."""
     if not bowl_style_list:
         return None
     for entry in bowl_style_list:
@@ -45,7 +54,6 @@ def classify_bowl_style(bowl_style_list):
 
 
 def fetch_player_role(pid):
-    """Fetch position and bowling style from ESPN API, return normalized role."""
     url = ESPN_API.format(pid=pid)
     try:
         resp = requests.get(url, headers=HEADERS, timeout=10)
@@ -64,7 +72,7 @@ def fetch_player_role(pid):
 
 
 def scrape_batting_position(pid, cricket_class=1):
-    """Get most common batting position from career summary on stats page."""
+    """Get most common batting position from career summary on Cricinfo stats page."""
     from bs4 import BeautifulSoup
     url = f"https://stats.espncricinfo.com/ci/engine/player/{pid}.html?class={cricket_class};template=results;type=batting"
     try:
@@ -106,7 +114,6 @@ def save_cache(cache):
 
 
 def get_name_to_pid():
-    """Build name->pid from all available aggregate pickles."""
     name_pid = {}
     for pkl in ["batting_aggregate.pkl", "bowling_aggregate.pkl",
                  "odi_bat_agg.pkl", "odi_bowl_agg.pkl",
@@ -126,7 +133,6 @@ def get_name_to_pid():
 
 
 def scrape_stats_agg(cricket_class, stat_type="batting", min_matches=15, extra_params=""):
-    """Scrape batting/bowling aggregate for name->pid mapping."""
     from bs4 import BeautifulSoup
     base = (
         f"https://stats.espncricinfo.com/ci/engine/stats/index.html?"
@@ -139,7 +145,6 @@ def scrape_stats_agg(cricket_class, stat_type="batting", min_matches=15, extra_p
         url = f"{base};page={page}"
         print(f"    Fetching page {page}...", flush=True)
         resp = requests.get(url, headers=HEADERS, timeout=30)
-        from bs4 import BeautifulSoup
         soup = BeautifulSoup(resp.text, "lxml")
         tables = soup.select("table.engineTable")
         if not tables:
@@ -163,9 +168,9 @@ def scrape_stats_agg(cricket_class, stat_type="batting", min_matches=15, extra_p
                     parts = re.match(r"^(.+?)\(([^)]+)\)$", raw.strip())
                     row["player_name"] = parts.group(1).strip() if parts else raw.strip()
                     if link and link.get("href"):
-                        m = re.search(r"/player/(\d+)\.html", link["href"])
-                        if m:
-                            row["player_id"] = int(m.group(1))
+                        m_id = re.search(r"/player/(\d+)\.html", link["href"])
+                        if m_id:
+                            row["player_id"] = int(m_id.group(1))
             if "player_id" in row:
                 page_rows.append(row)
         if not page_rows:
@@ -180,11 +185,22 @@ def scrape_stats_agg(cricket_class, stat_type="batting", min_matches=15, extra_p
     return {r["player_name"]: r["player_id"] for r in all_rows}
 
 
+def needs_batting_position(pos, bat_r, bowl_r):
+    """Should we scrape batting position for this player?"""
+    if pos in ("top-order batter", "opening batter", "middle-order batter",
+               "batter", "wicketkeeper batter", "wicketkeeper"):
+        return True
+    if "allrounder" in pos and bat_r > 0:
+        return True
+    if pos in ("unknown", "") and bat_r > bowl_r:
+        return True
+    return False
+
+
 def main():
     print("=== Building name -> player_id map ===", flush=True)
     name_pid = get_name_to_pid()
 
-    # Fill gaps from stats scraping for formats missing or incompatible pickles
     scrape_configs = [
         ("Test bat",  {"cc": 1, "st": "batting",  "mm": 15}),
         ("Test bowl", {"cc": 1, "st": "bowling",  "mm": 15}),
@@ -204,9 +220,10 @@ def main():
 
     print(f"  Total: {len(name_pid)} unique player IDs\n", flush=True)
 
-    # Collect all player names from JSONs
+    # Collect all player names across all JSONs
     all_json_names = set()
-    for jpath in ["docs/rankings.json", "docs/odi_rankings.json", "docs/t20i_rankings.json", "docs/ipl_rankings.json"]:
+    for cfg in JSON_CONFIGS:
+        jpath = cfg["jpath"]
         if Path(jpath).exists():
             with open(jpath) as f:
                 data = json.load(f)
@@ -222,6 +239,7 @@ def main():
 
     print(f"  {len(pids_to_fetch)}/{len(all_json_names)} JSON players have player IDs\n", flush=True)
 
+    # Fetch ESPN API roles (cached)
     cache = load_cache()
     unique_pids = set(pids_to_fetch.values())
     to_fetch = [pid for pid in unique_pids if pid not in cache]
@@ -238,7 +256,7 @@ def main():
     save_cache(cache)
     print(f"  Done. Total cached: {len(cache)}\n", flush=True)
 
-    # Rebuild roles from cache with updated mapping
+    # Rebuild roles from cache
     for pid in cache:
         entry = cache[pid]
         if not isinstance(entry, dict):
@@ -251,107 +269,137 @@ def main():
 
     save_cache(cache)
 
-    # Scrape batting positions for "top-order batter" and "unknown" batter players
-    batpos_cache = {}
-    if BATPOS_CACHE.exists():
-        batpos_cache = pickle.load(open(BATPOS_CACHE, "rb"))
-
-    all_player_stats = {}
-    for jpath in ["docs/rankings.json", "docs/odi_rankings.json", "docs/t20i_rankings.json", "docs/ipl_rankings.json"]:
-        if Path(jpath).exists():
-            with open(jpath) as f:
-                d = json.load(f)
-            for p in d.get("all_players", []):
-                n = p.get("name", "")
-                if n not in all_player_stats:
-                    all_player_stats[n] = p
-
-    needs_batpos = []
-    for name, pid in pids_to_fetch.items():
-        entry = cache.get(pid, {})
-        if not isinstance(entry, dict):
-            continue
-        pos = (entry.get("pos") or "").strip().lower()
-        stats = all_player_stats.get(name, {})
-        bat_r = stats.get("bat_rating", 0) or 0
-        bowl_r = stats.get("bowl_rating", 0) or 0
-        if pos == "top-order batter" or (pos in ("unknown", "") and bat_r > bowl_r):
-            if pid not in batpos_cache:
-                needs_batpos.append((name, pid))
-
-    if needs_batpos:
-        print(f"  Scraping batting positions for {len(needs_batpos)} players...", flush=True)
-        for i, (name, pid) in enumerate(needs_batpos):
-            bp = scrape_batting_position(pid)
-            batpos_cache[pid] = bp
-            if (i + 1) % 25 == 0:
-                print(f"    {i+1}/{len(needs_batpos)}...", flush=True)
-                with open(BATPOS_CACHE, "wb") as f:
-                    pickle.dump(batpos_cache, f)
-            time.sleep(0.3)
-        with open(BATPOS_CACHE, "wb") as f:
-            pickle.dump(batpos_cache, f)
-        print(f"    Done.", flush=True)
-
-    # Build final name -> role map
-    name_role = {}
-    for name, pid in pids_to_fetch.items():
-        entry = cache.get(pid, {})
-        if not isinstance(entry, dict):
-            continue
-        pos = (entry.get("pos") or "").strip().lower()
-        role = POSITION_MAP.get(pos)
-        stats = all_player_stats.get(name, {})
-        bat_r = stats.get("bat_rating", 0) or 0
-        bowl_r = stats.get("bowl_rating", 0) or 0
-
-        if pos == "top-order batter":
-            bp = batpos_cache.get(pid)
-            if bp and bp <= 2:
-                role = "opener"
-            elif bp and bp >= 3:
-                role = "middle"
-
-        if role is None and pos in ("unknown", ""):
-            if bowl_r > bat_r:
-                role = entry.get("bowl_type")
-            elif bat_r > 0:
-                bp = batpos_cache.get(pid)
-                if bp and bp <= 2:
-                    role = "opener"
-                else:
-                    role = "middle"
-
-        if role:
-            name_role[name] = role
-
-    # Build name -> bowl_type map (spinner/fast) from ESPN cache
+    # Build name -> bowl_type map (format-independent, from ESPN)
     name_bowl_type = {}
     for name, pid in pids_to_fetch.items():
         entry = cache.get(pid, {})
         if isinstance(entry, dict) and entry.get("bowl_type"):
             name_bowl_type[name] = entry["bowl_type"]
 
-    # Build name -> bat_pos map (opener/middle) from batting positions
-    name_bat_pos = {}
-    for name, pid in pids_to_fetch.items():
-        bp = batpos_cache.get(pid)
-        if bp:
-            name_bat_pos[name] = "opener" if bp <= 2 else "middle"
+    # ── Per-format batting position scraping ─────────────────────────────
+    # Cache key = (pid, cricket_class) so Tendulkar gets opener for ODIs, middle for Tests
+    batpos_cache = {}
+    if BATPOS_CACHE.exists():
+        try:
+            batpos_cache = pickle.load(open(BATPOS_CACHE, "rb"))
+        except Exception:
+            batpos_cache = {}
 
-    from collections import Counter
-    dist = Counter(name_role.values())
-    print(f"  Role distribution: {dict(dist.most_common())}")
-    print(f"  Assigned: {len(name_role)}, unassigned: {len(pids_to_fetch) - len(name_role)}\n", flush=True)
+    # Migrate old cache format: if keys are plain ints, it's the old (pid-only) format
+    if batpos_cache and any(isinstance(k, int) for k in batpos_cache):
+        print("  Migrating old batpos cache (pid-only) -> clearing to re-scrape per format", flush=True)
+        batpos_cache = {}
 
-    # Patch JSONs
-    print("=== Patching JSON files ===", flush=True)
-    for jpath in ["docs/rankings.json", "docs/odi_rankings.json", "docs/t20i_rankings.json", "docs/ipl_rankings.json"]:
+    for cfg in JSON_CONFIGS:
+        jpath = cfg["jpath"]
+        cc = cfg["cricket_class"]
+        label = cfg["label"]
         if not Path(jpath).exists():
             continue
+
         with open(jpath) as f:
             data = json.load(f)
 
+        # Collect stats for players in this format
+        format_stats = {}
+        for p in data.get("all_players", []):
+            n = p.get("name", "")
+            if n:
+                format_stats[n] = p
+
+        # Find players that need batting position for this format
+        needs = []
+        for name, stats in format_stats.items():
+            pid = pids_to_fetch.get(name)
+            if not pid:
+                continue
+            entry = cache.get(pid, {})
+            if not isinstance(entry, dict):
+                continue
+            pos = (entry.get("pos") or "").strip().lower()
+            bat_r = stats.get("bat_rating", 0) or 0
+            bowl_r = stats.get("bowl_rating", 0) or 0
+            if needs_batting_position(pos, bat_r, bowl_r):
+                if (pid, cc) not in batpos_cache:
+                    needs.append((name, pid))
+
+        if needs:
+            print(f"  Scraping {label} batting positions for {len(needs)} players...", flush=True)
+            for i, (name, pid) in enumerate(needs):
+                bp = scrape_batting_position(pid, cricket_class=cc)
+                batpos_cache[(pid, cc)] = bp
+                if (i + 1) % 25 == 0:
+                    print(f"    {i+1}/{len(needs)}...", flush=True)
+                    with open(BATPOS_CACHE, "wb") as f:
+                        pickle.dump(batpos_cache, f)
+                time.sleep(0.3)
+            with open(BATPOS_CACHE, "wb") as f:
+                pickle.dump(batpos_cache, f)
+            print(f"    Done.", flush=True)
+        else:
+            print(f"  {label}: all batting positions cached.", flush=True)
+
+    with open(BATPOS_CACHE, "wb") as f:
+        pickle.dump(batpos_cache, f)
+
+    # ── Patch each JSON with format-specific bat_pos ─────────────────────
+    from collections import Counter
+    print("\n=== Patching JSON files ===", flush=True)
+
+    for cfg in JSON_CONFIGS:
+        jpath = cfg["jpath"]
+        cc = cfg["cricket_class"]
+        label = cfg["label"]
+        if not Path(jpath).exists():
+            continue
+
+        with open(jpath) as f:
+            data = json.load(f)
+
+        # Build format-specific name -> role and name -> bat_pos
+        format_stats = {}
+        for p in data.get("all_players", []):
+            format_stats[p.get("name", "")] = p
+
+        name_role = {}
+        name_bat_pos = {}
+        for name, pid in pids_to_fetch.items():
+            entry = cache.get(pid, {})
+            if not isinstance(entry, dict):
+                continue
+            pos = (entry.get("pos") or "").strip().lower()
+            role = POSITION_MAP.get(pos)
+            stats = format_stats.get(name, {})
+            bat_r = stats.get("bat_rating", 0) or 0
+            bowl_r = stats.get("bowl_rating", 0) or 0
+
+            # Get format-specific batting position
+            bp = batpos_cache.get((pid, cc))
+            if bp:
+                name_bat_pos[name] = "opener" if bp <= 2 else "middle"
+
+            if pos == "top-order batter":
+                if bp and bp <= 2:
+                    role = "opener"
+                elif bp and bp >= 3:
+                    role = "middle"
+
+            if role is None and pos in ("unknown", ""):
+                if bowl_r > bat_r:
+                    role = entry.get("bowl_type")
+                elif bat_r > 0:
+                    if bp and bp <= 2:
+                        role = "opener"
+                    else:
+                        role = "middle"
+
+            if role:
+                name_role[name] = role
+
+        dist = Counter(name_role.values())
+        print(f"  {label} roles: {dict(dist.most_common())}")
+
+        # Build lookup from all_players first
         ap_roles = {}
         for p in data.get("all_players", []):
             name = p.get("name", "")

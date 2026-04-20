@@ -945,6 +945,7 @@ footer {
   flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;
 }
 .xi-header h2 { margin: 0; }
+.xi-custom-header { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 .xi-actions { display: flex; gap: 0.5rem; }
 .xi-btn {
   padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
@@ -964,15 +965,16 @@ footer {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.6rem 0.9rem; border-radius: 8px;
   background: var(--card-bg); border: 1px solid var(--border);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
   min-height: 3rem;
 }
 .xi-slot:hover { border-color: var(--accent); }
+.xi-slot.xi-slot-readonly { cursor: default; }
+.xi-slot.xi-slot-readonly:hover { border-color: var(--border); }
 .xi-slot.xi-slot-empty {
   border-style: dashed; opacity: 0.7; cursor: pointer;
 }
 .xi-slot.xi-slot-empty:hover { opacity: 1; border-color: var(--accent); }
-.xi-slot.xi-slot-editing { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
 
 .xi-slot-num {
   font-size: 0.75rem; font-weight: 700; color: var(--muted);
@@ -1003,11 +1005,12 @@ footer {
   flex: 1; color: var(--muted); font-size: 0.85rem; font-style: italic;
 }
 
-.xi-slot-inline-search {
-  flex: 1; background: none; border: none; outline: none;
-  color: var(--text); font-size: 0.85rem; font-family: inherit;
+.xi-drag-handle {
+  cursor: grab; font-size: 1.1rem; min-width: auto; user-select: none;
 }
-.xi-slot-inline-search::placeholder { color: var(--muted); }
+.xi-drag-handle:active { cursor: grabbing; }
+.xi-slot.xi-dragging { opacity: 0.4; }
+.xi-slot.xi-drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.18); }
 
 .xi-search-wrap {
   position: relative; max-width: 500px; margin: 0.5rem 0 1rem;
