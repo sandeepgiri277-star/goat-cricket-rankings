@@ -46,7 +46,7 @@ function isFullMember(country) {
 
 const TUNE_DEFAULTS = {
   batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50,
-  alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5, bowlAvgW: 1.0,
+  alpha: 0.30, batAvgW: 1.0, srWeight: 1.0, bowlSrWeight: 0.5, wpiWeight: 0.5, bowlAvgW: 1.0,
   bowlK: 1000, ratingK: 250,
   xfTests: 33, xfOdis: 33, xfT20is: 34,
 };
@@ -56,6 +56,7 @@ const TUNE_RANGES = {
   batPitch:      { min: 0, max: 1.0, step: 0.1 },
   bowlPitch:     { min: 0, max: 1.0, step: 0.1 },
   alpha:        { min: 0, max: 1.0, step: 0.05 },
+  batAvgW:      { min: 0, max: 2.0, step: 0.1 },
   srWeight:     { min: 0, max: 2.0, step: 0.1 },
   bowlSrWeight: { min: 0, max: 1.0, step: 0.05 },
   wpiWeight:    { min: 0, max: 1.0, step: 0.05 },
@@ -89,14 +90,14 @@ function activeParams() {
 }
 
 const XF_PARAM_KEYS = {
-  tests: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'],
-  odis:  ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight'],
-  t20is: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight'],
+  tests: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'batAvgW', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'],
+  odis:  ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'batAvgW', 'srWeight', 'bowlSrWeight'],
+  t20is: ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'batAvgW', 'srWeight', 'bowlSrWeight'],
 };
 const XF_TUNE_DEFAULTS = {
-  tests: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, bowlSrWeight: 0.5, bowlAvgW: 1.0, wpiWeight: 0.5 },
-  odis:  { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
-  t20is: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, srWeight: 1.0, bowlSrWeight: 0.5 },
+  tests: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, batAvgW: 1.0, bowlSrWeight: 0.5, bowlAvgW: 1.0, wpiWeight: 0.5 },
+  odis:  { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, batAvgW: 1.0, srWeight: 1.0, bowlSrWeight: 0.5 },
+  t20is: { batLongevity: 0.15, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, batAvgW: 1.0, srWeight: 1.5, bowlSrWeight: 0.5 },
 };
 let XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
 
@@ -118,7 +119,7 @@ function computeIndices(allPlayers, p, m, isLOI) {
     let bei = 0;
     if (batInns > 0 && avg > 0) {
       const quality = Math.pow(avg, 1 - p.alpha) * Math.pow(rpi, p.alpha);
-      bei = quality * Math.pow(batInns, p.batLongevity) * Math.pow(batPf, p.batPitch);
+      bei = Math.pow(quality, p.batAvgW) * Math.pow(batInns, p.batLongevity) * Math.pow(batPf, p.batPitch);
       if (isLOI) bei *= Math.pow(sr / 100, p.srWeight);
     }
 
@@ -258,7 +259,7 @@ function isCustomParams() {
   return false;
 }
 
-const BAT_PARAM_KEYS = ['batLongevity', 'batPitch', 'alpha', 'srWeight'];
+const BAT_PARAM_KEYS = ['batLongevity', 'batPitch', 'alpha', 'batAvgW', 'srWeight'];
 const BOWL_PARAM_KEYS = ['bowlLongevity', 'bowlPitch', 'bowlSrWeight', 'bowlAvgW', 'wpiWeight'];
 
 function resetParams() {
@@ -994,8 +995,8 @@ function renderMethodology() {
     <p>A career average tells you <em>how well</em> a player performed, but not <em>for how long</em>. A player who averages 45 at a strike rate of 130 over 30 ${label} matches is not the same as one who sustains those numbers over 150 ${label} matches. Our index rewards both quality and longevity.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">BEI = avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup> × (SR / 100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
-    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>) applies a not-out correction — the higher the RPI exponent, the more players with inflated averages from not-outs are tempered. The result is multiplied by <strong>(SR/100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup></strong> to capture scoring speed. The <strong>innings<sup>${batLongExp.toFixed(2)}</sup></strong> exponent provides a controlled longevity bonus. All these parameters are tunable.</p>
+    <div class="formula">BEI = (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>)<sup>${TUNE_PARAMS.batAvgW.toFixed(1)}</sup> × (SR / 100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
+    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>) applies a not-out correction — the higher the RPI exponent, the more players with inflated averages from not-outs are tempered. The entire average component is raised to the <strong>average weight</strong> exponent (${TUNE_PARAMS.batAvgW.toFixed(1)}), controlling how much batting average matters overall relative to other factors. The result is multiplied by <strong>(SR/100)<sup>${TUNE_PARAMS.srWeight.toFixed(1)}</sup></strong> to capture scoring speed. The <strong>innings<sup>${batLongExp.toFixed(2)}</sup></strong> exponent provides a controlled longevity bonus. All these parameters are tunable.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
     <div class="formula">BoEI = (${m.bowl_k} / (SR<sup>${(2*TUNE_PARAMS.bowlSrWeight).toFixed(1)}</sup> × (econ/6)<sup>${(2*(1-TUNE_PARAMS.bowlSrWeight)).toFixed(1)}</sup>)) × balls<sup>${bowlLongExp.toFixed(2)}</sup> × scale</div>
@@ -1026,8 +1027,8 @@ function renderMethodology() {
     <p>A player who averages 50 over 20 ${label} matches is <strong>not</strong> the same as someone who averages 50 over 180 ${label} matches. The second player sustained that level for nine times longer — through form slumps, injuries, pitch conditions across decades, and the wear of 160 extra matches. Career averages treat them identically. Our index does not.</p>
 
     <h3>Batting Excellence Index (BEI)</h3>
-    <div class="formula">BEI = avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
-    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>) applies a not-out correction — the higher the RPI exponent, the more players with inflated averages from not-outs are tempered. The <strong>innings<sup>${batLongExp.toFixed(2)}</sup></strong> exponent provides a meaningful but controlled longevity bonus. All these parameters are tunable.</p>
+    <div class="formula">BEI = (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>)<sup>${TUNE_PARAMS.batAvgW.toFixed(1)}</sup> × innings<sup>${batLongExp.toFixed(2)}</sup></div>
+    <p>The batting quality metric uses a <strong>weighted geometric mean</strong> of the career average and runs per innings (RPI = runs ÷ innings). Career average (runs ÷ dismissals) rewards not-outs, while RPI measures raw per-innings production. The weighting (avg<sup>${(1-alphaVal).toFixed(1)}</sup> × RPI<sup>${alphaVal.toFixed(1)}</sup>) applies a not-out correction — the higher the RPI exponent, the more players with inflated averages from not-outs are tempered. The entire average component is raised to the <strong>average weight</strong> exponent (${TUNE_PARAMS.batAvgW.toFixed(1)}), controlling how much batting average matters overall. The <strong>innings<sup>${batLongExp.toFixed(2)}</sup></strong> exponent provides a meaningful but controlled longevity bonus. All these parameters are tunable.</p>
 
     <h3>Bowling Excellence Index (BoEI)</h3>
     <div class="formula">BoEI = (${m.bowl_k} / avg<sup>${TUNE_PARAMS.bowlAvgW.toFixed(1)}</sup>) × (wpi / baseline)<sup>${TUNE_PARAMS.wpiWeight.toFixed(2)}</sup> × (baseline_sr / sr)<sup>${(m.sr_exp * 2 * TUNE_PARAMS.bowlSrWeight).toFixed(2)}</sup> × innings<sup>${bowlLongExp.toFixed(2)}</sup> × scale</div>
@@ -1209,8 +1210,14 @@ function renderScoreBreakdown(player) {
     const z = beiStd > 0 ? (player.BEI - beiMedian) / beiStd : 0;
     const sdLabel = z >= 0 ? `${z.toFixed(1)} standard deviations above` : `${Math.abs(z).toFixed(1)} standard deviations below`;
 
+    const batAvgW = p.batAvgW;
+    const qualityWeighted = Math.pow(qualityMetric, batAvgW);
     const formulaParts = [];
-    formulaParts.push(`avg<sup>${(1-α).toFixed(1)}</sup> × rpi<sup>${α.toFixed(1)}</sup> = ${avg}^${(1-α).toFixed(1)} × ${rpi.toFixed(1)}^${α.toFixed(1)} = ${qualityMetric.toFixed(2)}`);
+    if (batAvgW !== 1) {
+      formulaParts.push(`(avg<sup>${(1-α).toFixed(1)}</sup> × rpi<sup>${α.toFixed(1)}</sup>)<sup>${batAvgW.toFixed(1)}</sup> = (${avg}^${(1-α).toFixed(1)} × ${rpi.toFixed(1)}^${α.toFixed(1)})<sup>${batAvgW.toFixed(1)}</sup> = ${qualityWeighted.toFixed(2)}`);
+    } else {
+      formulaParts.push(`avg<sup>${(1-α).toFixed(1)}</sup> × rpi<sup>${α.toFixed(1)}</sup> = ${avg}^${(1-α).toFixed(1)} × ${rpi.toFixed(1)}^${α.toFixed(1)} = ${qualityMetric.toFixed(2)}`);
+    }
     if (isLOI && sr) {
       const srW = p.srWeight;
       formulaParts.push(`× (SR/100)<sup>${srW.toFixed(1)}</sup> = × ${Math.pow(sr/100, srW).toFixed(2)}`);
@@ -1974,6 +1981,14 @@ function _tuneStatusText(key, v) {
     if (v <= 0.6) return 'Strong not-out penalty for high N.O. rates';
     return 'Almost entirely using runs per innings';
   }
+  if (key === 'batAvgW') {
+    if (v === 0) return 'Batting average ignored entirely';
+    if (v <= 0.4) return 'Average barely matters';
+    if (v <= 0.8) return 'Average matters somewhat';
+    if (v <= 1.2) return isDefault ? 'Standard weight to average (default)' : 'Standard weight to average';
+    if (v <= 1.6) return 'High averages strongly rewarded';
+    return 'Average dominates — accumulators rank highest';
+  }
   if (key === 'srWeight') {
     if (v === 0) return 'Strike rate ignored — pure run-scoring';
     if (v <= 0.5) return 'Minor strike rate bonus';
@@ -2020,7 +2035,7 @@ function setupTunePanel() {
     arrow.classList.toggle('open');
   });
 
-  const sliderKeys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
+  const sliderKeys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'batAvgW', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   for (const key of sliderKeys) {
     const slider = document.getElementById(`tune-${key}`);
     const statusEl = document.getElementById(`tune-${key}-status`);
@@ -2218,7 +2233,7 @@ function resetToOriginalData() {
 }
 
 function syncSlidersToParams() {
-  const keys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
+  const keys = ['batLongevity', 'bowlLongevity', 'batPitch', 'bowlPitch', 'alpha', 'batAvgW', 'srWeight', 'bowlSrWeight', 'wpiWeight', 'bowlAvgW'];
   const p = activeParams();
   for (const key of keys) {
     const slider = document.getElementById(`tune-${key}`);

@@ -80,6 +80,16 @@
           </div>
           <div class="tune-status" id="tune-alpha-status"></div>
         </div>
+        <div class="tune-slider-group tune-bat-only">
+          <label for="tune-batAvgW">How much should batting average matter?</label>
+          <div class="tune-slider-wrap">
+            <span class="tune-endpoint">Ignore average</span>
+            <input type="range" id="tune-batAvgW" min="0" max="100" step="1" value="50">
+            <span class="tune-endpoint">Average is everything</span>
+            <span class="tune-val" id="tune-batAvgW-val">50</span>
+          </div>
+          <div class="tune-status" id="tune-batAvgW-status"></div>
+        </div>
         <div class="tune-slider-group tune-bat-only" id="tune-sr-row">
           <label for="tune-srWeight">How important is strike rate?</label>
           <div class="tune-slider-wrap">
@@ -173,6 +183,11 @@
               <div class="tune-slider-wrap"><span class="tune-endpoint">Trust avg</span><input type="range" id="tune-xf-tests-alpha" min="0" max="100" step="1" value="30"><span class="tune-endpoint">Correct</span><span class="tune-val" id="tune-xf-tests-alpha-val">30</span></div>
               <div class="tune-status" id="tune-xf-tests-alpha-status"></div>
             </div>
+            <div class="tune-slider-group tune-bat-only">
+              <label>Batting average weight</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore avg</span><input type="range" id="tune-xf-tests-batAvgW" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Dominates</span><span class="tune-val" id="tune-xf-tests-batAvgW-val">50</span></div>
+              <div class="tune-status" id="tune-xf-tests-batAvgW-status"></div>
+            </div>
             <div class="tune-slider-group tune-bowl-only">
               <label>Bowling career length</label>
               <div class="tune-slider-wrap"><span class="tune-endpoint">Peak</span><input type="range" id="tune-xf-tests-bowlLongevity" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Long careers</span><span class="tune-val" id="tune-xf-tests-bowlLongevity-val">50</span></div>
@@ -220,6 +235,11 @@
               <div class="tune-status" id="tune-xf-odis-alpha-status"></div>
             </div>
             <div class="tune-slider-group tune-bat-only">
+              <label>Batting average weight</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore avg</span><input type="range" id="tune-xf-odis-batAvgW" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Dominates</span><span class="tune-val" id="tune-xf-odis-batAvgW-val">50</span></div>
+              <div class="tune-status" id="tune-xf-odis-batAvgW-status"></div>
+            </div>
+            <div class="tune-slider-group tune-bat-only">
               <label>Batting strike rate</label>
               <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore SR</span><input type="range" id="tune-xf-odis-srWeight" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Heavy SR</span><span class="tune-val" id="tune-xf-odis-srWeight-val">50</span></div>
               <div class="tune-status" id="tune-xf-odis-srWeight-status"></div>
@@ -259,6 +279,11 @@
               <label>Not-out correction</label>
               <div class="tune-slider-wrap"><span class="tune-endpoint">Trust avg</span><input type="range" id="tune-xf-t20is-alpha" min="0" max="100" step="1" value="30"><span class="tune-endpoint">Correct</span><span class="tune-val" id="tune-xf-t20is-alpha-val">30</span></div>
               <div class="tune-status" id="tune-xf-t20is-alpha-status"></div>
+            </div>
+            <div class="tune-slider-group tune-bat-only">
+              <label>Batting average weight</label>
+              <div class="tune-slider-wrap"><span class="tune-endpoint">Ignore avg</span><input type="range" id="tune-xf-t20is-batAvgW" min="0" max="100" step="1" value="50"><span class="tune-endpoint">Dominates</span><span class="tune-val" id="tune-xf-t20is-batAvgW-val">50</span></div>
+              <div class="tune-status" id="tune-xf-t20is-batAvgW-status"></div>
             </div>
             <div class="tune-slider-group tune-bat-only">
               <label>Batting strike rate</label>
