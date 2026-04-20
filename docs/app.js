@@ -53,8 +53,8 @@ const TUNE_DEFAULTS_BASE = {
 const FORMAT_DEFAULTS = {
   tests: { ...TUNE_DEFAULTS_BASE },
   odis:  { ...TUNE_DEFAULTS_BASE },
-  t20is: { ...TUNE_DEFAULTS_BASE, batLongevity: 0.15, srWeight: 1.5 },
-  ipl:   { ...TUNE_DEFAULTS_BASE, batLongevity: 0.15, srWeight: 1.5 },
+  t20is: { ...TUNE_DEFAULTS_BASE, batLongevity: 0.15, batAvgW: 0.7, srWeight: 1.5 },
+  ipl:   { ...TUNE_DEFAULTS_BASE, batLongevity: 0.15, batAvgW: 0.7, srWeight: 1.5 },
 };
 function currentDefaults() {
   return FORMAT_DEFAULTS[CURRENT_FORMAT] || TUNE_DEFAULTS_BASE;
@@ -107,7 +107,7 @@ const XF_PARAM_KEYS = {
 const XF_TUNE_DEFAULTS = {
   tests: { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, batAvgW: 1.0, bowlSrWeight: 0.5, bowlAvgW: 1.0, wpiWeight: 0.5 },
   odis:  { batLongevity: 0.30, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, batAvgW: 1.0, srWeight: 1.0, bowlSrWeight: 0.5 },
-  t20is: { batLongevity: 0.15, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, batAvgW: 1.0, srWeight: 1.5, bowlSrWeight: 0.5 },
+  t20is: { batLongevity: 0.15, bowlLongevity: 0.30, batPitch: 0.50, bowlPitch: 0.50, alpha: 0.30, batAvgW: 0.7, srWeight: 1.5, bowlSrWeight: 0.5 },
 };
 let XF_TUNE_PARAMS = JSON.parse(JSON.stringify(XF_TUNE_DEFAULTS));
 
