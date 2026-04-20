@@ -2725,7 +2725,7 @@ function showXiSearchResults(query, resultsEl) {
     <div class="xi-sr-item" data-name="${p.name}">
       <span>${getFlag(p.country)}</span>
       <span>${dispName}</span>
-      ${p.playing_role ? `<span class="xi-sr-role">${p.playing_role}</span>` : ''}
+      <span class="xi-sr-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
       <span class="xi-sr-stats">${xiPlayerStats(p)}</span>
     </div>`;
   }).join('');
