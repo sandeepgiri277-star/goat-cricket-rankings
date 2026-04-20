@@ -2004,7 +2004,7 @@ function switchTab(tabId, updateHash = true) {
   const showBowl = tabId !== 'batting' || showBothDisciplines;
   const isAR = tabId === 'allrounders' || showBothDisciplines;
   const hideTune = tabId === 'methodology';
-  if (isSaved) renderSavedXIs();
+  if (tabId === 'saved-xis') renderSavedXIs();
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
   document.querySelectorAll('.tune-ar-header').forEach(el => el.classList.toggle('hidden', !isAR));
