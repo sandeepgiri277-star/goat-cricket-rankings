@@ -239,10 +239,14 @@ def main():
 
     print(f"  {len(pids_to_fetch)}/{len(all_json_names)} JSON players have player IDs\n", flush=True)
 
-    # Fetch ESPN API roles (cached)
+    # Fetch ESPN API roles (cached); retry entries that previously failed (all-None)
     cache = load_cache()
     unique_pids = set(pids_to_fetch.values())
-    to_fetch = [pid for pid in unique_pids if pid not in cache]
+    failed_pids = {pid for pid in unique_pids if pid in cache and isinstance(cache[pid], dict)
+                   and not cache[pid].get("pos") and not cache[pid].get("bowl_type")}
+    to_fetch = [pid for pid in unique_pids if pid not in cache or pid in failed_pids]
+    if failed_pids:
+        print(f"  Retrying {len(failed_pids)} previously failed entries", flush=True)
     print(f"=== Fetching roles from ESPN API for {len(to_fetch)} players (cached: {len(cache)}) ===", flush=True)
 
     for i, pid in enumerate(to_fetch):
@@ -384,6 +388,9 @@ def main():
                 elif bp and bp >= 3:
                     role = "middle"
 
+            if role is None and pos in ("bowler",):
+                role = entry.get("bowl_type")
+
             if role is None and pos in ("unknown", ""):
                 if bowl_r > bat_r:
                     role = entry.get("bowl_type")
@@ -410,16 +417,23 @@ def main():
         for list_key in ["all_players", "batting_top25", "bowling_top25", "allrounder_top25"]:
             for pl in data.get(list_key, []):
                 name = pl.get("name", "")
+                has_pid = name in pids_to_fetch
                 role = name_role.get(name) or ap_roles.get(name)
                 if role:
                     pl["playing_role"] = role
                     patched += 1
+                elif has_pid:
+                    pl.pop("playing_role", None)
                 bt = name_bowl_type.get(name)
                 if bt:
                     pl["bowl_type"] = bt
+                elif has_pid:
+                    pl.pop("bowl_type", None)
                 bp = name_bat_pos.get(name)
                 if bp:
                     pl["bat_pos"] = bp
+                elif has_pid:
+                    pl.pop("bat_pos", None)
 
         with open(jpath, "w") as f:
             json.dump(data, f, separators=(",", ":"))
