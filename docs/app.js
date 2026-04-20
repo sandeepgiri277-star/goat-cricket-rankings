@@ -2590,12 +2590,14 @@ function updateXiBucket() {
   const currentTab = activeTab();
   if (CUSTOM_XI.length === 0 || currentTab === 'greatest-xi') {
     bucket.classList.add('hidden');
+    document.body.classList.remove('has-xi-bucket');
     return;
   }
   const fmt = FORMAT_LABELS[CURRENT_FORMAT] || CURRENT_FORMAT;
   const count = CUSTOM_XI.length;
   text.innerHTML = `<strong>${count}/11</strong> players selected for your ${fmt} XI`;
   bucket.classList.remove('hidden');
+  document.body.classList.add('has-xi-bucket');
 }
 
 function renderCustomXI() {

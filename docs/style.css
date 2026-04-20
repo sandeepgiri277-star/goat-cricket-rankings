@@ -1084,6 +1084,7 @@ footer {
 }
 @keyframes bucketSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .xi-bucket.hidden { display: none; }
+body.has-xi-bucket { padding-bottom: 3.5rem; }
 .xi-bucket-text { font-size: 0.85rem; color: var(--text); }
 .xi-bucket-text strong { color: var(--accent); }
 .xi-bucket-btn {
