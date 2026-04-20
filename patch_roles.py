@@ -113,12 +113,15 @@ def get_name_to_pid():
                  "t20i_bowl_agg.pkl", "ipl_bowl_agg.pkl"]:
         path = CACHE_DIR / pkl
         if path.exists():
-            df = pickle.load(open(path, "rb"))
-            if "player_name" in df.columns and "player_id" in df.columns:
-                for _, r in df.iterrows():
-                    pid = r.get("player_id")
-                    if pid and not (isinstance(pid, float) and pid != pid):
-                        name_pid[r["player_name"]] = int(pid)
+            try:
+                df = pickle.load(open(path, "rb"))
+                if "player_name" in df.columns and "player_id" in df.columns:
+                    for _, r in df.iterrows():
+                        pid = r.get("player_id")
+                        if pid and not (isinstance(pid, float) and pid != pid):
+                            name_pid[r["player_name"]] = int(pid)
+            except Exception as e:
+                print(f"  Warning: couldn't load {pkl}: {e}", flush=True)
     return name_pid
 
 
