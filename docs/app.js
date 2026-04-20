@@ -2774,6 +2774,13 @@ const XI_ROLE_TEMPLATES = {
 
 function xiPlayerRole(p) {
   const r = p.playing_role;
+  if (r === 'allrounder') {
+    const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
+    if (bat < 400 || bowl < 400) {
+      return bat >= bowl ? (p.bat_pos || 'middle') : (p.bowl_type || 'fast');
+    }
+    return 'allrounder';
+  }
   if (r && r !== 'unknown') return r;
   if (p.bat_pos === 'opener') return 'opener';
   if (p.bat_pos === 'middle') return 'middle';
