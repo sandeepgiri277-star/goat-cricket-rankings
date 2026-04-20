@@ -398,6 +398,16 @@
     <p>Updated weekly &middot; <span id="player-count"></span> players analysed</p>
   </footer>
 
+  <script>
+    document.title = 'JS inline OK';
+    window.onerror = function(msg, src, line, col, err) {
+      document.title = 'ERR: ' + msg;
+      document.body.classList.add('loaded');
+      document.querySelector('.content').innerHTML =
+        '<pre style="color:#e74c3c;padding:2rem;white-space:pre-wrap">JS Error: ' + msg + '\nSource: ' + src + '\nLine: ' + line + ':' + col + '</pre>';
+      return true;
+    };
+  </script>
   <script src="app.js?v=5"></script>
 </body>
 </html>
