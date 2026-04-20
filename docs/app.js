@@ -2714,7 +2714,11 @@ function setupXiDragDrop(container) {
       el.classList.remove('xi-dragging');
       container.querySelectorAll('.xi-drag-over').forEach(x => x.classList.remove('xi-drag-over'));
     });
+  });
+
+  container.querySelectorAll('.xi-slot').forEach(el => {
     el.addEventListener('dragover', (e) => {
+      if (_xiDragFrom < 0) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       container.querySelectorAll('.xi-drag-over').forEach(x => x.classList.remove('xi-drag-over'));
@@ -2723,12 +2727,12 @@ function setupXiDragDrop(container) {
     el.addEventListener('dragleave', () => { el.classList.remove('xi-drag-over'); });
     el.addEventListener('drop', (e) => {
       e.preventDefault();
-      const to = parseInt(el.dataset.idx);
-      if (_xiDragFrom >= 0 && _xiDragFrom !== to && _xiDragFrom < CUSTOM_XI.length && to < CUSTOM_XI.length) {
-        const [moved] = CUSTOM_XI.splice(_xiDragFrom, 1);
-        CUSTOM_XI.splice(to, 0, moved);
-        renderCustomXI();
-      }
+      let to = parseInt(el.dataset.idx);
+      if (_xiDragFrom < 0 || _xiDragFrom === to || _xiDragFrom >= CUSTOM_XI.length) return;
+      if (to >= CUSTOM_XI.length) to = CUSTOM_XI.length - 1;
+      const [moved] = CUSTOM_XI.splice(_xiDragFrom, 1);
+      CUSTOM_XI.splice(to, 0, moved);
+      renderCustomXI();
     });
   });
 }
