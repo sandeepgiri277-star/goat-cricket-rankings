@@ -1238,13 +1238,13 @@ footer {
 
 /* ─── XI Comparison ──────────────────────────────────────────────────────── */
 
-.xi-compare {
+.xi-compare, .xi-vs-compare {
   margin-top: 1.5rem; padding: 1.2rem;
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: 10px;
 }
-.xi-compare.hidden { display: none; }
-.xi-compare h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+.xi-compare.hidden, .xi-vs-compare.hidden { display: none; }
+.xi-compare h3, .xi-vs-title { margin: 0 0 1rem; font-size: 1.1rem; font-weight: 700; }
 
 .xi-compare-cols {
   display: flex; gap: 0; align-items: flex-start;

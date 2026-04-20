@@ -1999,11 +1999,11 @@ function switchTab(tabId, updateHash = true) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
-  const isSaved = tabId === 'saved-xis';
-  const showBat = tabId !== 'bowling' || isSaved;
-  const showBowl = tabId !== 'batting' || isSaved;
-  const isAR = tabId === 'allrounders' || isSaved;
-  const hideTune = tabId === 'greatest-xi' || tabId === 'methodology';
+  const showBothDisciplines = tabId === 'saved-xis' || tabId === 'greatest-xi';
+  const showBat = tabId !== 'bowling' || showBothDisciplines;
+  const showBowl = tabId !== 'batting' || showBothDisciplines;
+  const isAR = tabId === 'allrounders' || showBothDisciplines;
+  const hideTune = tabId === 'methodology';
   if (isSaved) renderSavedXIs();
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
@@ -2698,6 +2698,7 @@ function renderCustomXI() {
 
   setupXiDragDrop(container);
   renderXiSummary();
+  renderXiVsComparison();
 }
 
 function setupXiDragDrop(container) {
@@ -2896,6 +2897,81 @@ function renderXiSummary() {
     Bowling firepower: <strong>${sumBowl}</strong> \u00b7
     ${countryLine}
   `;
+}
+
+function _buildCompareCol(title, players) {
+  const sumBat = players.reduce((s, p) => s + (p.bat_rating || 0), 0);
+  const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
+  const countries = [...new Set(players.map(p => p.country))];
+
+  const rows = [];
+  for (let i = 0; i < 11; i++) {
+    const p = players[i];
+    if (p) {
+      rows.push(`<div class="xic-row">
+        <span class="xic-num">${i + 1}</span>
+        <span class="xic-flag">${getFlag(p.country)}</span>
+        <span class="xic-name">${p.name}</span>
+        <span class="xic-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
+        <span class="xic-rating xic-bat-r">${p.bat_rating || 0}</span>
+        <span class="xic-rating xic-bowl-r">${p.bowl_rating || 0}</span>
+      </div>`);
+    } else {
+      rows.push(`<div class="xic-row xic-empty"><span class="xic-num">${i + 1}</span> \u2014</div>`);
+    }
+  }
+
+  return {
+    html: `<div class="xi-compare-col">
+      <div class="xic-title">${title}</div>
+      <div class="xic-row xic-header-row">
+        <span class="xic-num"></span><span class="xic-flag"></span>
+        <span class="xic-name" style="font-weight:600;font-size:0.68rem;text-transform:uppercase;color:var(--muted)">Player</span>
+        <span class="xic-role"></span>
+        <span class="xic-rating xic-bat-r" style="font-size:0.65rem">Bat</span>
+        <span class="xic-rating xic-bowl-r" style="font-size:0.65rem">Bowl</span>
+      </div>
+      ${rows.join('')}
+      <div class="xic-summary">
+        <span class="xic-fp" data-type="bat">Bat: <strong>${sumBat}</strong></span>
+        <span class="xic-fp" data-type="bowl">Bowl: <strong>${sumBowl}</strong></span>
+        <span>${countries.map(c => getFlag(c)).join(' ')}</span>
+      </div>
+    </div>`,
+    sumBat,
+    sumBowl,
+  };
+}
+
+function renderXiVsComparison() {
+  const panel = document.getElementById('xi-vs-compare');
+  const cols = document.getElementById('xi-vs-cols');
+  if (!panel || !cols) return;
+
+  if (CUSTOM_XI.length < 11) {
+    panel.classList.add('hidden');
+    return;
+  }
+
+  const defaultXI = generateDefaultXI().filter(Boolean);
+  if (defaultXI.length === 0) { panel.classList.add('hidden'); return; }
+
+  panel.classList.remove('hidden');
+
+  const left = _buildCompareCol("Professor's XI", defaultXI);
+  const right = _buildCompareCol('Your XI', CUSTOM_XI);
+
+  cols.innerHTML = left.html + '<div class="xic-vs">VS</div>' + right.html;
+
+  const allCols = cols.querySelectorAll('.xi-compare-col');
+  if (left.sumBat !== right.sumBat) {
+    const winIdx = left.sumBat > right.sumBat ? 0 : 1;
+    allCols[winIdx].querySelector('.xic-fp[data-type="bat"]').classList.add('xic-winner');
+  }
+  if (left.sumBowl !== right.sumBowl) {
+    const winIdx = left.sumBowl > right.sumBowl ? 0 : 1;
+    allCols[winIdx].querySelector('.xic-fp[data-type="bowl"]').classList.add('xic-winner');
+  }
 }
 
 function renderSavedXiPicker() {
@@ -3175,63 +3251,18 @@ function renderComparison() {
 
   panel.classList.remove('hidden');
 
-  const colHTML = xis.map(({ meta, players }) => {
-    const sumBat = players.reduce((s, p) => s + (p.bat_rating || 0), 0);
-    const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
-    const countries = [...new Set(players.map(p => p.country))];
+  const left = _buildCompareCol(xis[0].meta.name, xis[0].players);
+  const right = _buildCompareCol(xis[1].meta.name, xis[1].players);
 
-    const rows = [];
-    for (let i = 0; i < 11; i++) {
-      const p = players[i];
-      if (p) {
-        rows.push(`<div class="xic-row">
-          <span class="xic-num">${i + 1}</span>
-          <span class="xic-flag">${getFlag(p.country)}</span>
-          <span class="xic-name">${p.name}</span>
-          <span class="xic-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
-          <span class="xic-rating xic-bat-r">${p.bat_rating || 0}</span>
-          <span class="xic-rating xic-bowl-r">${p.bowl_rating || 0}</span>
-        </div>`);
-      } else {
-        rows.push(`<div class="xic-row xic-empty"><span class="xic-num">${i + 1}</span> \u2014</div>`);
-      }
-    }
+  cols.innerHTML = left.html + '<div class="xic-vs">VS</div>' + right.html;
 
-    return `
-      <div class="xi-compare-col">
-        <div class="xic-title">${meta.name}</div>
-        <div class="xic-row xic-header-row">
-          <span class="xic-num"></span><span class="xic-flag"></span>
-          <span class="xic-name" style="font-weight:600;font-size:0.68rem;text-transform:uppercase;color:var(--muted)">Player</span>
-          <span class="xic-role"></span>
-          <span class="xic-rating xic-bat-r" style="font-size:0.65rem">Bat</span>
-          <span class="xic-rating xic-bowl-r" style="font-size:0.65rem">Bowl</span>
-        </div>
-        ${rows.join('')}
-        <div class="xic-summary">
-          <span class="xic-fp" data-type="bat">Bat: <strong>${sumBat}</strong></span>
-          <span class="xic-fp" data-type="bowl">Bowl: <strong>${sumBowl}</strong></span>
-          <span>${countries.map(c => getFlag(c)).join(' ')}</span>
-        </div>
-      </div>`;
-  });
-
-  const bat0 = xis[0].players.reduce((s, p) => s + (p.bat_rating || 0), 0);
-  const bat1 = xis[1].players.reduce((s, p) => s + (p.bat_rating || 0), 0);
-  const bowl0 = xis[0].players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
-  const bowl1 = xis[1].players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
-
-  cols.innerHTML = colHTML.join('<div class="xic-vs">VS</div>');
-
-  const fpEls = cols.querySelectorAll('.xic-fp');
-  fpEls.forEach(el => el.classList.remove('xic-winner'));
   const allCols = cols.querySelectorAll('.xi-compare-col');
-  if (bat0 !== bat1) {
-    const winIdx = bat0 > bat1 ? 0 : 1;
+  if (left.sumBat !== right.sumBat) {
+    const winIdx = left.sumBat > right.sumBat ? 0 : 1;
     allCols[winIdx].querySelector('.xic-fp[data-type="bat"]').classList.add('xic-winner');
   }
-  if (bowl0 !== bowl1) {
-    const winIdx = bowl0 > bowl1 ? 0 : 1;
+  if (left.sumBowl !== right.sumBowl) {
+    const winIdx = left.sumBowl > right.sumBowl ? 0 : 1;
     allCols[winIdx].querySelector('.xic-fp[data-type="bowl"]').classList.add('xic-winner');
   }
 }
