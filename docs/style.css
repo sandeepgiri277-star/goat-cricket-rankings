@@ -1014,7 +1014,7 @@ footer {
 .xi-slot.xi-drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.18); }
 
 .xi-search-wrap {
-  position: relative; max-width: 500px; margin: 0.5rem 0 1rem; z-index: 10;
+  position: relative; max-width: 500px; margin: 0.5rem 0 2.5rem; z-index: 10;
 }
 .xi-search-wrap input {
   width: 100%; padding: 0.6rem 0.9rem; border-radius: 8px;

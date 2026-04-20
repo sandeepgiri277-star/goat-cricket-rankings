@@ -2514,9 +2514,10 @@ function xiRoleLabel(p) {
   const r = p.playing_role;
   if (r === 'allrounder') return 'Allrounder';
   if (r === 'keeper') return 'WK';
-  if (r === 'spinner' || p.bowl_type === 'spinner') return 'Spinner';
-  if (r === 'fast' || p.bowl_type === 'fast') return 'Fast';
+  if (r === 'spinner') return 'Spinner';
+  if (r === 'fast') return 'Fast';
   if (r === 'opener' || p.bat_pos === 'opener') return 'Opener';
+  if (r === 'middle') return 'Middle Order';
   return 'Batter';
 }
 
@@ -2565,12 +2566,12 @@ function renderDefaultXI(xi) {
   const summaryEl = document.getElementById('xi-default-summary');
   if (summaryEl) {
     const players = xi.filter(Boolean);
-    const avgBat = players.filter(p => p.bat_rating > 0).reduce((s, p) => s + p.bat_rating, 0) / Math.max(1, players.filter(p => p.bat_rating > 0).length);
-    const avgBowl = players.filter(p => p.bowl_rating > 0).reduce((s, p) => s + p.bowl_rating, 0) / Math.max(1, players.filter(p => p.bowl_rating > 0).length);
+    const sumBat = players.reduce((s, p) => s + (p.bat_rating || 0), 0);
+    const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
     const countries = [...new Set(players.map(p => p.country))];
     summaryEl.innerHTML = `
-      Batting firepower: <strong>${Math.round(avgBat)}</strong> \u00b7
-      Bowling firepower: <strong>${Math.round(avgBowl)}</strong> \u00b7
+      Batting firepower: <strong>${sumBat}</strong> \u00b7
+      Bowling firepower: <strong>${sumBowl}</strong> \u00b7
       ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
     `;
   }
@@ -2722,14 +2723,14 @@ function renderXiSummary() {
   if (!el) return;
   if (CUSTOM_XI.length === 0) { el.innerHTML = ''; return; }
 
-  const avgBat = CUSTOM_XI.filter(p => p.bat_rating > 0).reduce((s, p) => s + p.bat_rating, 0) / Math.max(1, CUSTOM_XI.filter(p => p.bat_rating > 0).length);
-  const avgBowl = CUSTOM_XI.filter(p => p.bowl_rating > 0).reduce((s, p) => s + p.bowl_rating, 0) / Math.max(1, CUSTOM_XI.filter(p => p.bowl_rating > 0).length);
+  const sumBat = CUSTOM_XI.reduce((s, p) => s + (p.bat_rating || 0), 0);
+  const sumBowl = CUSTOM_XI.reduce((s, p) => s + (p.bowl_rating || 0), 0);
   const countries = [...new Set(CUSTOM_XI.map(p => p.country))];
 
   el.innerHTML = `
     <strong>${CUSTOM_XI.length}/11</strong> players selected \u00b7 
-    Batting firepower: <strong>${Math.round(avgBat)}</strong> \u00b7 
-    Bowling firepower: <strong>${Math.round(avgBowl)}</strong> \u00b7 
+    Batting firepower: <strong>${sumBat}</strong> \u00b7 
+    Bowling firepower: <strong>${sumBowl}</strong> \u00b7 
     ${countries.length} ${countries.length === 1 ? 'country' : 'countries'} represented: ${countries.map(c => getFlag(c)).join(' ')}
   `;
 }
@@ -2772,6 +2773,14 @@ function setupGreatestXI() {
         mainResults.classList.remove('open');
       }
     }
+  });
+
+  document.getElementById('xi-start-template').addEventListener('click', () => {
+    const defaultXI = generateDefaultXI().filter(Boolean);
+    CUSTOM_XI = [...defaultXI];
+    renderCustomXI();
+    renderXiSummary();
+    updateXiBucket();
   });
 
   document.getElementById('xi-clear').addEventListener('click', () => {
