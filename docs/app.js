@@ -2779,7 +2779,7 @@ function xiPlayerRole(p) {
   const r = p.playing_role;
   if (r === 'allrounder') {
     const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
-    if (bat < 400 || bowl < 400) {
+    if (bat < 500 || bowl < 500) {
       return bat >= bowl ? (p.bat_pos || 'middle') : (p.bowl_type || 'fast');
     }
     return 'allrounder';
