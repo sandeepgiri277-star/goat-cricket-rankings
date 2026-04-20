@@ -2948,7 +2948,7 @@ function renderXiVsComparison() {
   const cols = document.getElementById('xi-vs-cols');
   if (!panel || !cols) return;
 
-  if (CUSTOM_XI.length < 11) {
+  if (CUSTOM_XI.length === 0) {
     panel.classList.add('hidden');
     return;
   }
@@ -3006,6 +3006,14 @@ function renderSavedXiPicker() {
   });
 }
 
+function refreshXiPlayerRefs() {
+  if (!DATA || !DATA.all_players) return;
+  for (let i = 0; i < CUSTOM_XI.length; i++) {
+    const fresh = DATA.all_players.find(p => p.name === CUSTOM_XI[i].name);
+    if (fresh) CUSTOM_XI[i] = fresh;
+  }
+}
+
 function renderGreatestXI() {
   const formatLabel = { tests: 'Test', odis: 'ODI', t20is: 'T20I', ipl: 'IPL' }[CURRENT_FORMAT] || 'Test';
   const heading = document.getElementById('heading-xi');
@@ -3013,6 +3021,7 @@ function renderGreatestXI() {
   const customHeading = document.getElementById('heading-custom-xi');
   if (customHeading) customHeading.textContent = `Build Your Own ${formatLabel} XI`;
 
+  refreshXiPlayerRefs();
   const defaultXI = generateDefaultXI();
   renderDefaultXI(defaultXI);
   renderCustomXI();
