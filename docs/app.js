@@ -443,7 +443,9 @@ function searchPlayers(query) {
   const surname = words[words.length - 1];
   const multiWord = words.length > 1;
 
-  const scored = DATA.all_players.map(p => {
+  const fmOnly = CURRENT_FORMAT !== 'ipl';
+  const pool = fmOnly ? DATA.all_players.filter(p => isFullMember(p.country)) : DATA.all_players;
+  const scored = pool.map(p => {
     const nameLower = p.name.toLowerCase();
     const nameParts = nameLower.split(' ');
     const playerSurname = nameParts[nameParts.length - 1];
