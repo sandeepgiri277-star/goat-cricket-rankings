@@ -435,33 +435,65 @@ function computeCrossFormat() {
   return CROSS_FORMAT_DATA;
 }
 
+const KNOWN_AS = {
+  'sachin': 'SR Tendulkar', 'virat': 'V Kohli', 'rohit': 'RG Sharma',
+  'dhoni': 'MS Dhoni', 'bumrah': 'JJ Bumrah', 'jadeja': 'RA Jadeja',
+  'ashwin': 'R Ashwin', 'pant': 'RR Pant', 'rahul': 'KL Rahul',
+  'gavaskar': 'SM Gavaskar', 'kapil': 'N Kapil Dev', 'dravid': 'RS Dravid',
+  'ganguly': 'SC Ganguly', 'sehwag': 'V Sehwag', 'yuvraj': 'Yuvraj Singh',
+  'bradman': 'DG Bradman', 'warne': 'SK Warne', 'ponting': 'RT Ponting',
+  'gilchrist': 'AC Gilchrist', 'mcgrath': 'GD McGrath', 'smith': 'SPD Smith',
+  'warner': 'DA Warner', 'starc': 'MA Starc', 'cummins': 'PJ Cummins',
+  'root': 'JE Root', 'anderson': 'JM Anderson', 'stokes': 'BA Stokes',
+  'buttler': 'JC Buttler', 'broad': 'SCJ Broad', 'boycott': 'G Boycott',
+  'botham': 'IT Botham', 'pietersen': 'KP Pietersen',
+  'ab': 'AB de Villiers', 'devilliers': 'AB de Villiers', 'steyn': 'DW Steyn',
+  'kallis': 'JH Kallis', 'amla': 'HM Amla', 'rabada': 'KG Rabada',
+  'viv': 'IVA Richards', 'richards': 'IVA Richards', 'lara': 'BC Lara',
+  'ambrose': 'CEL Ambrose', 'marshall': 'MD Marshall', 'holding': 'MA Holding',
+  'sobers': 'GS Sobers', 'gayle': 'CH Gayle',
+  'sangakkara': 'KC Sangakkara', 'jayasuriya': 'ST Jayasuriya',
+  'murali': 'M Muralidaran', 'muralidaran': 'M Muralidaran',
+  'wasim': 'Wasim Akram', 'akram': 'Wasim Akram', 'waqar': 'Waqar Younis',
+  'imran': 'Imran Khan', 'babar': 'Babar Azam', 'rizwan': 'Mohammad Rizwan',
+  'williamson': 'KS Williamson', 'boult': 'TA Boult',
+  'shakib': 'Shakib Al Hasan', 'rashid': 'Rashid Khan',
+  'malinga': 'SL Malinga', 'narine': 'SP Narine', 'russell': 'AD Russell',
+  'pollard': 'KA Pollard', 'pooran': 'N Pooran',
+  'kohli': 'V Kohli', 'tendulkar': 'SR Tendulkar',
+  'hutton': 'L Hutton', 'hobbs': 'JB Hobbs', 'barnes': 'SF Barnes',
+};
+
 function searchPlayers(query) {
   const q = query.trim().toLowerCase();
   if (q.length < 2) return [];
+
+  const fmOnly = CURRENT_FORMAT !== 'ipl';
+  const pool = fmOnly ? DATA.all_players.filter(p => isFullMember(p.country)) : DATA.all_players;
+
+  const alias = KNOWN_AS[q];
+  const aliasLower = alias ? alias.toLowerCase() : null;
 
   const words = q.split(/\s+/);
   const surname = words[words.length - 1];
   const multiWord = words.length > 1;
 
-  const fmOnly = CURRENT_FORMAT !== 'ipl';
-  const pool = fmOnly ? DATA.all_players.filter(p => isFullMember(p.country)) : DATA.all_players;
   const scored = pool.map(p => {
     const nameLower = p.name.toLowerCase();
     const nameParts = nameLower.split(' ');
     const playerSurname = nameParts[nameParts.length - 1];
     let score = 0;
 
+    if (aliasLower && nameLower === aliasLower) score += 300;
     if (nameLower.includes(q)) score += 200;
 
     if (multiWord) {
-      // Multi-word query: require surname match, then boost for other word matches
-      if (playerSurname !== surname && !playerSurname.includes(surname)) return { player: p, score: 0 };
+      if (playerSurname !== surname && !playerSurname.includes(surname)) return { player: p, score };
       score += 100;
       for (const w of words.slice(0, -1)) {
         if (nameLower.includes(w)) score += 40;
       }
     } else {
-      // Single word: match anywhere in name, prioritize surname
       if (playerSurname === q) score += 150;
       else if (playerSurname.includes(q)) score += 80;
       else if (nameLower.includes(q)) score += 50;
