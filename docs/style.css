@@ -1072,6 +1072,25 @@ footer {
 }
 .lb-row .lb-xi-add:hover { color: var(--accent); border-color: var(--accent); }
 
+.xi-bucket {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: var(--card); border-top: 1px solid var(--accent);
+  padding: 0.6rem 1.2rem; display: flex; align-items: center;
+  justify-content: space-between; gap: 1rem;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+  animation: bucketSlideUp 0.25s ease-out;
+}
+@keyframes bucketSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.xi-bucket.hidden { display: none; }
+.xi-bucket-text { font-size: 0.85rem; color: var(--text); }
+.xi-bucket-text strong { color: var(--accent); }
+.xi-bucket-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 0.45rem 1rem; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: opacity 0.15s;
+}
+.xi-bucket-btn:hover { opacity: 0.85; }
+
 @media (max-width: 480px) {
   .hero h1 { font-size: 1.3rem; }
   .subtitle { font-size: 0.85rem; }

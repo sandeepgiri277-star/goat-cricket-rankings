@@ -953,8 +953,14 @@ function addRowClickHandlers(container) {
   container.querySelectorAll('.lb-xi-add').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      const before = CUSTOM_XI.length;
       addToXI(btn.dataset.player);
-      switchTab('greatest-xi');
+      if (CUSTOM_XI.length > before) {
+        btn.textContent = '\u2713';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+        setTimeout(() => { btn.textContent = '+'; btn.style.color = ''; btn.style.borderColor = ''; }, 1200);
+      }
     });
   });
 }
@@ -1937,6 +1943,7 @@ function switchTab(tabId, updateHash = true) {
   if (tunePanel) tunePanel.style.display = hideTune ? 'none' : '';
   syncSlidersToParams();
   updateSrRowVisibility();
+  updateXiBucket();
 
   if (updateHash) {
     history.pushState(null, '', `#${CURRENT_FORMAT}/${tabId}`);
@@ -2541,11 +2548,28 @@ function addToXI(playerName) {
   if (CUSTOM_XI.length >= 11) return;
   CUSTOM_XI.push(player);
   renderCustomXI();
+  updateXiBucket();
 }
 
 function removeFromCustomXI(idx) {
   CUSTOM_XI.splice(idx, 1);
   renderCustomXI();
+  updateXiBucket();
+}
+
+function updateXiBucket() {
+  const bucket = document.getElementById('xi-bucket');
+  const text = document.getElementById('xi-bucket-text');
+  if (!bucket || !text) return;
+  const currentTab = activeTab();
+  if (CUSTOM_XI.length === 0 || currentTab === 'greatest-xi') {
+    bucket.classList.add('hidden');
+    return;
+  }
+  const fmt = FORMAT_LABELS[CURRENT_FORMAT] || CURRENT_FORMAT;
+  const count = CUSTOM_XI.length;
+  text.innerHTML = `<strong>${count}/11</strong> players selected for your ${fmt} XI`;
+  bucket.classList.remove('hidden');
 }
 
 function renderCustomXI() {
@@ -2718,6 +2742,11 @@ function setupGreatestXI() {
   document.getElementById('xi-clear').addEventListener('click', () => {
     CUSTOM_XI = [];
     renderCustomXI();
+    updateXiBucket();
+  });
+
+  document.getElementById('xi-bucket-view').addEventListener('click', () => {
+    switchTab('greatest-xi');
   });
 
   document.getElementById('xi-copy-link').addEventListener('click', () => {
