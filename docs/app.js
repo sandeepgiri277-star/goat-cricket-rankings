@@ -2786,36 +2786,36 @@ function showXiSearchResults(query, resultsEl) {
 
 const XI_ROLE_TEMPLATES = {
   tests: [
-    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
-    { role: 'middle',     min: 3, max: 4, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
-    { role: 'allrounder', min: 1, max: 2, label: 'Allrounders' },
-    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
-    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+    { role: 'opener',     min: 2, label: 'Openers' },
+    { role: 'middle',     min: 3, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 1, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, label: 'Spinners' },
+    { role: 'fast',       min: 2, label: 'Fast Bowlers' },
   ],
   odis: [
-    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
-    { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
-    { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
-    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
-    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+    { role: 'opener',     min: 2, label: 'Openers' },
+    { role: 'middle',     min: 2, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 2, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, label: 'Spinners' },
+    { role: 'fast',       min: 2, label: 'Fast Bowlers' },
   ],
   t20is: [
-    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
-    { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
-    { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
-    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
-    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+    { role: 'opener',     min: 2, label: 'Openers' },
+    { role: 'middle',     min: 2, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 2, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, label: 'Spinners' },
+    { role: 'fast',       min: 2, label: 'Fast Bowlers' },
   ],
   ipl: [
-    { role: 'opener',     min: 2, max: 3, label: 'Openers' },
-    { role: 'middle',     min: 2, max: 3, label: 'Middle Order' },
-    { role: 'keeper',     min: 1, max: 2, label: 'Keeper' },
-    { role: 'allrounder', min: 2, max: 3, label: 'Allrounders' },
-    { role: 'spinner',    min: 1, max: 2, label: 'Spinners' },
-    { role: 'fast',       min: 2, max: 3, label: 'Fast Bowlers' },
+    { role: 'opener',     min: 2, label: 'Openers' },
+    { role: 'middle',     min: 2, label: 'Middle Order' },
+    { role: 'keeper',     min: 1, label: 'Keeper' },
+    { role: 'allrounder', min: 2, label: 'Allrounders' },
+    { role: 'spinner',    min: 1, label: 'Spinners' },
+    { role: 'fast',       min: 2, label: 'Fast Bowlers' },
   ],
 };
 
@@ -2891,22 +2891,19 @@ function renderConstraintBars() {
   const tmpl = XI_ROLE_TEMPLATES[CURRENT_FORMAT] || XI_ROLE_TEMPLATES.tests;
   const counts = xiRoleCounts(CUSTOM_XI);
 
-  el.innerHTML = tmpl.map(({ role, min, max, label }) => {
+  el.innerHTML = tmpl.map(({ role, min, label }) => {
     const have = counts[role] || 0;
-    const pct = Math.min(100, (have / max) * 100);
-    let status = 'under';
-    if (have >= min && have <= max) status = 'ok';
-    else if (have > max) status = 'over';
+    const pct = Math.min(100, (have / min) * 100);
+    const status = have >= min ? 'ok' : 'under';
 
     return `
       <div class="xi-cb" data-status="${status}">
         <div class="xi-cb-header">
           <span class="xi-cb-label">${label}</span>
-          <span class="xi-cb-count">${have}<span class="xi-cb-range"> / ${min}–${max}</span></span>
+          <span class="xi-cb-count">${have}<span class="xi-cb-range"> / ${min} min</span></span>
         </div>
         <div class="xi-cb-track">
           <div class="xi-cb-fill" style="width:${pct}%"></div>
-          <div class="xi-cb-min" style="left:${(min / max) * 100}%"></div>
         </div>
       </div>`;
   }).join('');
