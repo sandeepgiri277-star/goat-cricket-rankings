@@ -31,9 +31,9 @@
   </nav>
 
   <nav class="tabs" id="tabs">
-    <button class="tab active" data-tab="allrounders">Allrounders</button>
-    <button class="tab" data-tab="batting">Batting</button>
+    <button class="tab active" data-tab="batting">Batting</button>
     <button class="tab" data-tab="bowling">Bowling</button>
+    <button class="tab" data-tab="allrounders">Allrounders</button>
     <button class="tab" data-tab="player-lookup">Player Lookup</button>
     <button class="tab" data-tab="greatest-xi">Greatest XI</button>
     <button class="tab" data-tab="saved-xis">Saved XIs</button>
@@ -318,16 +318,8 @@
   </div>
 
   <main class="content">
-    <!-- Allrounders Tab -->
-    <section class="tab-panel active" id="panel-allrounders">
-      <h2 id="heading-allrounders">Top 100 Test Allrounders</h2>
-      <p class="panel-desc">Players who excelled with both bat and ball across their careers. Click any player to explore their score breakdown.</p>
-      <div class="lb-container" id="table-allrounders"></div>
-      <div class="chart-container" id="chart-allrounders"></div>
-    </section>
-
     <!-- Batting Tab -->
-    <section class="tab-panel" id="panel-batting">
+    <section class="tab-panel active" id="panel-batting">
       <h2 id="heading-batting">Top 100 Test Batters</h2>
       <p class="panel-desc">The greatest batsmen in cricket history, ranked by career batting excellence. Click any player to explore their score breakdown.</p>
       <div class="lb-container" id="table-batting"></div>
@@ -340,6 +332,14 @@
       <p class="panel-desc">The greatest bowlers in cricket history, ranked by career bowling excellence. Click any player to explore their score breakdown.</p>
       <div class="lb-container" id="table-bowling"></div>
       <div class="chart-container" id="chart-bowling"></div>
+    </section>
+
+    <!-- Allrounders Tab -->
+    <section class="tab-panel" id="panel-allrounders">
+      <h2 id="heading-allrounders">Top 100 Test Allrounders</h2>
+      <p class="panel-desc">Players who excelled with both bat and ball across their careers. Click any player to explore their score breakdown.</p>
+      <div class="lb-container" id="table-allrounders"></div>
+      <div class="chart-container" id="chart-allrounders"></div>
     </section>
 
     <!-- Player Lookup Tab -->
@@ -431,6 +431,6 @@
         '<pre style="color:#e74c3c;padding:2rem;white-space:pre-wrap">JS Error: ' + msg + '\nSource: ' + src + '\nLine: ' + line + ':' + col + '</pre>';
     };
   </script>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

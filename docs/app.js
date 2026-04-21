@@ -123,7 +123,7 @@ let ORIGINAL_DATA = {};
 
 function activeTab() {
   const el = document.querySelector('.tab.active');
-  return el ? el.dataset.tab : 'allrounders';
+  return el ? el.dataset.tab : 'batting';
 }
 function activeParams() {
   return activeTab() === 'allrounders' ? AR_TUNE_PARAMS : TUNE_PARAMS;
@@ -651,7 +651,7 @@ async function switchFormat(format) {
     plTab.style.display = 'none';
     const curTab = document.querySelector('.tab.active')?.dataset.tab;
     if (curTab === 'player-lookup' || curTab === 'greatest-xi' || curTab === 'saved-xis') {
-      switchTab('allrounders', false);
+      switchTab('batting', false);
     }
   } else {
     plTab.style.display = '';
@@ -666,7 +666,7 @@ async function switchFormat(format) {
   if (isXf) syncXfSliders();
 
   const activeTab = document.querySelector('.tab.active');
-  const tabId = activeTab ? activeTab.dataset.tab : 'allrounders';
+  const tabId = activeTab ? activeTab.dataset.tab : 'batting';
   switchTab(tabId, false);
   history.pushState(null, '', `#${format}/${tabId}`);
 }
@@ -691,7 +691,7 @@ async function restoreFromHash() {
   for (const f of formatPrefixes) {
     if (hash === f || hash.startsWith(f + '/')) {
       format = f;
-      rest = hash.slice(f.length + 1) || 'allrounders';
+      rest = hash.slice(f.length + 1) || 'batting';
       break;
     }
   }
@@ -756,7 +756,7 @@ async function restoreFromHash() {
       const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'greatest-xi', 'methodology'];
       if (validTabs.includes(rest)) {
         if (rest === 'player-lookup' && CURRENT_FORMAT === 'crossformat') {
-          switchTab('allrounders', false);
+          switchTab('batting', false);
         } else {
           switchTab(rest, false);
         }
