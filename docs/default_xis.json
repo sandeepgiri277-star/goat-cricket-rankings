@@ -50,5 +50,11 @@
     "SL Malinga",
     "JJ Bumrah",
     "YS Chahal"
-  ]
+  ],
+  "captains": {
+    "tests": "Imran Khan",
+    "odis": "MS Dhoni",
+    "t20is": "JC Buttler",
+    "ipl": "RA Jadeja"
+  }
 }

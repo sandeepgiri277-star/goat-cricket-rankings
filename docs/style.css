@@ -998,6 +998,22 @@ footer {
   background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem;
   border-radius: 4px; white-space: nowrap;
 }
+.xi-slot-captain {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.3rem; height: 1.3rem; border-radius: 50%;
+  background: #f1c40f; color: #1a1a2e; font-weight: 800;
+  font-size: 0.65rem; line-height: 1; flex-shrink: 0;
+}
+.xi-slot-captain-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.3rem; height: 1.3rem; border-radius: 50%;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); font-weight: 700; font-size: 0.6rem;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s;
+  flex-shrink: 0; font-family: inherit; line-height: 1;
+}
+.xi-slot-custom:hover .xi-slot-captain-btn { opacity: 0.6; }
+.xi-slot-captain-btn:hover { opacity: 1 !important; border-color: #f1c40f; color: #f1c40f; }
 .xi-slot-stats {
   font-size: 0.75rem; color: var(--muted); font-weight: 400;
   margin-left: auto; white-space: nowrap;

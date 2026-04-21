@@ -6,6 +6,7 @@ let CURRENT_FORMAT = 'tests';
 let CROSS_FORMAT_DATA = null;
 const CUSTOM_XIS = { tests: [], odis: [], t20is: [], ipl: [] };
 let CUSTOM_XI = CUSTOM_XIS.tests;
+const CUSTOM_XI_CAPTAINS = { tests: null, odis: null, t20is: null, ipl: null };
 let _xiEditingSlot = -1;
 let _xiDragFrom = -1;
 let _plotlyReady = typeof Plotly !== 'undefined';
@@ -2585,15 +2586,22 @@ function renderDefaultXI(xi) {
   const container = document.getElementById('xi-default-slots');
   if (!container) return;
 
+  const captainName = CURATED_XIS.captains ? CURATED_XIS.captains[CURRENT_FORMAT] : null;
+
   container.innerHTML = xi.map((player, i) => {
     const num = String(i + 1).padStart(2, '\u2007');
     if (player) {
+      const role = xiPlayerRole(player);
+      const roleLabel = ROLE_LABELS[role] || role;
+      const isCaptain = player.name === captainName;
       return `
         <div class="xi-slot xi-slot-readonly">
           <span class="xi-slot-num">${num}</span>
           <div class="xi-slot-player">
             <span class="xi-slot-flag">${getFlag(player.country)}</span>
             <span>${player.name}</span>
+            ${isCaptain ? '<span class="xi-slot-captain">C</span>' : ''}
+            <span class="xi-slot-role">${roleLabel}</span>
           </div>
           <span class="xi-slot-stats">${xiPlayerStats(player)}</span>
         </div>`;
@@ -2654,6 +2662,7 @@ function renderCustomXI() {
   const container = document.getElementById('xi-custom-slots');
   if (!container) return;
 
+  const captain = CUSTOM_XI_CAPTAINS[CURRENT_FORMAT];
   const slots = [];
   for (let i = 0; i < 11; i++) {
     const num = String(i + 1).padStart(2, '\u2007');
@@ -2661,6 +2670,7 @@ function renderCustomXI() {
       const player = CUSTOM_XI[i];
       const role = xiPlayerRole(player);
       const roleLabel = ROLE_LABELS[role] || role;
+      const isCaptain = player.name === captain;
       slots.push(`
         <div class="xi-slot xi-slot-custom" data-idx="${i}" draggable="true">
           <span class="xi-slot-num xi-drag-handle" title="Drag to reorder">\u2261</span>
@@ -2668,6 +2678,7 @@ function renderCustomXI() {
           <div class="xi-slot-player">
             <span class="xi-slot-flag">${getFlag(player.country)}</span>
             <span>${player.name}</span>
+            ${isCaptain ? '<span class="xi-slot-captain">C</span>' : '<button class="xi-slot-captain-btn" data-name="' + player.name + '" title="Set as captain">C</button>'}
             <span class="xi-slot-role">${roleLabel}</span>
           </div>
           <span class="xi-slot-stats">${xiPlayerStats(player)}</span>
@@ -2687,6 +2698,14 @@ function renderCustomXI() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       removeFromCustomXI(parseInt(btn.dataset.idx));
+    });
+  });
+
+  container.querySelectorAll('.xi-slot-captain-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      CUSTOM_XI_CAPTAINS[CURRENT_FORMAT] = btn.dataset.name;
+      renderCustomXI();
     });
   });
 
@@ -2904,7 +2923,7 @@ function renderXiSummary() {
   `;
 }
 
-function _buildCompareCol(title, players) {
+function _buildCompareCol(title, players, captainName) {
   const sumBat = players.reduce((s, p) => s + (p.bat_rating || 0), 0);
   const sumBowl = players.reduce((s, p) => s + (p.bowl_rating || 0), 0);
   const countries = [...new Set(players.map(p => p.country))];
@@ -2913,10 +2932,11 @@ function _buildCompareCol(title, players) {
   for (let i = 0; i < 11; i++) {
     const p = players[i];
     if (p) {
+      const capBadge = p.name === captainName ? ' <span class="xi-slot-captain" style="width:1rem;height:1rem;font-size:0.55rem">C</span>' : '';
       rows.push(`<div class="xic-row">
         <span class="xic-num">${i + 1}</span>
         <span class="xic-flag">${getFlag(p.country)}</span>
-        <span class="xic-name">${p.name}</span>
+        <span class="xic-name">${p.name}${capBadge}</span>
         <span class="xic-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
         <span class="xic-rating xic-bat-r">${p.bat_rating || 0}</span>
         <span class="xic-rating xic-bowl-r">${p.bowl_rating || 0}</span>
@@ -2965,8 +2985,9 @@ function renderXiVsComparison() {
 
   panel.classList.remove('hidden');
 
-  const left = _buildCompareCol("Professor's XI", defaultXI);
-  const right = _buildCompareCol('Your XI', CUSTOM_XI);
+  const profCaptain = CURATED_XIS.captains ? CURATED_XIS.captains[CURRENT_FORMAT] : null;
+  const left = _buildCompareCol("Professor's XI", defaultXI, profCaptain);
+  const right = _buildCompareCol('Your XI', CUSTOM_XI, CUSTOM_XI_CAPTAINS[CURRENT_FORMAT]);
 
   cols.innerHTML = left.html + '<div class="xic-vs">VS</div>' + right.html;
 
