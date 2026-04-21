@@ -2833,31 +2833,22 @@ function xiPlayerRole(p) {
 }
 
 function xiPlayerTags(p) {
-  const tags = [];
   const r = p.playing_role;
   const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
   const isAR = bat >= 500 && bowl >= 500;
 
-  if (r === 'keeper') tags.push('keeper');
-  if (p.bat_pos === 'opener') tags.push('opener');
-  else if (p.bat_pos === 'middle' && r !== 'keeper') tags.push('middle');
+  if (isAR) return ['allrounder'];
 
-  if (isAR) {
-    if (!tags.includes('opener') && !tags.includes('middle')) tags.push('allrounder');
-    else tags.push('allrounder');
-  } else if (r === 'allrounder') {
-    if (bat >= bowl) { if (!tags.length) tags.push(p.bat_pos || 'middle'); }
-    else tags.push(p.bowl_type || 'fast');
+  if (r === 'keeper') {
+    const pos = p.bat_pos === 'opener' ? 'opener' : 'middle';
+    return ['keeper', pos];
   }
 
-  if (!tags.includes('keeper') && r === 'keeper') tags.push('keeper');
-  if (r === 'spinner' && !isAR && !tags.includes('spinner')) tags.push('spinner');
-  if (r === 'fast' && !isAR && !tags.includes('fast')) tags.push('fast');
-  if (p.bowl_type === 'spinner' && isAR && !tags.includes('spinner')) tags.push('spinner');
-  if (p.bowl_type === 'fast' && isAR && !tags.includes('fast')) tags.push('fast');
+  if (r === 'spinner') return ['spinner'];
+  if (r === 'fast') return ['fast'];
 
-  if (tags.length === 0) tags.push(xiPlayerRole(p));
-  return [...new Set(tags)];
+  if (p.bat_pos === 'opener') return ['opener'];
+  return [xiPlayerRole(p)];
 }
 
 function roleTagsHTML(p) {
