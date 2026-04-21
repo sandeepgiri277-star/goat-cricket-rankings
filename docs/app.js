@@ -2837,7 +2837,10 @@ function xiPlayerTags(p) {
   const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
   const isAR = bat >= 500 && bowl >= 500;
 
-  if (isAR) return ['allrounder'];
+  if (isAR) {
+    const stronger = bat >= bowl ? (p.bat_pos === 'opener' ? 'opener' : 'middle') : (p.bowl_type || 'fast');
+    return ['allrounder', stronger];
+  }
 
   if (r === 'keeper') {
     const pos = p.bat_pos === 'opener' ? 'opener' : 'middle';
@@ -2860,6 +2863,9 @@ function xiRoleCounts(players) {
   for (const p of players) {
     const role = xiPlayerRole(p);
     counts[role] = (counts[role] || 0) + 1;
+    if (role === 'allrounder' && p.bowl_type) {
+      counts[p.bowl_type] = (counts[p.bowl_type] || 0) + 1;
+    }
   }
   return counts;
 }
