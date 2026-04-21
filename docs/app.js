@@ -2861,10 +2861,8 @@ function roleTagsHTML(p) {
 function xiRoleCounts(players) {
   const counts = {};
   for (const p of players) {
-    const role = xiPlayerRole(p);
-    counts[role] = (counts[role] || 0) + 1;
-    if (role === 'allrounder' && p.bowl_type) {
-      counts[p.bowl_type] = (counts[p.bowl_type] || 0) + 1;
+    for (const tag of xiPlayerTags(p)) {
+      counts[tag] = (counts[tag] || 0) + 1;
     }
   }
   return counts;
