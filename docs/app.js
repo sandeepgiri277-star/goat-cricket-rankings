@@ -2591,8 +2591,6 @@ function renderDefaultXI(xi) {
   container.innerHTML = xi.map((player, i) => {
     const num = String(i + 1).padStart(2, '\u2007');
     if (player) {
-      const role = xiPlayerRole(player);
-      const roleLabel = ROLE_LABELS[role] || role;
       const isCaptain = player.name === captainName;
       return `
         <div class="xi-slot xi-slot-readonly">
@@ -2601,7 +2599,7 @@ function renderDefaultXI(xi) {
             <span class="xi-slot-flag">${getFlag(player.country)}</span>
             <span>${player.name}</span>
             ${isCaptain ? '<span class="xi-slot-captain">C</span>' : ''}
-            <span class="xi-slot-role">${roleLabel}</span>
+            <span class="xi-slot-role">${roleTagsHTML(player)}</span>
           </div>
           <span class="xi-slot-stats">${xiPlayerStats(player)}</span>
         </div>`;
@@ -2668,8 +2666,6 @@ function renderCustomXI() {
     const num = String(i + 1).padStart(2, '\u2007');
     if (i < CUSTOM_XI.length) {
       const player = CUSTOM_XI[i];
-      const role = xiPlayerRole(player);
-      const roleLabel = ROLE_LABELS[role] || role;
       const isCaptain = player.name === captain;
       slots.push(`
         <div class="xi-slot xi-slot-custom" data-idx="${i}" draggable="true">
@@ -2679,7 +2675,7 @@ function renderCustomXI() {
             <span class="xi-slot-flag">${getFlag(player.country)}</span>
             <span>${player.name}</span>
             ${isCaptain ? '<span class="xi-slot-captain">C</span>' : '<button class="xi-slot-captain-btn" data-name="' + player.name + '" title="Set as captain">C</button>'}
-            <span class="xi-slot-role">${roleLabel}</span>
+            <span class="xi-slot-role">${roleTagsHTML(player)}</span>
           </div>
           <span class="xi-slot-stats">${xiPlayerStats(player)}</span>
           <button class="xi-slot-remove" data-idx="${i}" title="Remove">&times;</button>
@@ -2773,7 +2769,7 @@ function showXiSearchResults(query, resultsEl) {
     <div class="xi-sr-item" data-name="${p.name}">
       <span>${getFlag(p.country)}</span>
       <span>${dispName}</span>
-      <span class="xi-sr-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
+      <span class="xi-sr-role">${roleTagsHTML(p)}</span>
       <span class="xi-sr-stats">${xiPlayerStats(p)}</span>
     </div>`;
   }).join('');
@@ -2834,6 +2830,38 @@ function xiPlayerRole(p) {
   if (p.bat_pos === 'opener' || p.bat_pos === 'middle') return p.bat_pos;
   if (r && r !== 'unknown') return r;
   return 'middle';
+}
+
+function xiPlayerTags(p) {
+  const tags = [];
+  const r = p.playing_role;
+  const bat = p.bat_rating || 0, bowl = p.bowl_rating || 0;
+  const isAR = bat >= 500 && bowl >= 500;
+
+  if (r === 'keeper') tags.push('keeper');
+  if (p.bat_pos === 'opener') tags.push('opener');
+  else if (p.bat_pos === 'middle' && r !== 'keeper') tags.push('middle');
+
+  if (isAR) {
+    if (!tags.includes('opener') && !tags.includes('middle')) tags.push('allrounder');
+    else tags.push('allrounder');
+  } else if (r === 'allrounder') {
+    if (bat >= bowl) { if (!tags.length) tags.push(p.bat_pos || 'middle'); }
+    else tags.push(p.bowl_type || 'fast');
+  }
+
+  if (!tags.includes('keeper') && r === 'keeper') tags.push('keeper');
+  if (r === 'spinner' && !isAR && !tags.includes('spinner')) tags.push('spinner');
+  if (r === 'fast' && !isAR && !tags.includes('fast')) tags.push('fast');
+  if (p.bowl_type === 'spinner' && isAR && !tags.includes('spinner')) tags.push('spinner');
+  if (p.bowl_type === 'fast' && isAR && !tags.includes('fast')) tags.push('fast');
+
+  if (tags.length === 0) tags.push(xiPlayerRole(p));
+  return [...new Set(tags)];
+}
+
+function roleTagsHTML(p) {
+  return xiPlayerTags(p).map(t => ROLE_LABELS[t] || t).join(' · ');
 }
 
 function xiRoleCounts(players) {
@@ -2937,7 +2965,7 @@ function _buildCompareCol(title, players, captainName) {
         <span class="xic-num">${i + 1}</span>
         <span class="xic-flag">${getFlag(p.country)}</span>
         <span class="xic-name">${p.name}${capBadge}</span>
-        <span class="xic-role">${ROLE_LABELS[xiPlayerRole(p)] || ''}</span>
+        <span class="xic-role">${roleTagsHTML(p)}</span>
         <span class="xic-rating xic-bat-r">${p.bat_rating || 0}</span>
         <span class="xic-rating xic-bowl-r">${p.bowl_rating || 0}</span>
       </div>`);
