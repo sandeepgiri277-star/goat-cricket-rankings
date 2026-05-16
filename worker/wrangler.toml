@@ -1,0 +1,15 @@
+name = "goat-cricket-ai"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# To bind KV-backed rate limiting, create a namespace and uncomment:
+#   wrangler kv:namespace create RATE_LIMIT
+# then paste the id returned by that command below.
+#
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# Logs (optional)
+[observability]
+enabled = true

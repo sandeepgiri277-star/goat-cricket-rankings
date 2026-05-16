@@ -1543,56 +1543,35 @@ footer {
   font-size: 0.82rem; cursor: pointer; font-family: inherit;
 }
 .ai-chat-send:hover { opacity: 0.9; }
-.ai-chat-footer {
-  display: flex; justify-content: flex-end;
-  padding: 0 0.85rem 0.5rem;
-}
-.ai-chat-key-btn {
-  background: none; border: none; color: var(--text-muted);
-  font-size: 0.7rem; cursor: pointer; text-decoration: underline;
-  font-family: inherit; padding: 0;
-}
-.ai-chat-key-btn:hover { color: var(--text); }
 
-/* ─── API Key Modal ─────────────────────────────────────────────────── */
+/* ─── Generic AI modal (used by ranking explainer) ──────────────────── */
 
-.ai-key-modal {
+.ai-modal {
   position: fixed; inset: 0; z-index: 200;
   display: flex; align-items: center; justify-content: center;
   padding: 1rem;
 }
-.ai-key-modal.hidden { display: none; }
-.ai-key-backdrop {
+.ai-modal.hidden { display: none; }
+.ai-modal-backdrop {
   position: absolute; inset: 0;
   background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
 }
-.ai-key-dialog {
+.ai-modal-dialog {
   position: relative; background: var(--bg-card);
   border: 1px solid var(--border); border-radius: 12px;
   padding: 1.5rem; max-width: 460px; width: 100%;
   box-shadow: 0 12px 36px rgba(0,0,0,0.5);
 }
-.ai-key-dialog h3 { margin: 0 0 0.8rem; font-size: 1.05rem; }
-.ai-key-dialog p { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 0.7rem; line-height: 1.45; }
-.ai-key-dialog input {
-  width: 100%; padding: 0.7rem 0.85rem; border-radius: 8px;
-  border: 1px solid var(--border); background: rgba(255,255,255,0.03);
-  color: var(--text); font-family: inherit; font-size: 0.86rem;
-  box-sizing: border-box; margin: 0.5rem 0 1rem;
-}
-.ai-key-dialog input:focus { border-color: var(--accent); outline: none; }
-.ai-key-actions {
+.ai-modal-dialog h3 { margin: 0 0 0.8rem; font-size: 1.05rem; }
+.ai-modal-actions {
   display: flex; gap: 0.5rem; justify-content: flex-end;
 }
-.ai-key-actions button {
+.ai-modal-actions button {
   padding: 0.55rem 0.95rem; border-radius: 7px;
   font-family: inherit; font-size: 0.85rem; font-weight: 600;
   cursor: pointer; border: 1px solid var(--border);
   background: transparent; color: var(--text);
 }
-.ai-key-clear { color: #e74c3c !important; margin-right: auto; }
-.ai-key-save { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
-.ai-key-save:hover { opacity: 0.9; }
 
 .ai-explain-dialog { max-width: 540px; }
 .ai-explain-output { min-height: 80px; margin: 0.5rem 0 1rem; }

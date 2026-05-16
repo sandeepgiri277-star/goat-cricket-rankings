@@ -3400,61 +3400,13 @@ function _aiToast(msg) {
   setTimeout(() => t.remove(), 2800);
 }
 
-function openKeyModal(onSave) {
-  const modal = document.getElementById('ai-key-modal');
-  const input = document.getElementById('ai-key-input');
-  if (!modal || !input) return;
-  input.value = getLLMKey();
-  modal.classList.remove('hidden');
-  setTimeout(() => input.focus(), 30);
-  modal._onSave = onSave || null;
-}
-
-function closeKeyModal() {
-  const modal = document.getElementById('ai-key-modal');
-  if (modal) modal.classList.add('hidden');
-}
-
-function setupKeyModal() {
-  const modal = document.getElementById('ai-key-modal');
-  if (!modal) return;
-  document.getElementById('ai-key-backdrop').addEventListener('click', closeKeyModal);
-  document.getElementById('ai-key-cancel').addEventListener('click', closeKeyModal);
-  document.getElementById('ai-key-clear').addEventListener('click', () => {
-    setLLMKey('');
-    clearLLMCache();
-    _aiToast('API key removed');
-    closeKeyModal();
-  });
-  document.getElementById('ai-key-save').addEventListener('click', () => {
-    const v = document.getElementById('ai-key-input').value.trim();
-    if (!v) { _aiToast('Please enter a key'); return; }
-    if (!v.startsWith('sk-ant-')) {
-      _aiToast('Anthropic keys start with sk-ant-');
-      return;
-    }
-    setLLMKey(v);
-    _aiToast('API key saved');
-    const cb = modal._onSave;
-    closeKeyModal();
-    if (cb) cb();
-  });
-  document.getElementById('ai-key-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('ai-key-save').click();
-    if (e.key === 'Escape') closeKeyModal();
-  });
-}
-
-async function callAIWithKeyPrompt(args) {
-  if (!hasLLMKey()) {
-    return new Promise((resolve, reject) => {
-      openKeyModal(async () => {
-        try { resolve(await askLLM(args)); }
-        catch (e) { reject(e); }
-      });
-    });
-  }
-  return askLLM(args);
+function _aiErrorMessage(err) {
+  const msg = err && err.message ? err.message : String(err);
+  if (msg === 'RATE_LIMITED') return 'Daily AI request limit reached. Try again in 24 hours.';
+  if (msg === 'NETWORK_ERROR') return 'Network error. Check your connection and try again.';
+  if (msg === 'FORBIDDEN') return 'AI service is restricted to the official site.';
+  if (msg.startsWith('AI_ERROR_')) return 'AI service temporarily unavailable. Try again shortly.';
+  return 'Error: ' + msg;
 }
 
 /* ─── Compare Tab ───────────────────────────────────────────────────────── */
@@ -3621,7 +3573,7 @@ ${tuneDesc || '(all at defaults)'}
 Compare these two ${fmt} cricketers head-to-head. Explain who comes out on top under the user's current settings, citing specific numbers. If they're closely matched, say so. If one slider in particular swings the comparison, call that out.`;
 
   try {
-    const text = await callAIWithKeyPrompt({
+    const text = await askLLM({
       system: SYSTEM_PROMPT_BASE,
       user,
       cacheKey: `cmp|${CURRENT_FORMAT}|${a.name}|${b.name}`,
@@ -3629,7 +3581,7 @@ Compare these two ${fmt} cricketers head-to-head. Explain who comes out on top u
     });
     out.innerHTML = `<div class="ai-response">${_renderMarkdown(text)}</div>`;
   } catch (e) {
-    out.innerHTML = `<div class="ai-error">${e.message === 'NO_API_KEY' ? 'Add your API key to enable AI analysis.' : 'Error: ' + e.message}</div>`;
+    out.innerHTML = `<div class="ai-error">${_aiErrorMessage(e)}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = 'Regenerate';
@@ -3679,7 +3631,7 @@ ${tuneDesc || '(all at defaults)'}
 Explain in 2-4 sentences why ${player.name} is ranked at their current ${kindLabel} position. Cite specific stats. If user has changed any slider from default, mention how that's helping or hurting this player.`;
 
   try {
-    const text = await callAIWithKeyPrompt({
+    const text = await askLLM({
       system: SYSTEM_PROMPT_BASE,
       user,
       cacheKey: `why|${CURRENT_FORMAT}|${kind}|${playerName}`,
@@ -3687,7 +3639,7 @@ Explain in 2-4 sentences why ${player.name} is ranked at their current ${kindLab
     });
     out.innerHTML = `<div class="ai-response">${_renderMarkdown(text)}</div>`;
   } catch (e) {
-    out.innerHTML = `<div class="ai-error">${e.message === 'NO_API_KEY' ? 'Add your API key to enable AI explanations.' : 'Error: ' + e.message}</div>`;
+    out.innerHTML = `<div class="ai-error">${_aiErrorMessage(e)}</div>`;
   }
 }
 
@@ -3696,14 +3648,14 @@ function openExplainModal(playerName, kind) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'ai-explain-modal';
-    modal.className = 'ai-key-modal';
+    modal.className = 'ai-modal';
     modal.innerHTML = `
-      <div class="ai-key-backdrop" id="ai-explain-backdrop"></div>
-      <div class="ai-key-dialog ai-explain-dialog">
+      <div class="ai-modal-backdrop" id="ai-explain-backdrop"></div>
+      <div class="ai-modal-dialog ai-explain-dialog">
         <h3 id="ai-explain-title"></h3>
         <div class="ai-explain-output" id="ai-explain-output"></div>
-        <div class="ai-key-actions">
-          <button class="ai-key-cancel" id="ai-explain-close">Close</button>
+        <div class="ai-modal-actions">
+          <button id="ai-explain-close">Close</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -3738,7 +3690,6 @@ function setupChatWidget() {
   const closeBtn = document.getElementById('ai-chat-close');
   const form = document.getElementById('ai-chat-form');
   const input = document.getElementById('ai-chat-input');
-  const keyBtn = document.getElementById('ai-chat-key-btn');
   if (!fab) return;
 
   fab.addEventListener('click', () => {
@@ -3749,7 +3700,6 @@ function setupChatWidget() {
     }
   });
   closeBtn.addEventListener('click', () => panel.classList.add('hidden'));
-  keyBtn.addEventListener('click', () => openKeyModal());
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -3823,7 +3773,7 @@ ${histText ? 'Previous conversation:\n' + histText + '\n\n' : ''}User question: 
 If asked about a specific player not in the top 10, mention that you have access to their full stats and would need their name. If the question is general, answer concisely with specific numbers.`;
 
   try {
-    const out = await callAIWithKeyPrompt({
+    const out = await askLLM({
       system: SYSTEM_PROMPT_BASE + '\n\nYou are answering in an open chat. Stay focused on cricket and the rankings.',
       user,
       cacheKey: `chat|${CURRENT_FORMAT}|${text}|${histText.length}`,
@@ -3833,7 +3783,7 @@ If asked about a specific player not in the top 10, mention that you have access
     CHAT_HISTORY.push({ role: 'ai', text: out });
   } catch (e) {
     CHAT_HISTORY.pop();
-    CHAT_HISTORY.push({ role: 'error', text: e.message === 'NO_API_KEY' ? 'Add your API key first (button below).' : 'Error: ' + e.message });
+    CHAT_HISTORY.push({ role: 'error', text: _aiErrorMessage(e) });
   }
   _renderChat();
 }
@@ -3866,7 +3816,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupXfWeightBar();
     setupGreatestXI();
     setupSavedXIs();
-    setupKeyModal();
     setupCompareTab();
     setupWhyButtons();
     setupChatWidget();

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GOAT Cricket Rankings</title>
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8" async></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -461,25 +461,6 @@
       <input type="text" class="ai-chat-input" id="ai-chat-input" placeholder="Ask anything about the rankings..." autocomplete="off">
       <button type="submit" class="ai-chat-send">Send</button>
     </form>
-    <div class="ai-chat-footer">
-      <button class="ai-chat-key-btn" id="ai-chat-key-btn">API key</button>
-    </div>
-  </div>
-
-  <!-- API Key Modal -->
-  <div class="ai-key-modal hidden" id="ai-key-modal">
-    <div class="ai-key-backdrop" id="ai-key-backdrop"></div>
-    <div class="ai-key-dialog">
-      <h3>Anthropic API Key</h3>
-      <p>The AI features (rank explanations, comparison analysis, chat) use Anthropic's Claude API directly from your browser. Your key is stored locally on your device and never sent to our server.</p>
-      <p>Get a key at <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>. Claude Haiku is very cheap (~$0.005 per question).</p>
-      <input type="password" id="ai-key-input" placeholder="sk-ant-..." autocomplete="off">
-      <div class="ai-key-actions">
-        <button class="ai-key-clear" id="ai-key-clear">Remove key</button>
-        <button class="ai-key-cancel" id="ai-key-cancel">Cancel</button>
-        <button class="ai-key-save" id="ai-key-save">Save</button>
-      </div>
-    </div>
   </div>
 
   <footer>
@@ -493,7 +474,7 @@
         '<pre style="color:#e74c3c;padding:2rem;white-space:pre-wrap">JS Error: ' + msg + '\nSource: ' + src + '\nLine: ' + line + ':' + col + '</pre>';
     };
   </script>
-  <script src="llm.js?v=1"></script>
-  <script src="app.js?v=27"></script>
+  <script src="llm.js?v=2"></script>
+  <script src="app.js?v=28"></script>
 </body>
 </html>

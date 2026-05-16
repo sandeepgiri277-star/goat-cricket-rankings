@@ -1,29 +1,17 @@
 /* ─── LLM Helper Module ─────────────────────────────────────────────────────
- * Handles API key management, caching, and direct calls to Anthropic.
- * BYOK pattern: user provides their own Anthropic API key (stored in
- * localStorage). Responses are cached locally for 24h to minimize cost.
+ * Calls a hosted Cloudflare Worker proxy that holds the Anthropic API key
+ * as a secret. No key on the browser, no key required from users.
+ *
+ * If you need to redeploy the proxy or move it to a different host, just
+ * update LLM_ENDPOINT below.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const LLM_KEY_STORAGE = 'goat-anthropic-key';
+const LLM_ENDPOINT = 'https://goat-cricket-ai.YOUR-SUBDOMAIN.workers.dev';
 const LLM_CACHE_KEY = 'goat-llm-cache';
 const LLM_MODEL = 'claude-haiku-4-5';
 const LLM_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-function getLLMKey() {
-  return localStorage.getItem(LLM_KEY_STORAGE) || '';
-}
-
-function setLLMKey(k) {
-  if (k) localStorage.setItem(LLM_KEY_STORAGE, k);
-  else localStorage.removeItem(LLM_KEY_STORAGE);
-}
-
-function hasLLMKey() {
-  return !!getLLMKey();
-}
-
 function _hashKey(s) {
-  // Fast non-crypto hash for cache key
   let h = 0;
   for (let i = 0; i < s.length; i++) {
     h = ((h << 5) - h) + s.charCodeAt(i);
@@ -39,7 +27,7 @@ function _loadCache() {
 
 function _saveCache(c) {
   try { localStorage.setItem(LLM_CACHE_KEY, JSON.stringify(c)); }
-  catch (e) { /* localStorage full, ignore */ }
+  catch { /* localStorage full, ignore */ }
 }
 
 function clearLLMCache() {
@@ -61,7 +49,6 @@ function _getCached(hash) {
 function _setCached(hash, value) {
   const cache = _loadCache();
   cache[hash] = { t: Date.now(), v: value };
-  // Cap cache at 100 entries; drop oldest
   const keys = Object.keys(cache);
   if (keys.length > 100) {
     keys.sort((a, b) => cache[a].t - cache[b].t);
@@ -71,36 +58,33 @@ function _setCached(hash, value) {
 }
 
 async function askLLM({ system, user, cacheKey, maxTokens = 600 }) {
-  const apiKey = getLLMKey();
-  if (!apiKey) throw new Error('NO_API_KEY');
-
   const hash = _hashKey((cacheKey || '') + '|' + system + '|' + user);
   const cached = _getCached(hash);
   if (cached) return cached;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: LLM_MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: user }],
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(LLM_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: LLM_MODEL,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: 'user', content: user }],
+      }),
+    });
+  } catch (e) {
+    throw new Error('NETWORK_ERROR');
+  }
+
+  if (res.status === 429) throw new Error('RATE_LIMITED');
+  if (res.status === 403) throw new Error('FORBIDDEN');
 
   if (!res.ok) {
-    const errText = await res.text();
-    if (res.status === 401 || res.status === 403) {
-      setLLMKey('');
-      throw new Error('INVALID_API_KEY');
-    }
-    throw new Error(`API_ERROR_${res.status}: ${errText.slice(0, 200)}`);
+    let detail = '';
+    try { detail = (await res.text()).slice(0, 200); } catch {}
+    throw new Error(`AI_ERROR_${res.status}: ${detail}`);
   }
 
   const data = await res.json();
@@ -110,10 +94,6 @@ async function askLLM({ system, user, cacheKey, maxTokens = 600 }) {
 }
 
 /* ─── Context builders ──────────────────────────────────────────────────── */
-
-function _fmtPct(v) {
-  return Math.round(v * 100) + '%';
-}
 
 function describeTuneParams(p, format) {
   const lines = [];
