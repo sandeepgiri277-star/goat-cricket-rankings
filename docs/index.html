@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GOAT Cricket Rankings</title>
-  <link rel="stylesheet" href="style.css?v=13">
+  <link rel="stylesheet" href="style.css?v=14">
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8" async></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -35,6 +35,7 @@
     <button class="tab" data-tab="bowling">Bowling</button>
     <button class="tab" data-tab="allrounders">Allrounders</button>
     <button class="tab" data-tab="player-lookup">Player Lookup</button>
+    <button class="tab" data-tab="compare">Compare</button>
     <button class="tab" data-tab="greatest-xi">Greatest XI</button>
     <button class="tab" data-tab="saved-xis">Saved XIs</button>
     <button class="tab" data-tab="methodology">Methodology</button>
@@ -356,6 +357,30 @@
       </div>
     </section>
 
+    <!-- Compare Tab -->
+    <section class="tab-panel" id="panel-compare">
+      <h2 id="heading-compare">Player vs Player</h2>
+      <p class="panel-desc">Pick two players to see them head-to-head under your current settings, then get an AI analysis.</p>
+      <div class="cmp-pickers">
+        <div class="cmp-picker-wrap">
+          <label class="cmp-label">Player A</label>
+          <input type="text" class="cmp-search" id="cmp-search-a" placeholder="Search for a player..." autocomplete="off">
+          <div class="cmp-results" id="cmp-results-a"></div>
+        </div>
+        <div class="cmp-vs">VS</div>
+        <div class="cmp-picker-wrap">
+          <label class="cmp-label">Player B</label>
+          <input type="text" class="cmp-search" id="cmp-search-b" placeholder="Search for a player..." autocomplete="off">
+          <div class="cmp-results" id="cmp-results-b"></div>
+        </div>
+      </div>
+      <div class="cmp-board hidden" id="cmp-board"></div>
+      <div class="cmp-ai hidden" id="cmp-ai">
+        <button class="cmp-ai-btn" id="cmp-ai-btn">Get AI Analysis</button>
+        <div class="cmp-ai-output" id="cmp-ai-output"></div>
+      </div>
+    </section>
+
     <!-- Greatest XI Tab -->
     <section class="tab-panel" id="panel-greatest-xi">
       <!-- Default XI (read-only) -->
@@ -420,6 +445,43 @@
     <span class="xi-cart-badge" id="xi-bucket-text">0</span>
   </div>
 
+  <!-- AI Chat Widget -->
+  <button class="ai-chat-fab" id="ai-chat-fab" title="Ask the Cricket AI">
+    <span class="ai-chat-fab-icon">&#9881;</span>
+    <span class="ai-chat-fab-label">Ask AI</span>
+  </button>
+  <div class="ai-chat-panel hidden" id="ai-chat-panel">
+    <div class="ai-chat-header">
+      <strong>Cricket AI</strong>
+      <button class="ai-chat-close" id="ai-chat-close" title="Close">&times;</button>
+    </div>
+    <div class="ai-chat-messages" id="ai-chat-messages"></div>
+    <div class="ai-chat-suggest" id="ai-chat-suggest"></div>
+    <form class="ai-chat-input-row" id="ai-chat-form">
+      <input type="text" class="ai-chat-input" id="ai-chat-input" placeholder="Ask anything about the rankings..." autocomplete="off">
+      <button type="submit" class="ai-chat-send">Send</button>
+    </form>
+    <div class="ai-chat-footer">
+      <button class="ai-chat-key-btn" id="ai-chat-key-btn">API key</button>
+    </div>
+  </div>
+
+  <!-- API Key Modal -->
+  <div class="ai-key-modal hidden" id="ai-key-modal">
+    <div class="ai-key-backdrop" id="ai-key-backdrop"></div>
+    <div class="ai-key-dialog">
+      <h3>Anthropic API Key</h3>
+      <p>The AI features (rank explanations, comparison analysis, chat) use Anthropic's Claude API directly from your browser. Your key is stored locally on your device and never sent to our server.</p>
+      <p>Get a key at <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>. Claude Haiku is very cheap (~$0.005 per question).</p>
+      <input type="password" id="ai-key-input" placeholder="sk-ant-..." autocomplete="off">
+      <div class="ai-key-actions">
+        <button class="ai-key-clear" id="ai-key-clear">Remove key</button>
+        <button class="ai-key-cancel" id="ai-key-cancel">Cancel</button>
+        <button class="ai-key-save" id="ai-key-save">Save</button>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <p>Updated weekly &middot; <span id="player-count"></span> players analysed</p>
   </footer>
@@ -431,6 +493,7 @@
         '<pre style="color:#e74c3c;padding:2rem;white-space:pre-wrap">JS Error: ' + msg + '\nSource: ' + src + '\nLine: ' + line + ':' + col + '</pre>';
     };
   </script>
-  <script src="app.js?v=26"></script>
+  <script src="llm.js?v=1"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>

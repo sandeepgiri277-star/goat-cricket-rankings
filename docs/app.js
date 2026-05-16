@@ -642,16 +642,18 @@ async function switchFormat(format) {
   renderAll();
 
   const plTab = document.querySelector('.tab[data-tab="player-lookup"]');
+  const cmpTab = document.querySelector('.tab[data-tab="compare"]');
   const xiTab = document.querySelector('.tab[data-tab="greatest-xi"]');
   const savedTab = document.querySelector('.tab[data-tab="saved-xis"]');
   const tunePanel = document.getElementById('tune-panel');
   const isXf = format === 'crossformat';
   if (xiTab) xiTab.style.display = isXf ? 'none' : '';
   if (savedTab) savedTab.style.display = isXf ? 'none' : '';
+  if (cmpTab) cmpTab.style.display = isXf ? 'none' : '';
   if (isXf) {
     plTab.style.display = 'none';
     const curTab = document.querySelector('.tab.active')?.dataset.tab;
-    if (curTab === 'player-lookup' || curTab === 'greatest-xi' || curTab === 'saved-xis') {
+    if (curTab === 'player-lookup' || curTab === 'greatest-xi' || curTab === 'saved-xis' || curTab === 'compare') {
       switchTab('batting', false);
     }
   } else {
@@ -754,7 +756,7 @@ async function restoreFromHash() {
       if (xiPart) decodeXiFromHash(xiPart);
       renderGreatestXI();
     } else {
-      const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'greatest-xi', 'methodology'];
+      const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'compare', 'greatest-xi', 'saved-xis', 'methodology'];
       if (validTabs.includes(rest)) {
         if (rest === 'player-lookup' && CURRENT_FORMAT === 'crossformat') {
           switchTab('batting', false);
@@ -793,6 +795,9 @@ function renderAll() {
   renderGreatestXI();
   if (activeTab() === 'saved-xis') {
     renderSavedXIs();
+  }
+  if (activeTab() === 'compare') {
+    renderCompareBoard();
   }
 }
 
@@ -951,6 +956,7 @@ function renderAllrounderTable() {
         <div class="lb-primary-val">${p.ar_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
+      ${_whyButtonHTML(p.name)}
       ${xiAddBtn(p.name)}
     </div>
   `).join('');
@@ -971,6 +977,7 @@ function renderBattingTable() {
         <div class="lb-primary-val">${p.bat_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
+      ${_whyButtonHTML(p.name)}
       ${xiAddBtn(p.name)}
     </div>
   `).join('');
@@ -991,6 +998,7 @@ function renderBowlingTable() {
         <div class="lb-primary-val">${p.bowl_rating}</div>
         <div class="lb-primary-label">Rating</div>
       </div>
+      ${_whyButtonHTML(p.name)}
       ${xiAddBtn(p.name)}
     </div>
   `).join('');
@@ -1001,6 +1009,7 @@ function addRowClickHandlers(container) {
   container.querySelectorAll('.lb-row').forEach(row => {
     row.addEventListener('click', (e) => {
       if (e.target.closest('.lb-xi-add')) return;
+      if (e.target.closest('.lb-why-btn')) return;
       const name = row.dataset.player;
       const fromAR = activeTab() === 'allrounders';
       switchTab('player-lookup');
@@ -2000,12 +2009,13 @@ function switchTab(tabId, updateHash = true) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
-  const showBothDisciplines = tabId === 'saved-xis' || tabId === 'greatest-xi';
+  const showBothDisciplines = tabId === 'saved-xis' || tabId === 'greatest-xi' || tabId === 'compare';
   const showBat = tabId !== 'bowling' || showBothDisciplines;
   const showBowl = tabId !== 'batting' || showBothDisciplines;
   const isAR = tabId === 'allrounders' || showBothDisciplines;
   const hideTune = tabId === 'methodology';
   if (tabId === 'saved-xis') renderSavedXIs();
+  if (tabId === 'compare') renderCompareBoard();
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));
   document.querySelectorAll('.tune-bowl-only').forEach(el => el.classList.toggle('hidden', !showBowl));
   document.querySelectorAll('.tune-ar-header').forEach(el => el.classList.toggle('hidden', !isAR));
@@ -3378,6 +3388,474 @@ function setupFormatBar() {
   });
 }
 
+/* ─── AI / LLM Integration ──────────────────────────────────────────────── */
+
+const COMPARE_STATE = { a: null, b: null };
+
+function _aiToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'ai-toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+
+function openKeyModal(onSave) {
+  const modal = document.getElementById('ai-key-modal');
+  const input = document.getElementById('ai-key-input');
+  if (!modal || !input) return;
+  input.value = getLLMKey();
+  modal.classList.remove('hidden');
+  setTimeout(() => input.focus(), 30);
+  modal._onSave = onSave || null;
+}
+
+function closeKeyModal() {
+  const modal = document.getElementById('ai-key-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function setupKeyModal() {
+  const modal = document.getElementById('ai-key-modal');
+  if (!modal) return;
+  document.getElementById('ai-key-backdrop').addEventListener('click', closeKeyModal);
+  document.getElementById('ai-key-cancel').addEventListener('click', closeKeyModal);
+  document.getElementById('ai-key-clear').addEventListener('click', () => {
+    setLLMKey('');
+    clearLLMCache();
+    _aiToast('API key removed');
+    closeKeyModal();
+  });
+  document.getElementById('ai-key-save').addEventListener('click', () => {
+    const v = document.getElementById('ai-key-input').value.trim();
+    if (!v) { _aiToast('Please enter a key'); return; }
+    if (!v.startsWith('sk-ant-')) {
+      _aiToast('Anthropic keys start with sk-ant-');
+      return;
+    }
+    setLLMKey(v);
+    _aiToast('API key saved');
+    const cb = modal._onSave;
+    closeKeyModal();
+    if (cb) cb();
+  });
+  document.getElementById('ai-key-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('ai-key-save').click();
+    if (e.key === 'Escape') closeKeyModal();
+  });
+}
+
+async function callAIWithKeyPrompt(args) {
+  if (!hasLLMKey()) {
+    return new Promise((resolve, reject) => {
+      openKeyModal(async () => {
+        try { resolve(await askLLM(args)); }
+        catch (e) { reject(e); }
+      });
+    });
+  }
+  return askLLM(args);
+}
+
+/* ─── Compare Tab ───────────────────────────────────────────────────────── */
+
+function setupCompareTab() {
+  const aSearch = document.getElementById('cmp-search-a');
+  const bSearch = document.getElementById('cmp-search-b');
+  const aResults = document.getElementById('cmp-results-a');
+  const bResults = document.getElementById('cmp-results-b');
+  if (!aSearch || !bSearch) return;
+
+  function bindSearch(input, results, slot) {
+    input.addEventListener('input', () => {
+      const q = input.value.trim();
+      if (q.length < 2) { results.innerHTML = ''; results.classList.remove('open'); return; }
+      const matches = searchPlayers(q).slice(0, 8);
+      if (matches.length === 0) {
+        results.innerHTML = '<div class="cmp-result-item" style="color:var(--muted)">No players found</div>';
+        results.classList.add('open');
+        return;
+      }
+      results.innerHTML = matches.map(p => `
+        <div class="cmp-result-item" data-name="${p.name}">
+          <span>${getFlag(p.country)}</span>
+          <span>${p.name}</span>
+          <span class="cmp-result-stats">Bat ${p.bat_rating || 0} \u00b7 Bowl ${p.bowl_rating || 0}</span>
+        </div>`).join('');
+      results.classList.add('open');
+      results.querySelectorAll('.cmp-result-item[data-name]').forEach(item => {
+        item.addEventListener('click', () => {
+          const player = DATA.all_players.find(pl => pl.name === item.dataset.name);
+          if (!player) return;
+          COMPARE_STATE[slot] = player;
+          input.value = player.name;
+          results.classList.remove('open');
+          renderCompareBoard();
+        });
+      });
+    });
+    input.addEventListener('blur', () => { setTimeout(() => results.classList.remove('open'), 150); });
+  }
+  bindSearch(aSearch, aResults, 'a');
+  bindSearch(bSearch, bResults, 'b');
+
+  document.getElementById('cmp-ai-btn').addEventListener('click', runCompareAI);
+}
+
+function _refreshCompareRefs() {
+  if (!DATA) return;
+  for (const slot of ['a', 'b']) {
+    const cur = COMPARE_STATE[slot];
+    if (cur) {
+      const fresh = DATA.all_players.find(p => p.name === cur.name);
+      if (fresh) COMPARE_STATE[slot] = fresh;
+    }
+  }
+}
+
+function _statRow(label, va, vb, higherWins = true, fmt = (x) => x) {
+  const a = va === null || va === undefined ? null : va;
+  const b = vb === null || vb === undefined ? null : vb;
+  let aClass = '', bClass = '';
+  if (a !== null && b !== null && a !== b) {
+    const aWins = higherWins ? a > b : a < b;
+    if (aWins) aClass = 'cmp-win'; else bClass = 'cmp-win';
+  }
+  return `<div class="cmp-stat-row">
+    <span class="cmp-stat-a ${aClass}">${a === null ? '\u2014' : fmt(a)}</span>
+    <span class="cmp-stat-label">${label}</span>
+    <span class="cmp-stat-b ${bClass}">${b === null ? '\u2014' : fmt(b)}</span>
+  </div>`;
+}
+
+function renderCompareBoard() {
+  _refreshCompareRefs();
+  const board = document.getElementById('cmp-board');
+  const aiSection = document.getElementById('cmp-ai');
+  const aiOut = document.getElementById('cmp-ai-output');
+  if (!board) return;
+
+  const a = COMPARE_STATE.a, b = COMPARE_STATE.b;
+  if (!a || !b) {
+    board.classList.add('hidden');
+    if (aiSection) aiSection.classList.add('hidden');
+    return;
+  }
+
+  board.classList.remove('hidden');
+  if (aiSection) aiSection.classList.remove('hidden');
+  if (aiOut) aiOut.innerHTML = '';
+
+  const isLOI = CURRENT_FORMAT !== 'tests';
+  const isTests = CURRENT_FORMAT === 'tests';
+
+  const header = `<div class="cmp-board-header">
+    <div class="cmp-board-player">
+      <span class="cmp-flag">${getFlag(a.country)}</span>
+      <div>
+        <div class="cmp-name">${a.name}</div>
+        <div class="cmp-sub">${roleTagsHTML(a)}</div>
+      </div>
+    </div>
+    <div class="cmp-board-vs">VS</div>
+    <div class="cmp-board-player cmp-board-player-right">
+      <div style="text-align:right">
+        <div class="cmp-name">${b.name}</div>
+        <div class="cmp-sub">${roleTagsHTML(b)}</div>
+      </div>
+      <span class="cmp-flag">${getFlag(b.country)}</span>
+    </div>
+  </div>`;
+
+  const rows = [];
+  rows.push('<div class="cmp-section-title">Headline Ratings</div>');
+  rows.push(_statRow('Batting rating', a.bat_rating || 0, b.bat_rating || 0));
+  rows.push(_statRow('Bowling rating', a.bowl_rating || 0, b.bowl_rating || 0));
+  rows.push(_statRow('Total (Bat + Bowl)', (a.bat_rating || 0) + (a.bowl_rating || 0), (b.bat_rating || 0) + (b.bowl_rating || 0)));
+  rows.push(_statRow('Allrounder rating', a.ar_rating || 0, b.ar_rating || 0));
+  rows.push(_statRow('Bat rank', a.bat_rank || null, b.bat_rank || null, false));
+  rows.push(_statRow('Bowl rank', a.bowl_rank || null, b.bowl_rank || null, false));
+
+  rows.push('<div class="cmp-section-title">Career</div>');
+  rows.push(_statRow('Matches', a.matches || 0, b.matches || 0));
+  rows.push(_statRow('Batting innings', a.bat_inns || 0, b.bat_inns || 0));
+  rows.push(_statRow('Bowling innings', a.bowl_inns || 0, b.bowl_inns || 0));
+
+  rows.push('<div class="cmp-section-title">Batting</div>');
+  rows.push(_statRow('Average', a.career_bat_avg || null, b.career_bat_avg || null));
+  if (isLOI) rows.push(_statRow('Strike rate', a.career_bat_sr || null, b.career_bat_sr || null));
+  rows.push(_statRow('Runs per innings', a.career_rpi || null, b.career_rpi || null));
+
+  rows.push('<div class="cmp-section-title">Bowling</div>');
+  rows.push(_statRow('Average', a.career_bowl_avg || null, b.career_bowl_avg || null, false));
+  rows.push(_statRow('Strike rate', a.career_bowl_sr || null, b.career_bowl_sr || null, false));
+  if (isLOI) rows.push(_statRow('Economy', a.career_bowl_econ || null, b.career_bowl_econ || null, false));
+  if (isTests) rows.push(_statRow('Wickets per innings', a.career_wpi || null, b.career_wpi || null));
+
+  board.innerHTML = header + '<div class="cmp-stats">' + rows.join('') + '</div>';
+}
+
+async function runCompareAI() {
+  const a = COMPARE_STATE.a, b = COMPARE_STATE.b;
+  if (!a || !b) return;
+  const out = document.getElementById('cmp-ai-output');
+  const btn = document.getElementById('cmp-ai-btn');
+  if (!out || !btn) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Thinking...';
+  out.innerHTML = '<div class="ai-loading">Analyzing<span class="ai-dots"></span></div>';
+
+  const fmt = { tests: 'Test', odis: 'ODI', t20is: 'T20I', ipl: 'IPL' }[CURRENT_FORMAT] || 'Test';
+  const tuneDesc = describeTuneParams(activeParams(), CURRENT_FORMAT);
+  const ctx = formatRankingsContext(CURRENT_FORMAT);
+
+  const user = `${ctx}
+
+Player A: ${summarizePlayer(a)}
+Player B: ${summarizePlayer(b)}
+
+User's current tune parameters:
+${tuneDesc || '(all at defaults)'}
+
+Compare these two ${fmt} cricketers head-to-head. Explain who comes out on top under the user's current settings, citing specific numbers. If they're closely matched, say so. If one slider in particular swings the comparison, call that out.`;
+
+  try {
+    const text = await callAIWithKeyPrompt({
+      system: SYSTEM_PROMPT_BASE,
+      user,
+      cacheKey: `cmp|${CURRENT_FORMAT}|${a.name}|${b.name}`,
+      maxTokens: 700,
+    });
+    out.innerHTML = `<div class="ai-response">${_renderMarkdown(text)}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="ai-error">${e.message === 'NO_API_KEY' ? 'Add your API key to enable AI analysis.' : 'Error: ' + e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Regenerate';
+  }
+}
+
+/* ─── Why this ranking? ─────────────────────────────────────────────────── */
+
+function _whyButtonHTML(playerName) {
+  return `<button class="lb-why-btn" data-why="${playerName}" title="Why this ranking?">?</button>`;
+}
+
+async function explainRanking(playerName, kind) {
+  const player = DATA.all_players.find(p => p.name === playerName);
+  if (!player) return;
+
+  // Build context: this player + 1-2 ranked just above and below them
+  const isBat = kind === 'bat';
+  const sortKey = isBat ? 'BEI' : 'BoEI';
+  const rankKey = isBat ? 'bat_rank' : 'bowl_rank';
+  const myRank = player[rankKey];
+  let neighbors = [];
+  if (myRank) {
+    neighbors = DATA.all_players
+      .filter(p => p[rankKey] && Math.abs(p[rankKey] - myRank) <= 2 && p.name !== player.name)
+      .sort((a, b) => a[rankKey] - b[rankKey])
+      .slice(0, 4);
+  }
+
+  const out = document.getElementById('ai-explain-output');
+  out.innerHTML = '<div class="ai-loading">Thinking<span class="ai-dots"></span></div>';
+
+  const tuneDesc = describeTuneParams(activeParams(), CURRENT_FORMAT);
+  const ctx = formatRankingsContext(CURRENT_FORMAT);
+  const kindLabel = isBat ? 'batting' : (kind === 'bowl' ? 'bowling' : 'allrounder');
+
+  const user = `${ctx}
+
+Player in question: ${summarizePlayer(player)}
+
+Nearby ${kindLabel} ranks for context:
+${neighbors.map(p => `- #${p[rankKey]}: ${summarizePlayer(p)}`).join('\n')}
+
+User's current tune parameters:
+${tuneDesc || '(all at defaults)'}
+
+Explain in 2-4 sentences why ${player.name} is ranked at their current ${kindLabel} position. Cite specific stats. If user has changed any slider from default, mention how that's helping or hurting this player.`;
+
+  try {
+    const text = await callAIWithKeyPrompt({
+      system: SYSTEM_PROMPT_BASE,
+      user,
+      cacheKey: `why|${CURRENT_FORMAT}|${kind}|${playerName}`,
+      maxTokens: 500,
+    });
+    out.innerHTML = `<div class="ai-response">${_renderMarkdown(text)}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="ai-error">${e.message === 'NO_API_KEY' ? 'Add your API key to enable AI explanations.' : 'Error: ' + e.message}</div>`;
+  }
+}
+
+function openExplainModal(playerName, kind) {
+  let modal = document.getElementById('ai-explain-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'ai-explain-modal';
+    modal.className = 'ai-key-modal';
+    modal.innerHTML = `
+      <div class="ai-key-backdrop" id="ai-explain-backdrop"></div>
+      <div class="ai-key-dialog ai-explain-dialog">
+        <h3 id="ai-explain-title"></h3>
+        <div class="ai-explain-output" id="ai-explain-output"></div>
+        <div class="ai-key-actions">
+          <button class="ai-key-cancel" id="ai-explain-close">Close</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('ai-explain-backdrop').addEventListener('click', () => modal.classList.add('hidden'));
+    document.getElementById('ai-explain-close').addEventListener('click', () => modal.classList.add('hidden'));
+  }
+  document.getElementById('ai-explain-title').textContent = `Why is ${playerName} ranked here?`;
+  modal.classList.remove('hidden');
+  explainRanking(playerName, kind);
+}
+
+function setupWhyButtons() {
+  // Event delegation — leaderboards re-render often
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.lb-why-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const tab = activeTab();
+    const kind = tab === 'allrounders' ? 'ar' : (tab === 'bowling' ? 'bowl' : 'bat');
+    openExplainModal(btn.dataset.why, kind);
+  });
+}
+
+/* ─── Open Chat Widget ──────────────────────────────────────────────────── */
+
+const CHAT_HISTORY = [];
+
+function setupChatWidget() {
+  const fab = document.getElementById('ai-chat-fab');
+  const panel = document.getElementById('ai-chat-panel');
+  const closeBtn = document.getElementById('ai-chat-close');
+  const form = document.getElementById('ai-chat-form');
+  const input = document.getElementById('ai-chat-input');
+  const keyBtn = document.getElementById('ai-chat-key-btn');
+  if (!fab) return;
+
+  fab.addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) {
+      if (CHAT_HISTORY.length === 0) _renderChatSuggestions();
+      setTimeout(() => input.focus(), 50);
+    }
+  });
+  closeBtn.addEventListener('click', () => panel.classList.add('hidden'));
+  keyBtn.addEventListener('click', () => openKeyModal());
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (!q) return;
+    input.value = '';
+    sendChatMessage(q);
+  });
+}
+
+function _renderChatSuggestions() {
+  const el = document.getElementById('ai-chat-suggest');
+  if (!el) return;
+  const fmt = { tests: 'Test', odis: 'ODI', t20is: 'T20I', ipl: 'IPL' }[CURRENT_FORMAT] || 'Test';
+  const suggestions = [
+    `Who is the greatest ${fmt} batter ever?`,
+    `How does my tune config change the rankings?`,
+    `Compare Imran Khan and Kapil Dev`,
+    `Why is the #1 bowler ranked #1?`,
+  ];
+  el.innerHTML = suggestions.map(s => `<button class="ai-chat-suggest-btn">${s}</button>`).join('');
+  el.querySelectorAll('.ai-chat-suggest-btn').forEach(btn => {
+    btn.addEventListener('click', () => sendChatMessage(btn.textContent));
+  });
+}
+
+function _renderChat() {
+  const el = document.getElementById('ai-chat-messages');
+  const suggest = document.getElementById('ai-chat-suggest');
+  if (!el) return;
+  el.innerHTML = CHAT_HISTORY.map(m => {
+    if (m.role === 'user') return `<div class="ai-msg ai-msg-user">${_escapeHtml(m.text)}</div>`;
+    if (m.role === 'loading') return `<div class="ai-msg ai-msg-ai"><div class="ai-loading">Thinking<span class="ai-dots"></span></div></div>`;
+    if (m.role === 'error') return `<div class="ai-msg ai-msg-ai ai-error">${_escapeHtml(m.text)}</div>`;
+    return `<div class="ai-msg ai-msg-ai">${_renderMarkdown(m.text)}</div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+  if (suggest && CHAT_HISTORY.length > 0) suggest.innerHTML = '';
+}
+
+async function sendChatMessage(text) {
+  CHAT_HISTORY.push({ role: 'user', text });
+  CHAT_HISTORY.push({ role: 'loading' });
+  _renderChat();
+
+  const topBat = (DATA.batting_top25 || []).slice(0, 10).map(p => `#${p.bat_rank} ${p.name} (${p.country}) bat ${p.bat_rating}`).join('\n');
+  const topBowl = (DATA.bowling_top25 || []).slice(0, 10).map(p => `#${p.bowl_rank} ${p.name} (${p.country}) bowl ${p.bowl_rating}`).join('\n');
+  const topAR = (DATA.allrounder_top25 || []).slice(0, 10).map(p => `${p.name} (${p.country}) AR ${p.ar_rating}`).join('\n');
+  const tuneDesc = describeTuneParams(activeParams(), CURRENT_FORMAT);
+  const ctx = formatRankingsContext(CURRENT_FORMAT);
+
+  const histText = CHAT_HISTORY.filter(m => m.role === 'user' || m.role === 'ai').slice(0, -1)
+    .map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.text}`).join('\n\n');
+
+  const user = `${ctx}
+
+Top 10 batters (current settings):
+${topBat}
+
+Top 10 bowlers:
+${topBowl}
+
+Top 10 allrounders:
+${topAR}
+
+User's current tune parameters:
+${tuneDesc || '(all at defaults)'}
+
+${histText ? 'Previous conversation:\n' + histText + '\n\n' : ''}User question: ${text}
+
+If asked about a specific player not in the top 10, mention that you have access to their full stats and would need their name. If the question is general, answer concisely with specific numbers.`;
+
+  try {
+    const out = await callAIWithKeyPrompt({
+      system: SYSTEM_PROMPT_BASE + '\n\nYou are answering in an open chat. Stay focused on cricket and the rankings.',
+      user,
+      cacheKey: `chat|${CURRENT_FORMAT}|${text}|${histText.length}`,
+      maxTokens: 800,
+    });
+    CHAT_HISTORY.pop();
+    CHAT_HISTORY.push({ role: 'ai', text: out });
+  } catch (e) {
+    CHAT_HISTORY.pop();
+    CHAT_HISTORY.push({ role: 'error', text: e.message === 'NO_API_KEY' ? 'Add your API key first (button below).' : 'Error: ' + e.message });
+  }
+  _renderChat();
+}
+
+/* ─── Tiny markdown + escape helpers ────────────────────────────────────── */
+
+function _escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function _renderMarkdown(text) {
+  let s = _escapeHtml(text);
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\n\n/g, '</p><p>');
+  s = s.replace(/\n/g, '<br>');
+  return '<p>' + s + '</p>';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   try {
     setupTheme();
@@ -3388,6 +3866,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupXfWeightBar();
     setupGreatestXI();
     setupSavedXIs();
+    setupKeyModal();
+    setupCompareTab();
+    setupWhyButtons();
+    setupChatWidget();
   } catch (e) {
     console.error('Setup crash:', e);
     document.title = 'SETUP ERROR: ' + e.message;
