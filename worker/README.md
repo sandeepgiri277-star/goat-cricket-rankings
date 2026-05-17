@@ -34,7 +34,25 @@ npx wrangler kv:namespace create RATE_LIMIT
 
 Copy the `id` from the output. Open `wrangler.toml`, uncomment the `[[kv_namespaces]]` block, and paste the id.
 
-### 4. Deploy
+### 4. (Optional) Wire the agentic Cricket Analyst
+
+This worker supports two routing surfaces:
+
+| Path | Purpose |
+|---|---|
+| `POST /` | Direct Anthropic proxy. Used by simple one-shot features (Why / Compare / chat). Works as soon as `ANTHROPIC_API_KEY` is set. |
+| `POST /agent/ask`, `/agent/ask/stream`, `/agent/ask/approve` | Proxies to the Modal-hosted Cricket Analyst (LangGraph agent). Used by the "Analyst" tab on the frontend. |
+
+To enable the agent path, deploy the agent first (see `agent/README.md`), then:
+
+```bash
+npx wrangler secret put AGENT_ENDPOINT
+# paste your modal URL, e.g. https://you--cricket-analyst-fastapi-app.modal.run
+```
+
+If you skip this, the direct Anthropic path still works; the agent endpoints just 500.
+
+### 5. Deploy
 
 ```bash
 npx wrangler deploy
@@ -42,7 +60,7 @@ npx wrangler deploy
 
 Wrangler will print a URL like `https://goat-cricket-ai.your-subdomain.workers.dev`. **Copy this URL.**
 
-### 5. Wire it into the frontend
+### 6. Wire it into the frontend
 
 Open `docs/llm.js` and set:
 

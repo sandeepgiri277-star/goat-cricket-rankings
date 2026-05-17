@@ -653,7 +653,7 @@ async function switchFormat(format) {
   if (isXf) {
     plTab.style.display = 'none';
     const curTab = document.querySelector('.tab.active')?.dataset.tab;
-    if (curTab === 'player-lookup' || curTab === 'greatest-xi' || curTab === 'saved-xis' || curTab === 'compare') {
+    if (curTab === 'player-lookup' || curTab === 'greatest-xi' || curTab === 'saved-xis' || curTab === 'compare' || curTab === 'analyst') {
       switchTab('batting', false);
     }
   } else {
@@ -756,7 +756,7 @@ async function restoreFromHash() {
       if (xiPart) decodeXiFromHash(xiPart);
       renderGreatestXI();
     } else {
-      const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'compare', 'greatest-xi', 'saved-xis', 'methodology'];
+      const validTabs = ['allrounders', 'batting', 'bowling', 'player-lookup', 'compare', 'greatest-xi', 'saved-xis', 'analyst', 'methodology'];
       if (validTabs.includes(rest)) {
         if (rest === 'player-lookup' && CURRENT_FORMAT === 'crossformat') {
           switchTab('batting', false);
@@ -2009,11 +2009,11 @@ function switchTab(tabId, updateHash = true) {
   document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
   document.getElementById(`panel-${tabId}`).classList.add('active');
 
-  const showBothDisciplines = tabId === 'saved-xis' || tabId === 'greatest-xi' || tabId === 'compare';
+  const showBothDisciplines = tabId === 'saved-xis' || tabId === 'greatest-xi' || tabId === 'compare' || tabId === 'analyst';
   const showBat = tabId !== 'bowling' || showBothDisciplines;
   const showBowl = tabId !== 'batting' || showBothDisciplines;
   const isAR = tabId === 'allrounders' || showBothDisciplines;
-  const hideTune = tabId === 'methodology';
+  const hideTune = tabId === 'methodology' || tabId === 'analyst';
   if (tabId === 'saved-xis') renderSavedXIs();
   if (tabId === 'compare') renderCompareBoard();
   document.querySelectorAll('.tune-bat-only').forEach(el => el.classList.toggle('hidden', !showBat));

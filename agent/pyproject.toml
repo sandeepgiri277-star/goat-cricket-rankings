@@ -1,0 +1,48 @@
+[project]
+name = "cricket-analyst"
+version = "0.1.0"
+description = "Agentic research analyst over the GOAT Cricket Rankings dataset"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=0.2.50",
+    "langchain-anthropic>=0.3.0",
+    "langchain-core>=0.3.0",
+    "pydantic>=2.9.0",
+    "anthropic>=0.40.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.9.0",
+    "typer>=0.15.0",
+    "rank-bm25>=0.2.2",
+    "numpy>=2.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sse-starlette>=2.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+    "ruff>=0.8.0",
+]
+trace = [
+    "langfuse>=2.50.0",
+]
+
+[project.scripts]
+analyst = "analyst.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/analyst", "src/api"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]

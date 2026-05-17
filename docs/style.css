@@ -1629,3 +1629,136 @@ footer {
   .ai-chat-fab-label { display: none; }
   .ai-chat-fab { padding: 0.75rem; }
 }
+
+/* ─── Cricket Analyst tab ───────────────────────────────────────────────── */
+
+.tab-analyst { position: relative; }
+.tab-badge-new {
+  display: inline-block; vertical-align: middle;
+  margin-left: 0.35rem; padding: 0.05rem 0.4rem;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em;
+  border-radius: 4px; background: var(--accent); color: #fff;
+}
+
+.analyst-hero { margin-bottom: 1.2rem; }
+.analyst-input-row {
+  display: flex; gap: 0.6rem; align-items: center;
+  flex-wrap: wrap; margin: 0.5rem 0 1rem;
+}
+#analyst-input {
+  flex: 1 1 320px; padding: 0.75rem 0.95rem;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03); color: var(--text);
+  font-family: inherit; font-size: 0.92rem;
+}
+#analyst-input:focus { border-color: var(--accent); outline: none; }
+.analyst-send {
+  padding: 0.75rem 1.2rem; border-radius: 8px;
+  background: var(--accent); color: #fff; border: none;
+  font-family: inherit; font-weight: 600; cursor: pointer;
+}
+.analyst-send:hover { opacity: 0.9; }
+.analyst-approval-toggle {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.82rem; color: var(--text-muted); cursor: pointer;
+  user-select: none;
+}
+
+.analyst-suggestions {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.2rem;
+}
+.analyst-chip {
+  padding: 0.45rem 0.8rem; border-radius: 16px;
+  background: rgba(99,110,250,0.08); border: 1px solid rgba(99,110,250,0.25);
+  color: var(--text); font-size: 0.8rem; font-family: inherit;
+  cursor: pointer;
+}
+.analyst-chip:hover { background: rgba(99,110,250,0.16); }
+
+.analyst-stream {
+  display: flex; flex-direction: column; gap: 0.9rem;
+}
+.analyst-event {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.9rem 1rem;
+  animation: analystfadein 0.25s ease-out;
+}
+@keyframes analystfadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.analyst-event-title {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.analyst-plan { border-left: 3px solid #3498db; }
+.plan-row { font-size: 0.86rem; margin: 0.3rem 0; }
+.plan-label { color: var(--text-muted); font-weight: 600; margin-right: 0.4rem; }
+.plan-tasks ol { margin: 0.3rem 0 0 1.4rem; padding: 0; }
+.plan-tasks li { margin: 0.2rem 0; font-size: 0.86rem; }
+
+.analyst-approval {
+  display: flex; gap: 0.5rem; margin-top: 0.8rem;
+  padding-top: 0.7rem; border-top: 1px solid var(--border);
+}
+.analyst-approve-btn {
+  padding: 0.55rem 1rem; border-radius: 7px;
+  background: #27ae60; color: #fff; border: none;
+  font-family: inherit; font-weight: 600; cursor: pointer;
+}
+.analyst-cancel-btn {
+  padding: 0.55rem 1rem; border-radius: 7px;
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border);
+  font-family: inherit; cursor: pointer;
+}
+
+.analyst-tools { border-left: 3px solid #9b59b6; }
+.tool-row {
+  font-family: 'SF Mono', Menlo, monospace; font-size: 0.78rem;
+  padding: 0.4rem 0; border-bottom: 1px dashed var(--border);
+}
+.tool-row:last-child { border-bottom: none; }
+.tool-name { color: var(--accent); font-weight: 700; }
+.tool-args { color: var(--text-muted); }
+.tool-result {
+  margin-top: 0.25rem; padding: 0.3rem 0.5rem;
+  background: rgba(0,0,0,0.15); border-radius: 4px;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 7em; overflow-y: auto;
+}
+
+.analyst-draft { border-left: 3px solid #f39c12; opacity: 0.85; }
+.draft-summary { margin: 0 0 0.5rem; font-size: 0.9rem; }
+.draft-points { margin: 0; padding-left: 1.3rem; font-size: 0.85rem; }
+
+.analyst-critique { border-left: 3px solid #e67e22; }
+.critique-status { margin-bottom: 0.4rem; font-size: 0.85rem; }
+.critique-pass { color: #27ae60; font-weight: 700; }
+.critique-fail { color: #e67e22; font-weight: 700; }
+.critique-issues { margin: 0.3rem 0 0 1.2rem; font-size: 0.82rem; color: var(--text-muted); }
+
+.analyst-final { border-left: 3px solid #27ae60; padding: 1.1rem 1.2rem; }
+.final-summary { margin: 0 0 0.6rem; font-size: 1.02rem; font-weight: 600; line-height: 1.45; }
+.final-points { margin: 0; padding-left: 1.3rem; font-size: 0.9rem; }
+.final-points li { margin: 0.25rem 0; }
+.final-cited {
+  margin-top: 0.7rem; padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem; color: var(--text-muted);
+}
+
+.analyst-trace { text-align: right; }
+.analyst-trace a {
+  color: var(--accent); font-size: 0.82rem; text-decoration: none;
+}
+.analyst-trace a:hover { text-decoration: underline; }
+
+.analyst-error {
+  color: #e74c3c; font-size: 0.86rem;
+  padding: 0.8rem 1rem; background: rgba(231,76,60,0.08);
+  border-left: 3px solid #e74c3c; border-radius: 6px;
+  margin-top: 1rem;
+}

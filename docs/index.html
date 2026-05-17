@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GOAT Cricket Rankings</title>
-  <link rel="stylesheet" href="style.css?v=15">
+  <link rel="stylesheet" href="style.css?v=16">
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8" async></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -38,6 +38,7 @@
     <button class="tab" data-tab="compare">Compare</button>
     <button class="tab" data-tab="greatest-xi">Greatest XI</button>
     <button class="tab" data-tab="saved-xis">Saved XIs</button>
+    <button class="tab tab-analyst" data-tab="analyst">Analyst <span class="tab-badge-new">AI</span></button>
     <button class="tab" data-tab="methodology">Methodology</button>
   </nav>
 
@@ -434,6 +435,72 @@
       </div>
     </section>
 
+    <!-- Analyst Tab (agentic) -->
+    <section class="tab-panel" id="panel-analyst">
+      <div class="analyst-hero">
+        <h2 id="heading-analyst">Cricket Analyst</h2>
+        <p class="panel-desc">
+          Ask anything. The Analyst plans, calls tools against the rankings dataset, drafts an answer,
+          critiques itself, and revises if grounding is weak. You can approve the plan before it executes
+          and inspect the full trace afterwards.
+        </p>
+      </div>
+
+      <div class="analyst-input-row">
+        <input type="text" id="analyst-input" autocomplete="off"
+               placeholder="e.g. Build a 1990s Test XI of fast bowlers' nightmares">
+        <label class="analyst-approval-toggle">
+          <input type="checkbox" id="analyst-require-approval">
+          <span>Approve plan first</span>
+        </label>
+        <button class="analyst-send" id="analyst-send">Ask</button>
+      </div>
+
+      <div class="analyst-suggestions" id="analyst-suggestions">
+        <button class="analyst-chip">Build me the best Test XI of all-time</button>
+        <button class="analyst-chip">Who's elite if I don't care about longevity?</button>
+        <button class="analyst-chip">Compare Imran Khan and Kapil Dev's career arcs</button>
+        <button class="analyst-chip">Who's the best Indian fast bowler in Tests?</button>
+      </div>
+
+      <div class="analyst-stream hidden" id="analyst-stream">
+        <div class="analyst-event analyst-plan hidden" id="analyst-plan">
+          <div class="analyst-event-title">Plan</div>
+          <div class="analyst-plan-body" id="analyst-plan-body"></div>
+          <div class="analyst-approval hidden" id="analyst-approval">
+            <button class="analyst-approve-btn" id="analyst-approve-btn">Approve plan</button>
+            <button class="analyst-cancel-btn" id="analyst-cancel-btn">Cancel</button>
+          </div>
+        </div>
+
+        <div class="analyst-event analyst-tools hidden" id="analyst-tools">
+          <div class="analyst-event-title">Tool calls</div>
+          <div class="analyst-tools-body" id="analyst-tools-body"></div>
+        </div>
+
+        <div class="analyst-event analyst-draft hidden" id="analyst-draft">
+          <div class="analyst-event-title">Draft</div>
+          <div class="analyst-draft-body" id="analyst-draft-body"></div>
+        </div>
+
+        <div class="analyst-event analyst-critique hidden" id="analyst-critique">
+          <div class="analyst-event-title">Critic feedback</div>
+          <div class="analyst-critique-body" id="analyst-critique-body"></div>
+        </div>
+
+        <div class="analyst-event analyst-final hidden" id="analyst-final">
+          <div class="analyst-event-title">Verdict</div>
+          <div class="analyst-final-body" id="analyst-final-body"></div>
+        </div>
+
+        <div class="analyst-trace hidden" id="analyst-trace">
+          <a id="analyst-trace-link" target="_blank" rel="noopener">View full trace in LangFuse →</a>
+        </div>
+      </div>
+
+      <div class="analyst-error hidden" id="analyst-error"></div>
+    </section>
+
     <!-- Methodology Tab -->
     <section class="tab-panel" id="panel-methodology">
       <div class="methodology" id="methodology-content"></div>
@@ -475,6 +542,7 @@
     };
   </script>
   <script src="llm.js?v=2"></script>
-  <script src="app.js?v=28"></script>
+  <script src="analyst.js?v=1"></script>
+  <script src="app.js?v=29"></script>
 </body>
 </html>
